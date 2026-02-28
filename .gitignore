@@ -1,0 +1,82 @@
+# ========================
+# Next.js / TypeScript
+# ========================
+node_modules/
+.next/
+out/
+dist/
+build/
+.turbo/
+
+# Next.js env files
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Package manager locks (keep only one — remove lines for managers you don't use)
+# yarn.lock
+# pnpm-lock.yaml
+package-lock.json
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# ========================
+# Python
+# ========================
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+.env/
+
+# Distribution / packaging
+*.egg-info/
+dist/
+build/
+.eggs/
+*.whl
+*.egg
+
+# Pytest
+.pytest_cache/
+.coverage
+htmlcov/
+*.cover
+
+# MyPy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Ruff / linters
+.ruff_cache/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# ========================
+# Editor / OS
+# ========================
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
