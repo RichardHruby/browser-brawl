@@ -1,4 +1,9 @@
 import WebSocket from 'ws';
+import { log, logError } from './log';
+
+// Cache resolved page target WS URL per CDP endpoint
+const wsUrlCache = new Map<string, { url: string; resolvedAt: number }>();
+const WS_URL_CACHE_TTL = 60_000; // 60s
 
 /**
  * Inject JavaScript into a browser session via CDP Runtime.evaluate.
@@ -8,34 +13,43 @@ import WebSocket from 'ws';
  */
 export async function injectJS(cdpUrl: string, script: string): Promise<boolean> {
   if (!cdpUrl) {
-    console.error('[injectJS] No CDP URL provided');
+    logError('[injectJS] No CDP URL provided');
     return false;
   }
 
-  console.log('[injectJS] cdpUrl received:', cdpUrl);
+  const t0 = Date.now();
 
   try {
-    const wsUrl = await getPageTargetWsUrl(cdpUrl);
-    if (!wsUrl) {
-      console.error('[injectJS] No page target found');
+    const result = await runWithPageTargetRetry(
+      cdpUrl,
+      'injectJS',
+      (wsUrl) => evaluateViaCDP(wsUrl, script),
+      (value) => value === false,
+    );
+    if (result == null) {
+      logError('[injectJS] No page target found');
       return false;
     }
-    return await evaluateViaCDP(wsUrl, script);
+    log(`[injectJS] done in ${Date.now() - t0}ms (success=${result})`);
+    return result;
   } catch (err) {
-    console.error('[injectJS] error:', err);
+    logError(`[injectJS] error after ${Date.now() - t0}ms:`, err);
     return false;
   }
 }
 
 function evaluateViaCDP(wsUrl: string, expression: string): Promise<boolean> {
   return new Promise((resolve) => {
+    const t0 = Date.now();
     const ws = new WebSocket(wsUrl);
     const timeout = setTimeout(() => {
+      log(`[evaluateViaCDP] TIMEOUT after ${Date.now() - t0}ms`);
       ws.close();
       resolve(false);
     }, 5000);
 
     ws.on('open', () => {
+      log(`[evaluateViaCDP] WS open in ${Date.now() - t0}ms`);
       ws.send(JSON.stringify({
         id: 1,
         method: 'Runtime.evaluate',
@@ -49,6 +63,7 @@ function evaluateViaCDP(wsUrl: string, expression: string): Promise<boolean> {
         if (msg.id === 1) {
           clearTimeout(timeout);
           ws.close();
+          log(`[evaluateViaCDP] response in ${Date.now() - t0}ms`);
           resolve(!msg.error);
         }
       } catch {
@@ -65,13 +80,16 @@ function evaluateViaCDP(wsUrl: string, expression: string): Promise<boolean> {
 
 function evaluateAndReturnViaCDP(wsUrl: string, expression: string): Promise<string | null> {
   return new Promise((resolve) => {
+    const t0 = Date.now();
     const ws = new WebSocket(wsUrl);
     const timeout = setTimeout(() => {
+      log(`[evaluateAndReturnViaCDP] TIMEOUT after ${Date.now() - t0}ms`);
       ws.close();
       resolve(null);
     }, 8000);
 
     ws.on('open', () => {
+      log(`[evaluateAndReturnViaCDP] WS open in ${Date.now() - t0}ms`);
       ws.send(JSON.stringify({
         id: 1,
         method: 'Runtime.evaluate',
@@ -85,6 +103,7 @@ function evaluateAndReturnViaCDP(wsUrl: string, expression: string): Promise<str
         if (msg.id === 1) {
           clearTimeout(timeout);
           ws.close();
+          log(`[evaluateAndReturnViaCDP] response in ${Date.now() - t0}ms`);
           if (msg.error || !msg.result?.result?.value) {
             resolve(null);
           } else {
@@ -109,27 +128,35 @@ function evaluateAndReturnViaCDP(wsUrl: string, expression: string): Promise<str
  */
 export async function captureScreenshot(cdpUrl: string): Promise<Buffer | null> {
   if (!cdpUrl) return null;
+  const t0 = Date.now();
 
   try {
-    const wsUrl = await getPageTargetWsUrl(cdpUrl);
-    if (!wsUrl) return null;
-
-    return await screenshotViaCDP(wsUrl);
+    const result = await runWithPageTargetRetry(
+      cdpUrl,
+      'captureScreenshot',
+      screenshotViaCDP,
+      (value) => value == null,
+    );
+    log(`[captureScreenshot] done in ${Date.now() - t0}ms (${result ? `${result.length} bytes` : 'null'})`);
+    return result;
   } catch (err) {
-    console.error('[captureScreenshot] error:', err);
+    logError(`[captureScreenshot] error after ${Date.now() - t0}ms:`, err);
     return null;
   }
 }
 
 function screenshotViaCDP(wsUrl: string): Promise<Buffer | null> {
   return new Promise((resolve) => {
+    const t0 = Date.now();
     const ws = new WebSocket(wsUrl);
     const timeout = setTimeout(() => {
+      log(`[screenshotViaCDP] TIMEOUT after ${Date.now() - t0}ms`);
       ws.close();
       resolve(null);
     }, 8000);
 
     ws.on('open', () => {
+      log(`[screenshotViaCDP] WS open in ${Date.now() - t0}ms`);
       ws.send(JSON.stringify({
         id: 1,
         method: 'Page.captureScreenshot',
@@ -143,6 +170,7 @@ function screenshotViaCDP(wsUrl: string): Promise<Buffer | null> {
         if (msg.id === 1) {
           clearTimeout(timeout);
           ws.close();
+          log(`[screenshotViaCDP] response in ${Date.now() - t0}ms`);
           if (msg.error || !msg.result?.data) {
             resolve(null);
           } else {
@@ -163,8 +191,18 @@ function screenshotViaCDP(wsUrl: string): Promise<Buffer | null> {
 
 /**
  * Resolve the WebSocket debugger URL for the first page target.
+ * Caches the result per CDP endpoint for 60s.
  */
 async function getPageTargetWsUrl(cdpUrl: string): Promise<string | null> {
+  const t0 = Date.now();
+
+  // Check cache first
+  const cached = wsUrlCache.get(cdpUrl);
+  if (cached && Date.now() - cached.resolvedAt < WS_URL_CACHE_TTL) {
+    log(`[getPageTargetWsUrl] cache HIT (${Date.now() - t0}ms)`);
+    return cached.url;
+  }
+
   const httpBase = cdpUrl
     .replace('wss://', 'https://')
     .replace('ws://', 'http://');
@@ -172,11 +210,46 @@ async function getPageTargetWsUrl(cdpUrl: string): Promise<string | null> {
   const targetsUrl = `${baseUrl.protocol}//${baseUrl.host}/json`;
 
   const targetsRes = await fetch(targetsUrl);
-  if (!targetsRes.ok) return null;
+  if (!targetsRes.ok) {
+    log(`[getPageTargetWsUrl] fetch FAILED (${targetsRes.status}) in ${Date.now() - t0}ms`);
+    return null;
+  }
 
   const targets = await targetsRes.json();
   const page = targets.find((t: { type: string; webSocketDebuggerUrl?: string }) => t.type === 'page');
-  return page?.webSocketDebuggerUrl ?? null;
+  const wsUrl = page?.webSocketDebuggerUrl ?? null;
+
+  if (wsUrl) {
+    wsUrlCache.set(cdpUrl, { url: wsUrl, resolvedAt: Date.now() });
+  }
+
+  log(`[getPageTargetWsUrl] resolved in ${Date.now() - t0}ms (cached=${!!wsUrl})`);
+  return wsUrl;
+}
+
+async function runWithPageTargetRetry<T>(
+  cdpUrl: string,
+  opName: string,
+  operation: (wsUrl: string) => Promise<T>,
+  isFailure: (result: T) => boolean,
+): Promise<T | null> {
+  let wsUrl = await getPageTargetWsUrl(cdpUrl);
+  if (!wsUrl) return null;
+
+  let result = await operation(wsUrl);
+  if (!isFailure(result)) return result;
+
+  if (!wsUrlCache.has(cdpUrl)) return result;
+
+  // Page targets can rotate; invalidate stale cache entry and retry once.
+  wsUrlCache.delete(cdpUrl);
+  log(`[${opName}] retrying with refreshed page target URL`);
+
+  wsUrl = await getPageTargetWsUrl(cdpUrl);
+  if (!wsUrl) return result;
+
+  result = await operation(wsUrl);
+  return result;
 }
 
 /**
@@ -231,7 +304,7 @@ export async function startNetworkCapture(
       ws.close();
     };
   } catch (err) {
-    console.error('[startNetworkCapture] error:', err);
+    logError('[startNetworkCapture] error:', err);
     return null;
   }
 }
@@ -243,11 +316,9 @@ export async function startNetworkCapture(
  */
 export async function snapshotDOM(cdpUrl: string): Promise<string | null> {
   if (!cdpUrl) return null;
+  const t0 = Date.now();
 
   try {
-    const wsUrl = await getPageTargetWsUrl(cdpUrl);
-    if (!wsUrl) return null;
-
     const expression = `
       (function() {
         var els = document.querySelectorAll(
@@ -276,9 +347,16 @@ export async function snapshotDOM(cdpUrl: string): Promise<string | null> {
       })()
     `;
 
-    return await evaluateAndReturnViaCDP(wsUrl, expression);
+    const result = await runWithPageTargetRetry(
+      cdpUrl,
+      'snapshotDOM',
+      (wsUrl) => evaluateAndReturnViaCDP(wsUrl, expression),
+      (value) => value == null,
+    );
+    log(`[snapshotDOM] done in ${Date.now() - t0}ms (${result ? `${result.length} chars` : 'null'})`);
+    return result;
   } catch (err) {
-    console.error('[snapshotDOM] error:', err);
+    logError(`[snapshotDOM] error after ${Date.now() - t0}ms:`, err);
     return null;
   }
 }

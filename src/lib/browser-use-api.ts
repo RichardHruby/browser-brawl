@@ -1,5 +1,6 @@
 import { BrowserUse } from 'browser-use-sdk';
 import { getBrowserUseApiKey } from './env';
+import { log } from './log';
 
 let buClient: BrowserUse | null = null;
 
@@ -50,7 +51,7 @@ export async function createAgentSession(): Promise<BUSession> {
   const session = await getBuClient().sessions.create({ keepAlive: true });
   const { liveUrl, cdpUrl } = await waitForSessionUrls(session.id, session.liveUrl ?? '');
 
-  console.log('[createAgentSession] id:', session.id, 'liveUrl:', liveUrl, 'cdpUrl:', cdpUrl || '(EMPTY)');
+  log('[createAgentSession] id:', session.id, 'liveUrl:', liveUrl, 'cdpUrl:', cdpUrl || '(EMPTY)');
   return {
     id: session.id,
     cdpUrl,
@@ -89,7 +90,7 @@ function extractCdpFromLiveUrl(liveUrl: string): string {
     const url = new URL(liveUrl);
     const wss = url.searchParams.get('wss');
     if (wss) {
-      console.log('[extractCdpFromLiveUrl] extracted wss param:', wss);
+      log('[extractCdpFromLiveUrl] extracted wss param:', wss);
       return wss;
     }
   } catch {

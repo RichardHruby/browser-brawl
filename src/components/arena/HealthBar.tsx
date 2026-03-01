@@ -8,7 +8,7 @@ interface Props {
 }
 
 export function HealthBar({ health, variant = 'arena' }: Props) {
-  const { shaking, color, isCritical } = useHealthBar(health);
+  const { shaking, color, isCritical, ghostHealth } = useHealthBar(health);
   const isStatic = variant === 'static';
 
   if (isStatic) {
@@ -56,15 +56,28 @@ export function HealthBar({ health, variant = 'arena' }: Props) {
           />
         ))}
 
-        {/* Bar fill */}
+        {/* Damage ghost bar — sits behind, shows lost HP in red before draining */}
+        {ghostHealth > health && (
+          <div
+            className="absolute top-0 left-0 h-full"
+            style={{
+              width: `${Math.max(0, ghostHealth)}%`,
+              background: 'var(--color-health-low)',
+              opacity: 0.7,
+              transition: 'width 600ms ease',
+            }}
+          />
+        )}
+
+        {/* Main bar fill */}
         <div
-          className={isCritical ? 'animate-health-flicker' : ''}
+          className={`relative z-[1] ${isCritical ? 'animate-health-flicker' : ''}`}
           style={{
             width: `${Math.max(0, health)}%`,
             height: '100%',
             background: `linear-gradient(90deg, ${color}cc, ${color})`,
             boxShadow: `0 0 8px ${color}88`,
-            transition: 'width 600ms ease, background 600ms ease',
+            transition: 'width 150ms ease, background 600ms ease',
           }}
         />
       </div>

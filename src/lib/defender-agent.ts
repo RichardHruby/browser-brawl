@@ -2,14 +2,15 @@ import Anthropic from '@anthropic-ai/sdk';
 import { observe, Laminar } from '@lmnr-ai/lmnr';
 import { getSession, createGate, type ServerGameSession } from './game-session-store';
 import { getDisruptionsForDifficulty, getDisruptionById } from './disruptions';
-import { injectJS, snapshotDOM } from './browserbase';
+import { injectJS, snapshotDOM } from './cdp';
 import { emitEvent } from './sse-emitter';
 import { nanoid } from 'nanoid';
 import { getAnthropicApiKey } from './env';
 import { recordDefenderAction, finalizeGame, recordHealthChange, captureAndUploadScreenshot, setSessionRecording } from './data-collector';
 import { stopScreencast } from './screencast';
+import { log, logError, logWarn } from './log';
 import type { DisruptionEvent } from '@/types/game';
-import type { DefenderDisruptionPayload, HealthUpdatePayload, TurnChangePayload } from '@/types/events';
+import type { DefenderActivityPayload, DefenderDisruptionPayload, HealthUpdatePayload, StatusUpdatePayload } from '@/types/events';
 
 const client = new Anthropic({ apiKey: getAnthropicApiKey() });
 
@@ -31,14 +32,14 @@ export function startDefenderLoop(gameId: string): void {
   const session = getSession(gameId);
   if (!session) return;
 
-  console.log('[defender] starting loop for game:', gameId);
-  console.log('[defender] cdpUrl:', session.cdpUrl || '(EMPTY)');
-  console.log('[defender] difficulty:', session.difficulty);
+  log('[defender] starting loop for game:', gameId);
+  log('[defender] cdpUrl:', session.cdpUrl || '(EMPTY)');
+  log('[defender] difficulty:', session.difficulty);
 
   if (session.mode === 'turnbased') {
     // Turn-based: no timers, no health decay — defender waits for signal from attacker
     runTurnBasedDefenderLoop(gameId).catch(err => {
-      console.error('[defender] turn-based loop error:', err);
+      logError('[defender] turn-based loop error:', err);
     });
     return;
   }
@@ -48,7 +49,16 @@ export function startDefenderLoop(gameId: string): void {
     tickHealthDecay(gameId);
   }, 1000);
 
-  scheduleNextAttack(gameId);
+  // Finetuned: wait for attacker's first real tool step before firing disruptions
+  if (session.finetunedReadyGate) {
+    session.finetunedReadyGate.promise.then(() => {
+      if (getSession(gameId)?.phase === 'arena') {
+        scheduleNextAttack(gameId);
+      }
+    });
+  } else {
+    scheduleNextAttack(gameId);
+  }
 }
 
 function scheduleNextAttack(gameId: string): void {
@@ -167,10 +177,10 @@ Respond with JSON only, no markdown: {"disruptionId":"<id>","reasoning":"<1 sent
     const text = response.content[0].type === 'text' ? response.content[0].text.trim() : '';
     const clean = text.replace(/^```[a-z]*\n?/, '').replace(/\n?```$/, '').trim();
     const result = JSON.parse(clean);
-    console.log(`[defender] Picked: ${result.disruptionId} — ${result.reasoning}`);
+    log(`[defender] Picked: ${result.disruptionId} — ${result.reasoning}`);
     return result;
   } catch (err) {
-    console.error('[defender] LLM pick error, using fallback:', err);
+    logError('[defender] LLM pick error, using fallback:', err);
     return { disruptionId: ready[0].id, reasoning: 'Fallback selection.' };
   }
 }
@@ -183,13 +193,13 @@ async function generateCustomInjection(
   session: ServerGameSession,
   reasoning: string
 ): Promise<string> {
-  console.log('[defender] Generating custom injection — fetching DOM snapshot...');
+  log('[defender] Generating custom injection — fetching DOM snapshot...');
   const domSnapshot = await snapshotDOM(session.cdpUrl);
   if (!domSnapshot) {
-    console.warn('[defender] snapshotDOM returned null, cannot generate custom injection');
+    logWarn('[defender] snapshotDOM returned null, cannot generate custom injection');
     return '';
   }
-  console.log(`[defender] DOM snapshot: ${domSnapshot.length} chars, generating JS...`);
+  log(`[defender] DOM snapshot: ${domSnapshot.length} chars, generating JS...`);
 
   const recentSteps = session.attackerSteps
     .slice(-5)
@@ -263,10 +273,10 @@ Rules:
       .trim();
 
     if (!code) return '';
-    console.log(`[defender] Custom JS generated (${code.length} chars): ${code.slice(0, 150)}...`);
+    log(`[defender] Custom JS generated (${code.length} chars): ${code.slice(0, 150)}...`);
     return wrapCustomInjection(code);
   } catch (err) {
-    console.error('[defender] Custom injection generation failed:', err);
+    logError('[defender] Custom injection generation failed:', err);
     return '';
   }
 }
@@ -285,11 +295,17 @@ async function runDefenderTurn(gameId: string): Promise<void> {
       tags: ['defender', `turn-${turnNum}`],
     },
     async () => {
+  const intervalMs = DIFFICULTY_INTERVAL[session.difficulty] ?? 15000;
+
   emitEvent(gameId, 'status_update', {
     attackerStatus: session.attackerStatus,
     defenderStatus: 'plotting',
   });
   session.defenderStatus = 'plotting';
+  emitEvent<DefenderActivityPayload>(gameId, 'defender_activity', {
+    message: 'Analyzing attacker behavior...',
+    kind: 'thinking',
+  });
 
   const availableDisruptions = getDisruptionsForDifficulty(session.difficulty);
 
@@ -310,13 +326,32 @@ async function runDefenderTurn(gameId: string): Promise<void> {
     });
   }
 
-  if (ready.length === 0) return;
+  if (ready.length === 0) {
+    emitEvent<DefenderActivityPayload>(gameId, 'defender_activity', {
+      message: 'All disruptions cooling down...',
+      kind: 'thinking',
+    });
+    session.defenderStatus = 'cooling_down';
+    emitEvent<StatusUpdatePayload>(gameId, 'status_update', {
+      attackerStatus: session.attackerStatus,
+      defenderStatus: 'cooling_down',
+      ...(session.mode === 'realtime' ? { nextAttackIn: Math.round(intervalMs / 1000) } : {}),
+    });
+    return;
+  }
 
   const chosen = await pickDisruption(session, ready);
   if (!chosen) return;
 
-  const disruption = getDisruptionById(chosen.disruptionId) ?? ready[0];
+  let disruption = getDisruptionById(chosen.disruptionId) ?? ready[0];
   if (!disruption) return;
+  let reasoning = chosen.reasoning;
+
+  // Emit the LLM's reasoning as a thinking step
+  emitEvent<DefenderActivityPayload>(gameId, 'defender_activity', {
+    message: chosen.reasoning,
+    kind: 'thinking',
+  });
 
   session.defenderStatus = 'striking';
   emitEvent(gameId, 'status_update', {
@@ -327,30 +362,54 @@ async function runDefenderTurn(gameId: string): Promise<void> {
   // Generate payload — custom injection gets a second LLM call
   let payload: string;
   if (disruption.id === 'custom-injection') {
+    emitEvent<DefenderActivityPayload>(gameId, 'defender_activity', {
+      message: 'Generating targeted JavaScript...',
+      kind: 'tool_call',
+    });
     payload = await generateCustomInjection(session, chosen.reasoning);
     if (!payload) {
       // Fallback to first non-custom disruption
       const fallback = ready.find(d => d.id !== 'custom-injection');
       if (!fallback) return;
+      disruption = fallback;
+      reasoning = `Fallback: ${fallback.name}`;
       payload = fallback.generatePayload();
-      console.log('[defender] Custom injection failed, falling back to:', fallback.name);
+      log('[defender] Custom injection failed, falling back to:', fallback.name);
     }
   } else {
     payload = disruption.generatePayload();
   }
 
-  // Screenshot before injection
-  const beforeScreenshotId = await captureAndUploadScreenshot(session.cdpUrl).catch(() => null);
-  const domSnap = await snapshotDOM(session.cdpUrl).catch(() => null);
+  // Fire screenshots in background (fire-and-forget — only for training data, never block game loop)
+  captureAndUploadScreenshot(session.cdpUrl).catch(() => null);
+  const domSnapPromise = snapshotDOM(session.cdpUrl).catch(() => null);
 
-  console.log('[defender] injecting disruption:', disruption.name, 'via cdpUrl:', session.cdpUrl || '(EMPTY)');
+  emitEvent<DefenderActivityPayload>(gameId, 'defender_activity', {
+    message: `Injecting ${disruption.name}...`,
+    kind: 'tool_call',
+  });
+
+  // Inject immediately — this is the critical path
+  log('[defender] injecting disruption:', disruption.name, 'via cdpUrl:', session.cdpUrl || '(EMPTY)');
   const success = await injectJS(session.cdpUrl, payload);
-  console.log('[defender] injection result:', success ? 'SUCCESS' : 'FAILED');
+  log('[defender] injection result:', success ? 'SUCCESS' : 'FAILED');
 
-  // Screenshot after injection (brief delay to let DOM changes render)
-  const afterScreenshotId = success
-    ? await new Promise<string | null>(r => setTimeout(() => captureAndUploadScreenshot(session.cdpUrl).then(r).catch(() => r(null)), 500))
-    : null;
+  if (!success) {
+    emitEvent<DefenderActivityPayload>(gameId, 'defender_activity', {
+      message: 'Injection blocked by browser',
+      kind: 'tool_call',
+    });
+  }
+
+  // Collect DOM snapshot (fast, ~500ms — likely done by now)
+  const domSnap = await domSnapPromise;
+  const beforeScreenshotId = null;
+
+  // Fire after-screenshot in background (don't block the turn)
+  if (success) {
+    setTimeout(() => captureAndUploadScreenshot(session.cdpUrl).catch(() => null), 500);
+  }
+  const afterScreenshotId = null;
 
   session.defenderCooldowns.set(disruption.id, session.mode === 'turnbased' ? session.turnNumber : Date.now());
 
@@ -362,7 +421,7 @@ async function runDefenderTurn(gameId: string): Promise<void> {
     healthDamage: disruption.healthDamage,
     success,
     timestamp: new Date().toISOString(),
-    reasoning: chosen.reasoning,
+    reasoning,
   };
   session.defenderDisruptions.push(event);
 
@@ -375,7 +434,7 @@ async function runDefenderTurn(gameId: string): Promise<void> {
     description: disruption.description,
     healthDamage: disruption.healthDamage,
     success,
-    reasoning: chosen.reasoning,
+    reasoning,
     timestamp: event.timestamp,
     injectionPayload: payload.slice(0, 5000),
     attackerStepAtTime: session.attackerSteps.length,
@@ -384,20 +443,21 @@ async function runDefenderTurn(gameId: string): Promise<void> {
     screenshotAfterId: afterScreenshotId ?? undefined,
   });
 
-  // Damage health
+  // Always emit disruption card (success or failure)
+  emitEvent<DefenderDisruptionPayload>(gameId, 'defender_disruption', {
+    disruptionId: disruption.id,
+    disruptionName: disruption.name,
+    description: disruption.description,
+    healthDamage: disruption.healthDamage,
+    success,
+    reasoning,
+  });
+
+  // Damage health only on successful injection
   if (success) {
     const prev = session.health;
     const next = Math.max(0, prev - disruption.healthDamage);
     session.health = next;
-
-    emitEvent<DefenderDisruptionPayload>(gameId, 'defender_disruption', {
-      disruptionId: disruption.id,
-      disruptionName: disruption.name,
-      description: disruption.description,
-      healthDamage: disruption.healthDamage,
-      success,
-      reasoning: chosen.reasoning,
-    });
 
     emitEvent<HealthUpdatePayload>(gameId, 'health_update', {
       currentHealth: next,
@@ -421,9 +481,10 @@ async function runDefenderTurn(gameId: string): Promise<void> {
   }
 
   session.defenderStatus = 'cooling_down';
-  emitEvent(gameId, 'status_update', {
+  emitEvent<StatusUpdatePayload>(gameId, 'status_update', {
     attackerStatus: session.attackerStatus,
     defenderStatus: 'cooling_down',
+    ...(session.mode === 'realtime' ? { nextAttackIn: Math.round(intervalMs / 1000) } : {}),
   });
     },
   ); // end observe()

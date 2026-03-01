@@ -3,8 +3,9 @@ import { getSession } from './game-session-store';
 import { emitEvent } from './sse-emitter';
 import { endGame } from './defender-agent';
 import { captureAndUploadScreenshot } from './data-collector';
-import { snapshotDOM } from './browserbase';
+import { snapshotDOM } from './cdp';
 import { AttackerStepLogger } from './attacker-step-logger';
+import { log } from './log';
 
 const MAX_STEPS = 50;
 
@@ -20,22 +21,30 @@ async function discoverWsUrl(cdpHttpUrl: string): Promise<string> {
   const base = new URL(httpBase);
 
   // Try /json/version first (browser-level WebSocket URL)
-  const versionRes = await fetch(`${base.protocol}//${base.host}/json/version`);
-  if (versionRes.ok) {
-    const info = await versionRes.json();
-    if (info.webSocketDebuggerUrl) {
-      return info.webSocketDebuggerUrl as string;
+  try {
+    const versionRes = await fetch(`${base.protocol}//${base.host}/json/version`);
+    if (versionRes.ok) {
+      const info = await versionRes.json();
+      if (info.webSocketDebuggerUrl) {
+        return info.webSocketDebuggerUrl as string;
+      }
     }
+  } catch {
+    // fall through to next attempt
   }
 
   // Fallback: try /json to find a page target's debugger URL
-  const targetsRes = await fetch(`${base.protocol}//${base.host}/json`);
-  if (targetsRes.ok) {
-    const targets = await targetsRes.json();
-    const page = targets.find((t: { type: string; webSocketDebuggerUrl?: string }) => t.type === 'page');
-    if (page?.webSocketDebuggerUrl) {
-      return page.webSocketDebuggerUrl as string;
+  try {
+    const targetsRes = await fetch(`${base.protocol}//${base.host}/json`);
+    if (targetsRes.ok) {
+      const targets = await targetsRes.json();
+      const page = targets.find((t: { type: string; webSocketDebuggerUrl?: string }) => t.type === 'page');
+      if (page?.webSocketDebuggerUrl) {
+        return page.webSocketDebuggerUrl as string;
+      }
     }
+  } catch {
+    // fall through
   }
 
   throw new Error(`Could not discover WebSocket debugger URL from ${cdpHttpUrl}`);
@@ -53,7 +62,7 @@ export async function runAttackerLoop(gameId: string, signal: AbortSignal): Prom
   if (!session) return;
 
   const wsUrl = await discoverWsUrl(session.cdpUrl);
-  console.log('[stagehand] discovered WebSocket URL:', wsUrl);
+  log('[stagehand] discovered WebSocket URL:', wsUrl);
 
   const stagehand = new Stagehand({
     env: 'LOCAL',
@@ -65,14 +74,18 @@ export async function runAttackerLoop(gameId: string, signal: AbortSignal): Prom
     experimental: true,
   });
 
-  await stagehand.init();
+  // Track whether we initiated close so we can distinguish abort errors
+  let closingForAbort = false;
 
   const onAbort = () => {
+    closingForAbort = true;
     stagehand.close().catch(() => {});
   };
   signal.addEventListener('abort', onAbort, { once: true });
 
   try {
+    await stagehand.init();
+
     const s = getSession(gameId);
     if (!s || s.phase !== 'arena') return;
 
@@ -162,9 +175,14 @@ Be persistent and methodical.`,
     });
 
     // Consume the text stream (drives the streaming pipeline to completion)
-    for await (const _chunk of streamResult.textStream) {
-      // Consumed to keep the stream flowing
+    // Check abort signal each iteration so we stop promptly on game end
+    for await (const chunk of streamResult.textStream) {
+      if (signal.aborted) break;
+      void chunk;
     }
+
+    // If aborted (game ended externally), skip result processing
+    if (signal.aborted) return;
 
     const result = await streamResult.result;
 
@@ -183,12 +201,20 @@ Be persistent and methodical.`,
         defenderStatus: s2.defenderStatus,
       });
     }
+  } catch (err) {
+    // Stagehand throws when close() is called during execution (abort/game-end).
+    // This is expected — don't propagate it as an attacker failure.
+    if (closingForAbort || signal.aborted) {
+      log('[stagehand] agent stopped (game ended)');
+      return;
+    }
+    throw err;
   } finally {
     signal.removeEventListener('abort', onAbort);
     try {
       await stagehand.close();
     } catch {
-      // ignore cleanup errors
+      // ignore cleanup errors — may already be closed by onAbort
     }
   }
 }

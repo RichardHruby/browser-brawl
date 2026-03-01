@@ -4,6 +4,7 @@ export type SSEEventType =
   | 'connection_established'
   | 'attacker_step'
   | 'defender_disruption'
+  | 'defender_activity'
   | 'health_update'
   | 'status_update'
   | 'timer_tick'
@@ -41,6 +42,11 @@ export interface DefenderDisruptionPayload {
   reasoning: string;
 }
 
+export interface DefenderActivityPayload {
+  message: string;
+  kind: 'thinking' | 'tool_call';
+}
+
 export interface HealthUpdatePayload {
   currentHealth: number;
   previousHealth: number;
@@ -55,6 +61,7 @@ export interface TimerTickPayload {
 export interface StatusUpdatePayload {
   attackerStatus: AttackerStatus;
   defenderStatus: DefenderStatus;
+  nextAttackIn?: number;
 }
 
 export interface TurnChangePayload {
