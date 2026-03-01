@@ -36,3 +36,4 @@ export function getLaminarApiKey(): string | undefined {
 export function getBrowserUseApiKey(): string | undefined {
   return loadFromEnvLocal('BROWSER_USE_API_KEY') ?? process.env.BROWSER_USE_API_KEY;
 }
+

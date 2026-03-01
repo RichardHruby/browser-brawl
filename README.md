@@ -237,6 +237,11 @@ LMNR_PROJECT_API_KEY=...
 NEXT_PUBLIC_CONVEX_URL=https://...convex.cloud
 NEXT_PUBLIC_CONVEX_SITE_URL=https://...convex.site
 
+# Optional: Product analytics/session recording with PostHog
+# NEXT_PUBLIC_POSTHOG_KEY=phc_...
+# Optional (defaults to US cloud if omitted)
+# NEXT_PUBLIC_POSTHOG_HOST=https://us.i.posthog.com
+
 # Required for one-click training pipeline
 MODAL_TRAIN_ENDPOINT=https://your-workspace--browser-brawl-train-pipeline-kickoff.modal.run
 ```
