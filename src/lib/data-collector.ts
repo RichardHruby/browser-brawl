@@ -1,5 +1,6 @@
 import { ConvexHttpClient } from 'convex/browser';
 import { api } from '../../convex/_generated/api';
+import { log, logWarn, logError } from './log';
 import type { SSEEventType } from '@/types/events';
 
 let client: ConvexHttpClient | null = null;
@@ -9,7 +10,7 @@ function getClient(): ConvexHttpClient | null {
 
   const url = process.env.NEXT_PUBLIC_CONVEX_URL;
   if (!url) {
-    console.warn('[data-collector] NEXT_PUBLIC_CONVEX_URL not set — data collection disabled');
+    logWarn('[data-collector] NEXT_PUBLIC_CONVEX_URL not set — data collection disabled');
     return null;
   }
 
@@ -22,7 +23,7 @@ function getClient(): ConvexHttpClient | null {
  */
 function fire(promise: Promise<unknown>): void {
   promise.catch((err) => {
-    console.error('[data-collector]', err);
+    logError('[data-collector]', err);
   });
 }
 
@@ -133,7 +134,7 @@ export function recordConversation(params: {
 
   const msgCount = JSON.parse(params.messages).length;
   const toolCount = params.toolDefinitions ? JSON.parse(params.toolDefinitions).length : 0;
-  console.log(`[training-data] 📝 Recording conversation | game=${params.gameId.slice(0, 8)} step=${params.stepNumber} msgs=${msgCount} tools=${toolCount} size=${(params.messages.length / 1024).toFixed(1)}KB`);
+  log(`[training-data] Recording conversation | game=${params.gameId.slice(0, 8)} step=${params.stepNumber} msgs=${msgCount} tools=${toolCount} size=${(params.messages.length / 1024).toFixed(1)}KB`);
 
   fire(
     c.mutation(api.conversations.record, {
@@ -213,13 +214,20 @@ export function recordNetworkRequest(params: {
 export async function captureAndUploadScreenshot(
   cdpUrl: string,
 ): Promise<string | null> {
+  const t0 = Date.now();
   try {
     const { captureScreenshot } = await import('./cdp');
     const png = await captureScreenshot(cdpUrl);
-    if (!png) return null;
-    return await uploadScreenshot(png);
+    if (!png) {
+      log(`[data-collector] captureAndUpload: no screenshot after ${Date.now() - t0}ms`);
+      return null;
+    }
+    const t1 = Date.now();
+    const storageId = await uploadScreenshot(png);
+    log(`[data-collector] captureAndUpload: capture=${t1 - t0}ms upload=${Date.now() - t1}ms total=${Date.now() - t0}ms`);
+    return storageId;
   } catch (err) {
-    console.error('[data-collector] captureAndUpload error:', err);
+    logError(`[data-collector] captureAndUpload error after ${Date.now() - t0}ms:`, err);
     return null;
   }
 }
@@ -239,7 +247,7 @@ export async function downloadAndUploadScreenshot(
     const buffer = Buffer.from(arrayBuf);
     return await uploadScreenshot(buffer);
   } catch (err) {
-    console.error('[data-collector] downloadAndUpload error:', err);
+    logError('[data-collector] downloadAndUpload error:', err);
     return null;
   }
 }
@@ -261,14 +269,14 @@ export async function uploadScreenshot(
     });
 
     if (!res.ok) {
-      console.error('[data-collector] Screenshot upload failed:', res.status);
+      logError('[data-collector] Screenshot upload failed:', res.status);
       return null;
     }
 
     const { storageId } = await res.json();
     return storageId as string;
   } catch (err) {
-    console.error('[data-collector] Screenshot upload error:', err);
+    logError('[data-collector] Screenshot upload error:', err);
     return null;
   }
 }

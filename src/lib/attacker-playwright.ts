@@ -9,6 +9,7 @@ import { getAnthropicApiKey } from './env';
 import { recordConversation, captureAndUploadScreenshot } from './data-collector';
 import { snapshotDOM } from './cdp';
 import { AttackerStepLogger } from './attacker-step-logger';
+import { log, logError } from './log';
 import type { TurnChangePayload } from '@/types/events';
 
 const anthropic = new Anthropic({ apiKey: getAnthropicApiKey() });
@@ -91,6 +92,7 @@ IMPORTANT:
       if (!s || s.phase !== 'arena') break;
 
       const loopStepNum = logger.currentStep + 1;
+      const loopT0 = Date.now();
       const loopResult = await observe(
         {
           name: `attacker-step-${loopStepNum}`,
@@ -105,14 +107,14 @@ IMPORTANT:
         defenderStatus: s.defenderStatus,
       });
 
-      // Capture screenshot + DOM snapshot before Claude call (fire-and-forget on failure)
-      const [preScreenshotId, domSnap] = await Promise.all([
-        captureAndUploadScreenshot(session.cdpUrl).catch(() => null),
-        snapshotDOM(session.cdpUrl).catch(() => null),
-      ]);
+      // Fire screenshot upload in background (fire-and-forget — only for training data, never block game loop)
+      captureAndUploadScreenshot(session.cdpUrl).catch(() => null);
 
-      // Call Claude (pass abort signal so the request is cancelled on game end)
-      console.log(`[attacker] Step ${logger.currentStep + 1} — calling Claude...`);
+      // Start DOM snapshot concurrently with Claude call (fast, ~500ms)
+      const domSnapPromise = snapshotDOM(session.cdpUrl).catch(() => null);
+
+      // Call Claude immediately
+      log(`[attacker] Step ${logger.currentStep + 1} — calling Claude (loop start +${Date.now() - loopT0}ms)...`);
       const response = await anthropic.messages.create({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 4096,
@@ -120,12 +122,16 @@ IMPORTANT:
         messages,
       }, { signal });
 
+      // Collect DOM snapshot (likely already done since Claude call takes ~3s)
+      const preScreenshotId = null;
+      const domSnap = await domSnapPromise;
+
       // Process response content
       const assistantContent = response.content;
       messages.push({ role: 'assistant', content: assistantContent });
 
       const blockTypes = assistantContent.map(b => b.type).join(', ');
-      console.log(`[training-data] 🤖 Claude response | step=${logger.currentStep + 1} blocks=[${blockTypes}] stop=${response.stop_reason}`);
+      log(`[training-data] Claude response | step=${logger.currentStep + 1} blocks=[${blockTypes}] stop=${response.stop_reason}`);
 
       // Persist full conversation for training data extraction
       recordConversation({
@@ -157,7 +163,7 @@ IMPORTANT:
         // No tool calls — Claude is done or responding with text
         const finalText = textBlocks.map(b => b.text).join('\n');
         const isComplete = finalText.toLowerCase().includes('task complete');
-        console.log(`[attacker] Text response (complete=${isComplete}): ${finalText.slice(0, 150)}`);
+        log(`[attacker] Text response (complete=${isComplete}): ${finalText.slice(0, 150)}`);
 
         if (isComplete) {
           logger.logComplete({
@@ -188,7 +194,7 @@ IMPORTANT:
         toolStepCount++;
 
         const description = `${toolUse.name}(${summarizeInput(toolUse.input)})`;
-        console.log(`[attacker] Tool: ${description}`);
+        log(`[attacker] Tool: ${description}`);
 
         // Execute via MCP
         let toolResultSummary = '';
@@ -204,7 +210,7 @@ IMPORTANT:
             .join('\n') ?? 'OK';
 
           toolResultSummary = resultContent.slice(0, 5000);
-          console.log(`[training-data] 🔧 Tool result | ${toolUse.name} full=${resultContent.length}chars saved=${toolResultSummary.length}chars`);
+          log(`[training-data] Tool result | ${toolUse.name} full=${resultContent.length}chars saved=${toolResultSummary.length}chars`);
 
           toolResults.push({
             type: 'tool_result',
@@ -212,7 +218,7 @@ IMPORTANT:
             content: resultContent.slice(0, 10000), // Truncate large responses
           });
         } catch (err) {
-          console.error(`[attacker] tool ${toolUse.name} error:`, err);
+          logError(`[attacker] tool ${toolUse.name} error:`, err);
           toolResultSummary = `Error: ${err instanceof Error ? err.message : String(err)}`;
           toolResults.push({
             type: 'tool_result',
@@ -236,7 +242,7 @@ IMPORTANT:
       // Add tool results to conversation
       messages.push({ role: 'user', content: toolResults });
 
-      console.log(`[training-data] 💾 Saving full turn | step=${logger.currentStep} toolResults=${toolResults.length}`);
+      log(`[training-data] Saving full turn | step=${logger.currentStep} toolResults=${toolResults.length}`);
       // Persist conversation with tool results included
       recordConversation({
         gameId,

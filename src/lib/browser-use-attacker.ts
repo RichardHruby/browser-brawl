@@ -6,6 +6,7 @@ import { initLaminar } from './laminar';
 import { downloadAndUploadScreenshot } from './data-collector';
 import { snapshotDOM } from './cdp';
 import { AttackerStepLogger } from './attacker-step-logger';
+import { log, logError } from './log';
 
 // Initialize Laminar so any underlying Anthropic calls are traced
 initLaminar();
@@ -50,7 +51,7 @@ export async function runBrowserUseAttackerLoop(
     snapshotDOM(session.cdpUrl).then(dom => { latestDomSnap = dom; }).catch(() => {});
 
     // Run the AI agent task on the existing session
-    console.log('[browser-use attacker] dispatching task to session:', session.browserSessionId);
+    log('[browser-use attacker] dispatching task to session:', session.browserSessionId);
     const taskRun = buClient.run(taskPrompt, {
       sessionId: session.browserSessionId,
       startUrl: session.task.startUrl || undefined,
@@ -61,7 +62,7 @@ export async function runBrowserUseAttackerLoop(
       await sleep(1000);
       if (taskRun.taskId) {
         session.buTaskId = taskRun.taskId;
-        console.log('[browser-use attacker] task created:', taskRun.taskId);
+        log('[browser-use attacker] task created:', taskRun.taskId);
       }
     };
     checkTaskId().catch(() => {});
@@ -78,7 +79,7 @@ export async function runBrowserUseAttackerLoop(
         s.buTaskId = taskRun.taskId;
       }
 
-      console.log('[browser-use attacker] step received:', JSON.stringify(step, null, 2));
+      log('[browser-use attacker] step received:', JSON.stringify(step, null, 2));
 
       // Phase 1: Emit reasoning as a "thinking" step
       const thinkingText = step.nextGoal || step.evaluationPreviousGoal || step.memory;
@@ -136,7 +137,7 @@ export async function runBrowserUseAttackerLoop(
       });
     }
   } catch (err) {
-    console.error('[browser-use attacker] error:', err);
+    logError('[browser-use attacker] error:', err);
     const s = getSession(gameId);
     if (s && s.phase === 'arena') {
       s.attackerStatus = 'failed';

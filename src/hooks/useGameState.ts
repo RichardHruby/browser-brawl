@@ -1,10 +1,11 @@
 'use client';
 
 import { useReducer, useCallback } from 'react';
-import type { ClientGameState, AttackerType, Difficulty, GameMode, Task, AgentEvent, DisruptionEvent } from '@/types/game';
+import type { ClientGameState, AttackerType, Difficulty, GameMode, Task, AgentEvent, DefenderStep, DisruptionEvent } from '@/types/game';
 import type {
   SSEEnvelope,
   AttackerStepPayload,
+  DefenderActivityPayload,
   DefenderDisruptionPayload,
   HealthUpdatePayload,
   StatusUpdatePayload,
@@ -33,6 +34,8 @@ const initial: ClientGameState = {
   turnNumber: 0,
   attackerStepsThisTurn: 0,
   attackerStepsPerTurn: 3,
+  defenderSteps: [],
+  defenderNextAttackIn: null,
 };
 
 type Action =
@@ -87,6 +90,17 @@ function reducer(state: ClientGameState, action: Action): ClientGameState {
           };
         }
 
+        case 'defender_activity': {
+          const p = envelope.payload as DefenderActivityPayload;
+          const newStep: DefenderStep = {
+            id: crypto.randomUUID(),
+            message: p.message,
+            kind: p.kind,
+            timestamp: envelope.timestamp,
+          };
+          return { ...state, defenderSteps: [...state.defenderSteps, newStep] };
+        }
+
         case 'defender_disruption': {
           const p = envelope.payload as DefenderDisruptionPayload;
           const newDisruption: DisruptionEvent = {
@@ -114,15 +128,27 @@ function reducer(state: ClientGameState, action: Action): ClientGameState {
 
         case 'status_update': {
           const p = envelope.payload as StatusUpdatePayload;
+          const nextAttackIn =
+            p.defenderStatus === 'cooling_down' && typeof p.nextAttackIn === 'number'
+              ? Math.max(0, p.nextAttackIn)
+              : null;
           return {
             ...state,
             attackerStatus: p.attackerStatus,
             defenderStatus: p.defenderStatus,
+            defenderNextAttackIn: nextAttackIn,
           };
         }
 
         case 'timer_tick': {
-          return { ...state, elapsedSeconds: (envelope.payload as { elapsedSeconds: number }).elapsedSeconds };
+          const nextCountdown = state.defenderNextAttackIn != null && state.defenderNextAttackIn > 0
+            ? state.defenderNextAttackIn - 1
+            : null;
+          return {
+            ...state,
+            elapsedSeconds: (envelope.payload as { elapsedSeconds: number }).elapsedSeconds,
+            defenderNextAttackIn: nextCountdown,
+          };
         }
 
         case 'turn_change': {

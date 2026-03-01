@@ -48,7 +48,9 @@ export function ArenaScreen({ state, onAbort }: Props) {
         />
         <DefenderPanel
           disruptions={state.defenderDisruptions}
+          steps={state.defenderSteps}
           status={state.defenderStatus}
+          nextAttackIn={state.defenderNextAttackIn}
         />
       </main>
     </div>

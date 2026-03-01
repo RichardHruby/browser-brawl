@@ -1,5 +1,6 @@
 import WebSocket from 'ws';
 import { uploadScreenshot } from './data-collector';
+import { log, logError } from './log';
 
 interface ScreencastFrame {
   timestamp: number; // ms since recording start
@@ -58,7 +59,7 @@ export async function startScreencast(gameId: string, cdpUrl: string): Promise<v
           everyNthFrame: 1,
         },
       }));
-      console.log(`[screencast] Started for game ${gameId}`);
+      log(`[screencast] Started for game ${gameId}`);
     });
 
     ws.on('message', (data) => {
@@ -91,14 +92,14 @@ export async function startScreencast(gameId: string, cdpUrl: string): Promise<v
     });
 
     ws.on('error', (err) => {
-      console.error(`[screencast] WebSocket error for game ${gameId}:`, err.message);
+      logError(`[screencast] WebSocket error for game ${gameId}:`, err.message);
     });
 
     ws.on('close', () => {
       session.stopped = true;
     });
   } catch (err) {
-    console.error('[screencast] start error:', err);
+    logError('[screencast] start error:', err);
   }
 }
 
@@ -127,7 +128,7 @@ export async function stopScreencast(gameId: string): Promise<string | null> {
   }, 500);
 
   const frameCount = session.frames.length;
-  console.log(`[screencast] Stopped for game ${gameId} — ${frameCount} frames captured`);
+  log(`[screencast] Stopped for game ${gameId} — ${frameCount} frames captured`);
 
   if (frameCount === 0) return null;
 
@@ -146,7 +147,7 @@ export async function stopScreencast(gameId: string): Promise<string | null> {
     const storageId = await uploadScreenshot(buffer);
 
     if (storageId) {
-      console.log(`[screencast] Uploaded recording for game ${gameId} (${frameCount} frames, ${(buffer.length / 1024 / 1024).toFixed(1)}MB)`);
+      log(`[screencast] Uploaded recording for game ${gameId} (${frameCount} frames, ${(buffer.length / 1024 / 1024).toFixed(1)}MB)`);
     }
 
     // Free memory
@@ -154,7 +155,7 @@ export async function stopScreencast(gameId: string): Promise<string | null> {
 
     return storageId;
   } catch (err) {
-    console.error('[screencast] upload error:', err);
+    logError('[screencast] upload error:', err);
     session.frames.length = 0;
     return null;
   }
