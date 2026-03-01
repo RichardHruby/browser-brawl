@@ -24,8 +24,14 @@ export function initLaminar(): void {
   try {
     // eslint-disable-next-line no-eval
     const lmnr = eval('require')('@lmnr-ai/lmnr');
-    lmnr.Laminar.initialize({ projectApiKey: apiKey });
-    console.log('[laminar] Tracing initialized');
+    // Must pass Anthropic module to instrumentModules for auto-instrumentation
+    // eslint-disable-next-line no-eval
+    const Anthropic = eval('require')('@anthropic-ai/sdk');
+    lmnr.Laminar.initialize({
+      projectApiKey: apiKey,
+      instrumentModules: { anthropic: Anthropic },
+    });
+    console.log('[laminar] Tracing initialized with Anthropic instrumentation');
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     console.warn('[laminar] Failed to load — tracing disabled:', msg);
