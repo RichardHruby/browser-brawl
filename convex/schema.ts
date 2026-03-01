@@ -90,4 +90,13 @@ export default defineSchema({
     responseSize: v.optional(v.number()),
     stepRef: v.optional(v.string()),
   }).index('by_gameId', ['gameId']),
+
+  // Full Claude conversation history for training data extraction
+  conversations: defineTable({
+    gameId: v.string(),
+    stepNumber: v.number(),
+    messages: v.string(), // JSON — full Anthropic messages array
+    toolDefinitions: v.optional(v.string()), // JSON — tool schemas from MCP
+    timestamp: v.string(),
+  }).index('by_gameId', ['gameId', 'stepNumber']),
 });

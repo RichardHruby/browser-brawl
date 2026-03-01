@@ -120,6 +120,29 @@ export function recordDefenderAction(params: {
   fire(c.mutation(api.steps.recordDefenderAction, params));
 }
 
+// ── Conversation history (for training data) ──────────────────────
+
+export function recordConversation(params: {
+  gameId: string;
+  stepNumber: number;
+  messages: string; // JSON-stringified Anthropic messages array
+  toolDefinitions?: string; // JSON-stringified tool schemas
+}): void {
+  const c = getClient();
+  if (!c) return;
+
+  const msgCount = JSON.parse(params.messages).length;
+  const toolCount = params.toolDefinitions ? JSON.parse(params.toolDefinitions).length : 0;
+  console.log(`[training-data] 📝 Recording conversation | game=${params.gameId.slice(0, 8)} step=${params.stepNumber} msgs=${msgCount} tools=${toolCount} size=${(params.messages.length / 1024).toFixed(1)}KB`);
+
+  fire(
+    c.mutation(api.conversations.record, {
+      ...params,
+      timestamp: new Date().toISOString(),
+    }),
+  );
+}
+
 // ── Health timeline ────────────────────────────────────────────────
 
 export function recordHealthChange(params: {
