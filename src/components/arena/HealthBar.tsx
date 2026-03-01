@@ -4,10 +4,32 @@ import { useHealthBar } from '@/hooks/useHealthBar';
 
 interface Props {
   health: number;
+  variant?: 'arena' | 'static';
 }
 
-export function HealthBar({ health }: Props) {
+export function HealthBar({ health, variant = 'arena' }: Props) {
   const { shaking, color, isCritical } = useHealthBar(health);
+  const isStatic = variant === 'static';
+
+  if (isStatic) {
+    return (
+      <div className="flex items-center gap-3 flex-1">
+        <div className="flex-1 h-3 rounded-full overflow-hidden" style={{ background: 'var(--color-bg-card)' }}>
+          <div
+            className="h-full rounded-full"
+            style={{
+              width: `${Math.max(0, health)}%`,
+              background: color,
+              transition: 'width 600ms ease, background 600ms ease',
+            }}
+          />
+        </div>
+        <span className="font-mono text-xs" style={{ color: 'var(--color-text-primary)' }}>
+          {Math.round(health)}%
+        </span>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-1 flex-1 px-4">

@@ -14,14 +14,16 @@ export function TurnIndicator({ currentTurn, turnNumber, stepsRemaining, stepsPe
   const color = isAttacker ? 'var(--color-attacker)' : 'var(--color-defender)';
   const label = isAttacker ? 'ATTACKER' : 'DEFENDER';
   const icon = isAttacker ? '⚔' : '🛡';
+  const bgColor = isAttacker ? 'var(--color-attacker-dim)' : 'var(--color-defender-dim)';
+  const borderColor = isAttacker ? 'var(--color-attacker-border)' : 'var(--color-defender-border)';
 
   return (
     <div
       className="flex items-center justify-center gap-3 py-1.5 px-4 font-display text-xs font-bold tracking-widest"
       style={{
-        background: `${isAttacker ? '#00d4ff' : '#ff003c'}15`,
-        borderTop: `1px solid ${isAttacker ? '#00d4ff' : '#ff003c'}44`,
-        borderBottom: `1px solid ${isAttacker ? '#00d4ff' : '#ff003c'}44`,
+        background: bgColor,
+        borderTop: `1px solid ${borderColor}`,
+        borderBottom: `1px solid ${borderColor}`,
         color,
       }}
     >

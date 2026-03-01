@@ -69,7 +69,7 @@ export interface ClientGameState {
   defenderDisruptions: DisruptionEvent[];
   winner: 'attacker' | 'defender' | null;
   winReason: string | null;
-  lastHit: boolean;
+  lastHitAt: number;
   currentTurn: TurnOwner | null;
   turnNumber: number;
   attackerStepsThisTurn: number;

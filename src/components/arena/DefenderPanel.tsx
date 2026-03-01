@@ -3,20 +3,7 @@
 import { useRef, useEffect } from 'react';
 import type { DisruptionEvent, DefenderStatus } from '@/types/game';
 import { DisruptionCard } from './DisruptionCard';
-
-const STATUS_LABELS: Record<DefenderStatus, string> = {
-  idle:         'IDLE',
-  plotting:     'PLOTTING',
-  striking:     'STRIKING',
-  cooling_down: 'COOLING',
-};
-
-const STATUS_COLORS: Record<DefenderStatus, string> = {
-  idle:         'var(--color-text-secondary)',
-  plotting:     '#cc44ff',
-  striking:     'var(--color-defender)',
-  cooling_down: '#ffaa00',
-};
+import { DEFENDER_STATUS_LABELS, DEFENDER_STATUS_COLORS } from '@/lib/constants';
 
 interface Props {
   disruptions: DisruptionEvent[];
@@ -34,23 +21,23 @@ export function DefenderPanel({ disruptions, status }: Props) {
 
   return (
     <div className="flex flex-col h-full w-72 shrink-0 rounded overflow-hidden"
-      style={{ border: '1px solid rgba(255,0,60,0.25)', background: 'var(--color-bg-panel)' }}>
+      style={{ border: '1px solid var(--color-defender-border)', background: 'var(--color-bg-panel)' }}>
 
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 shrink-0"
-        style={{ borderBottom: '1px solid rgba(255,0,60,0.15)' }}>
+        style={{ borderBottom: '1px solid var(--color-defender-dim)' }}>
         <span className="font-display text-sm font-bold tracking-widest neon-red">
           DEFENDER
         </span>
         <span
           className="text-xs font-mono px-2 py-0.5 rounded"
           style={{
-            color: STATUS_COLORS[status],
-            background: `${STATUS_COLORS[status]}22`,
-            border: `1px solid ${STATUS_COLORS[status]}44`,
+            color: DEFENDER_STATUS_COLORS[status],
+            background: `${DEFENDER_STATUS_COLORS[status]}22`,
+            border: `1px solid ${DEFENDER_STATUS_COLORS[status]}44`,
           }}
         >
-          ● {STATUS_LABELS[status]}
+          ● {DEFENDER_STATUS_LABELS[status]}
         </span>
       </div>
 
@@ -77,7 +64,7 @@ export function DefenderPanel({ disruptions, status }: Props) {
 
       {/* Footer */}
       <div className="px-4 py-2 shrink-0 text-xs font-mono"
-        style={{ borderTop: '1px solid rgba(255,0,60,0.1)', color: 'var(--color-text-secondary)' }}>
+        style={{ borderTop: '1px solid var(--color-defender-dim)', color: 'var(--color-text-secondary)' }}>
         {disruptions.filter(d => d.success).length} disruptions landed
       </div>
     </div>

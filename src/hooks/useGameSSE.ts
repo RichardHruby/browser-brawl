@@ -1,13 +1,16 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useLayoutEffect, useRef } from 'react';
 import type { SSEEnvelope } from '@/types/events';
 
 type Handler = (envelope: SSEEnvelope) => void;
 
 export function useGameSSE(sessionId: string | null, onEvent: Handler) {
   const handlerRef = useRef(onEvent);
-  handlerRef.current = onEvent;
+
+  useLayoutEffect(() => {
+    handlerRef.current = onEvent;
+  }, [onEvent]);
 
   useEffect(() => {
     if (!sessionId) return;

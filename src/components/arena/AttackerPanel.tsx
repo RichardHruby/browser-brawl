@@ -2,22 +2,7 @@
 
 import React, { useRef, useEffect } from 'react';
 import type { AgentEvent, AttackerStatus } from '@/types/game';
-
-const STATUS_LABELS: Record<AttackerStatus, string> = {
-  idle:     'IDLE',
-  thinking: 'THINKING',
-  acting:   'ACTING',
-  complete: 'DONE',
-  failed:   'FAILED',
-};
-
-const STATUS_COLORS: Record<AttackerStatus, string> = {
-  idle:     'var(--color-text-secondary)',
-  thinking: '#ffaa00',
-  acting:   'var(--color-attacker)',
-  complete: 'var(--color-health-high)',
-  failed:   'var(--color-health-low)',
-};
+import { ATTACKER_STATUS_LABELS, ATTACKER_STATUS_COLORS } from '@/lib/constants';
 
 interface Props {
   steps: AgentEvent[];
@@ -35,23 +20,23 @@ export function AttackerPanel({ steps, status }: Props) {
 
   return (
     <div className="flex flex-col h-full w-72 shrink-0 rounded overflow-hidden"
-      style={{ border: '1px solid rgba(0,212,255,0.25)', background: 'var(--color-bg-panel)' }}>
+      style={{ border: '1px solid var(--color-attacker-border)', background: 'var(--color-bg-panel)' }}>
 
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 shrink-0"
-        style={{ borderBottom: '1px solid rgba(0,212,255,0.15)' }}>
+        style={{ borderBottom: '1px solid var(--color-attacker-dim)' }}>
         <span className="font-display text-sm font-bold tracking-widest neon-cyan">
           ATTACKER
         </span>
         <span
           className="text-xs font-mono px-2 py-0.5 rounded"
           style={{
-            color: STATUS_COLORS[status],
-            background: `${STATUS_COLORS[status]}22`,
-            border: `1px solid ${STATUS_COLORS[status]}44`,
+            color: ATTACKER_STATUS_COLORS[status],
+            background: `${ATTACKER_STATUS_COLORS[status]}22`,
+            border: `1px solid ${ATTACKER_STATUS_COLORS[status]}44`,
           }}
         >
-          ● {STATUS_LABELS[status]}
+          ● {ATTACKER_STATUS_LABELS[status]}
         </span>
       </div>
 
@@ -77,11 +62,11 @@ export function AttackerPanel({ steps, status }: Props) {
               >
                 <div className="flex items-start gap-2">
                   <span className="text-xs font-mono shrink-0 mt-0.5"
-                    style={{ color: isThinking ? '#ffaa00' : 'var(--color-attacker)', opacity: 0.6 }}>
+                    style={{ color: isThinking ? 'var(--color-status-thinking)' : 'var(--color-attacker)', opacity: 0.6 }}>
                     {isThinking ? '>>' : String(displayNum).padStart(2, '0')}
                   </span>
                   <span className={`text-xs font-mono leading-relaxed ${isThinking ? 'italic' : ''}`}
-                    style={{ color: isThinking ? 'rgba(255,170,0,0.7)' : 'var(--color-text-mono)' }}>
+                    style={{ color: isThinking ? 'var(--color-status-thinking)' : 'var(--color-text-mono)', opacity: isThinking ? 0.7 : 1 }}>
                     {step.description}
                   </span>
                 </div>
@@ -94,7 +79,7 @@ export function AttackerPanel({ steps, status }: Props) {
 
       {/* Footer */}
       <div className="px-4 py-2 shrink-0 text-xs font-mono"
-        style={{ borderTop: '1px solid rgba(0,212,255,0.1)', color: 'var(--color-text-secondary)' }}>
+        style={{ borderTop: '1px solid var(--color-attacker-dim)', color: 'var(--color-text-secondary)' }}>
         {steps.filter(s => s.agentStatus !== 'thinking').length} action{steps.filter(s => s.agentStatus !== 'thinking').length !== 1 ? 's' : ''}
       </div>
     </div>

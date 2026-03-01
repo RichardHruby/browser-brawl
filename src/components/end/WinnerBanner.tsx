@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { REASON_LABELS } from '@/lib/constants';
 
 interface Props {
   winner: 'attacker' | 'defender';
@@ -9,15 +10,10 @@ interface Props {
   onPlayAgain: () => void;
 }
 
-const REASON_LABELS: Record<string, string> = {
-  task_complete:    'Task completed successfully',
-  health_depleted:  'Attacker health depleted',
-  aborted:          'Battle aborted',
-};
-
 export function WinnerBanner({ winner, reason, sessionId, onPlayAgain }: Props) {
   const isAttacker = winner === 'attacker';
-  const color = isAttacker ? 'var(--color-attacker)' : 'var(--color-defender)';
+  // Raw hex (not CSS var) because color is used with hex opacity suffixes below
+  const color = isAttacker ? '#00d4ff' : '#ff003c';
   const label = isAttacker ? 'ATTACKER WINS' : 'DEFENDER WINS';
   const reasonText = reason ? (REASON_LABELS[reason] ?? reason) : '';
 

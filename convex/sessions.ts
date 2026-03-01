@@ -71,7 +71,7 @@ export const list = query({
     winner: v.optional(v.union(v.literal('attacker'), v.literal('defender'))),
   },
   handler: async (ctx, args) => {
-    let q = ctx.db.query('sessions').order('desc');
+    const q = ctx.db.query('sessions').order('desc');
     const results = await q.collect();
 
     let filtered = results;

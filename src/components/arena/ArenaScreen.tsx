@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
 import { ArenaHeader } from './ArenaHeader';
 import { AttackerPanel } from './AttackerPanel';
 import { DefenderPanel } from './DefenderPanel';
@@ -15,14 +14,6 @@ interface Props {
 
 export function ArenaScreen({ state, onAbort }: Props) {
   const { formatted } = useArenaTimer(state.phase === 'arena');
-  const prevDisruptionCount = useRef(state.defenderDisruptions.length);
-  const isNewHit =
-    state.defenderDisruptions.length > prevDisruptionCount.current
-    || state.lastHit;
-
-  useEffect(() => {
-    prevDisruptionCount.current = state.defenderDisruptions.length;
-  }, [state.defenderDisruptions.length]);
 
   return (
     <div
@@ -41,6 +32,8 @@ export function ArenaScreen({ state, onAbort }: Props) {
         turnNumber={state.turnNumber}
         attackerStepsThisTurn={state.attackerStepsThisTurn}
         attackerStepsPerTurn={state.attackerStepsPerTurn}
+        difficulty={state.difficulty}
+        attackerType={state.attackerType}
       />
 
       <main className="flex flex-1 gap-2 p-2 overflow-hidden min-h-0">
@@ -50,7 +43,7 @@ export function ArenaScreen({ state, onAbort }: Props) {
         />
         <BrowserFrame
           liveViewUrl={state.liveViewUrl ?? ''}
-          hit={isNewHit}
+          hitAt={state.lastHitAt}
         />
         <DefenderPanel
           disruptions={state.defenderDisruptions}

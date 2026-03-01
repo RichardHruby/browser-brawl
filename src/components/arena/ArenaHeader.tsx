@@ -2,7 +2,14 @@
 
 import { HealthBar } from './HealthBar';
 import { TurnIndicator } from './TurnIndicator';
-import type { Task, AttackerStatus, DefenderStatus, GameMode, TurnOwner } from '@/types/game';
+import { DIFFICULTY_COLORS } from '@/lib/constants';
+import type { Task, AttackerStatus, DefenderStatus, GameMode, TurnOwner, Difficulty, AttackerType } from '@/types/game';
+
+const ATTACKER_TYPE_LABELS: Record<AttackerType, string> = {
+  'playwright-mcp': 'Playwright MCP',
+  'stagehand':      'Stagehand',
+  'browser-use':    'Browser-Use',
+};
 
 interface Props {
   health: number;
@@ -16,18 +23,28 @@ interface Props {
   turnNumber: number;
   attackerStepsThisTurn: number;
   attackerStepsPerTurn: number;
+  difficulty: Difficulty;
+  attackerType: AttackerType;
 }
 
-export function ArenaHeader({ health, elapsed, task, attackerStatus, defenderStatus, onAbort, mode, currentTurn, turnNumber, attackerStepsThisTurn, attackerStepsPerTurn }: Props) {
+export function ArenaHeader({ health, elapsed, task, attackerStatus, defenderStatus, onAbort, mode, currentTurn, turnNumber, attackerStepsThisTurn, attackerStepsPerTurn, difficulty, attackerType }: Props) {
+  const diffColor = DIFFICULTY_COLORS[difficulty];
+
   return (
     <div className="flex flex-col gap-1 shrink-0 px-4 py-2"
       style={{ borderBottom: '1px solid var(--color-border)', background: 'var(--color-bg-panel)' }}>
 
       {/* Top row: labels + timer + abort */}
       <div className="flex items-center justify-between">
-        <span className="font-display text-xs font-bold tracking-widest neon-cyan">
-          ⚔ ATTACKER
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="font-display text-xs font-bold tracking-widest neon-cyan">
+            ⚔ ATTACKER
+          </span>
+          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded"
+            style={{ color: 'var(--color-attacker)', background: 'var(--color-attacker-dim)' }}>
+            {ATTACKER_TYPE_LABELS[attackerType]}
+          </span>
+        </div>
 
         <div className="flex items-center gap-4">
           {task && (
@@ -52,9 +69,15 @@ export function ArenaHeader({ health, elapsed, task, attackerStatus, defenderSta
           </button>
         </div>
 
-        <span className="font-display text-xs font-bold tracking-widest neon-red">
-          DEFENDER 🛡
-        </span>
+        <div className="flex items-center gap-2">
+          <span className="text-[10px] font-mono px-1.5 py-0.5 rounded uppercase"
+            style={{ color: diffColor, background: `${diffColor}18` }}>
+            {difficulty}
+          </span>
+          <span className="font-display text-xs font-bold tracking-widest neon-red">
+            DEFENDER 🛡
+          </span>
+        </div>
       </div>
 
       {/* Health bar row */}
