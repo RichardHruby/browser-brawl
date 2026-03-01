@@ -60,16 +60,17 @@ function reducer(state: ClientGameState, action: Action): ClientGameState {
 
         case 'attacker_step': {
           const p = envelope.payload as AttackerStepPayload;
+          const existing = state.attackerSteps.find(s => s.step === p.step);
+          if (existing) {
+            return { ...state, attackerStatus: p.agentStatus };
+          }
           const newStep: AgentEvent = {
-            id: `${Date.now()}`,
+            id: crypto.randomUUID(),
             step: p.step,
             description: p.description,
             timestamp: envelope.timestamp,
             agentStatus: p.agentStatus,
           };
-          // Deduplicate by step number
-          const existing = state.attackerSteps.find(s => s.step === p.step);
-          if (existing) return state;
           return {
             ...state,
             attackerStatus: p.agentStatus,
@@ -80,7 +81,7 @@ function reducer(state: ClientGameState, action: Action): ClientGameState {
         case 'defender_disruption': {
           const p = envelope.payload as DefenderDisruptionPayload;
           const newDisruption: DisruptionEvent = {
-            id: `${Date.now()}`,
+            id: crypto.randomUUID(),
             disruptionId: p.disruptionId,
             disruptionName: p.disruptionName,
             description: p.description,

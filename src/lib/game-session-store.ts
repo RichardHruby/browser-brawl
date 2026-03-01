@@ -1,4 +1,4 @@
-import type { AgentEvent, DisruptionEvent, Difficulty, GamePhase, AttackerStatus, DefenderStatus, Task } from '@/types/game';
+import type { AgentEvent, AttackerMode, DisruptionEvent, Difficulty, GamePhase, AttackerStatus, DefenderStatus, Task } from '@/types/game';
 
 // Server-side extended session with runtime fields
 export interface ServerGameSession {
@@ -8,6 +8,7 @@ export interface ServerGameSession {
   liveViewUrl: string;
   task: Task;
   difficulty: Difficulty;
+  attackerMode: AttackerMode;
   phase: GamePhase;
   health: number;
   startedAt: string;
@@ -43,9 +44,11 @@ export function createSession(params: {
   liveViewUrl: string;
   task: Task;
   difficulty: Difficulty;
+  attackerMode?: AttackerMode;
 }): ServerGameSession {
   const session: ServerGameSession = {
     ...params,
+    attackerMode: params.attackerMode ?? 'playwright',
     phase: 'loading' as GamePhase,
     health: 100,
     startedAt: new Date().toISOString(),

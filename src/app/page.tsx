@@ -6,7 +6,7 @@ import { WinnerBanner } from '@/components/end/WinnerBanner';
 import { useGameState } from '@/hooks/useGameState';
 import { useGameSSE } from '@/hooks/useGameSSE';
 import { ArenaScreen } from '@/components/arena/ArenaScreen';
-import type { Difficulty, Task } from '@/types/game';
+import type { AttackerMode, Difficulty, Task } from '@/types/game';
 
 export default function Home() {
   const { state, startGame, setArenaReady, handleSSEEvent, reset } = useGameState();
@@ -16,7 +16,7 @@ export default function Home() {
     handleSSEEvent
   );
 
-  async function handleStart(difficulty: Difficulty, task: Task) {
+  async function handleStart(difficulty: Difficulty, task: Task, attackerMode: AttackerMode) {
     startGame(difficulty, task);
     try {
       const res = await fetch('/api/game/start', {
@@ -25,6 +25,7 @@ export default function Home() {
         body: JSON.stringify({
           taskId: task.id,
           difficulty,
+          attackerMode,
           customTask: task.id === 'custom' ? task.description : undefined,
         }),
       });

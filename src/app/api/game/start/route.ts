@@ -9,7 +9,7 @@ import { runAttackerLoop } from '@/lib/attacker-agent';
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { taskId, difficulty = 'easy', customTask } = body;
+  const { taskId, difficulty = 'easy', customTask, attackerMode = 'playwright' } = body;
 
   const task =
     customTask
@@ -49,6 +49,7 @@ export async function POST(req: NextRequest) {
     liveViewUrl,
     task,
     difficulty,
+    attackerMode,
   });
 
   // 3. Transition to arena

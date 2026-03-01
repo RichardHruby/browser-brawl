@@ -2,6 +2,7 @@ export type Difficulty = 'easy' | 'medium' | 'hard' | 'nightmare';
 export type GamePhase = 'lobby' | 'loading' | 'arena' | 'game_over';
 export type AttackerStatus = 'idle' | 'thinking' | 'acting' | 'complete' | 'failed';
 export type DefenderStatus = 'idle' | 'plotting' | 'striking' | 'cooling_down';
+export type AttackerMode = 'playwright' | 'stagehand';
 
 export interface Task {
   id: string;
