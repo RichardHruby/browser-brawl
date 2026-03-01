@@ -238,8 +238,8 @@ export function LobbyScreenV1({ onStart }: Props) {
           borderTop: '2px solid var(--color-border)',
         }}
       >
-        <div className="w-full max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 sm:gap-6 px-4">
-          <div className="order-2 sm:order-1 flex gap-4">
+        <div className="w-full max-w-6xl mx-auto flex flex-col sm:flex-row items-center gap-4 sm:gap-6 px-4">
+          <div className="order-2 sm:order-1 flex gap-4 sm:flex-1">
             <Link
               href="/history"
               className="font-mono text-sm tracking-widest font-bold transition-all duration-200 hover:underline"
@@ -256,35 +256,32 @@ export function LobbyScreenV1({ onStart }: Props) {
             </Link>
           </div>
 
-          <button
-            onClick={() => task && onStart(difficulty, task, mode, byomEnabled ? 'finetuned' : attackerType, byomEnabled ? modelUrl : undefined)}
-            disabled={!canStart}
-            className="order-1 sm:order-2 w-full max-w-sm sm:w-auto px-6 sm:px-12 py-3 font-display text-base sm:text-lg font-black tracking-[0.2em] sm:tracking-[0.3em] uppercase transition-all duration-300 cursor-pointer disabled:cursor-not-allowed"
-            style={{
-              background: canStart
-                ? 'linear-gradient(135deg, rgba(0,212,255,0.15), rgba(255,0,60,0.15))'
-                : 'var(--color-bg-card)',
-              border: canStart
-                ? '2px solid var(--color-attacker)'
-                : '2px solid var(--color-border)',
-              color: canStart
-                ? 'var(--color-text-primary)'
-                : 'var(--color-text-secondary)',
-              boxShadow: canStart
-                ? '0 0 20px rgba(0,212,255,0.3), 0 0 40px rgba(255,0,60,0.15)'
-                : 'none',
-              opacity: canStart ? 1 : 0.3,
-            }}
-          >
-            F I G H T
-          </button>
+          <div className="hidden sm:block sm:w-12 lg:w-24 shrink-0" aria-hidden />
 
-          <span
-            className="hidden sm:block order-3 font-mono text-xs tracking-wider select-none opacity-0"
-            aria-hidden
-          >
-            [ PRIOR TRACES ]
-          </span>
+          <div className="order-1 sm:order-2 w-full max-w-sm sm:max-w-none sm:flex-1 flex justify-center">
+            <button
+              onClick={() => task && onStart(difficulty, task, mode, byomEnabled ? 'finetuned' : attackerType, byomEnabled ? modelUrl : undefined)}
+              disabled={!canStart}
+              className="w-full max-w-sm sm:w-auto px-6 sm:px-12 py-3 font-display text-base sm:text-lg font-black tracking-[0.2em] sm:tracking-[0.3em] uppercase transition-all duration-300 cursor-pointer disabled:cursor-not-allowed"
+              style={{
+                background: canStart
+                  ? 'linear-gradient(135deg, rgba(0,212,255,0.15), rgba(255,0,60,0.15))'
+                  : 'var(--color-bg-card)',
+                border: canStart
+                  ? '2px solid var(--color-attacker)'
+                  : '2px solid var(--color-border)',
+                color: canStart
+                  ? 'var(--color-text-primary)'
+                  : 'var(--color-text-secondary)',
+                boxShadow: canStart
+                  ? '0 0 20px rgba(0,212,255,0.3), 0 0 40px rgba(255,0,60,0.15)'
+                  : 'none',
+                opacity: canStart ? 1 : 0.3,
+              }}
+            >
+              F I G H T
+            </button>
+          </div>
         </div>
       </div>
     </div>
