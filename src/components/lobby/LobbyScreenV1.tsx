@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { GlitchText } from '@/components/shared/GlitchText';
+import { BrandLogo } from '@/components/shared/BrandLogo';
 import { FighterSelect } from './FighterSelect';
 import { ArenaSelector } from './ArenaSelector';
 import { DifficultyBar } from './DifficultyBar';
@@ -33,17 +34,7 @@ export function LobbyScreenV1({ onStart }: Props) {
       <div className="flex-1 flex flex-col items-center justify-start lg:justify-center px-4 sm:px-6 lg:px-8 py-8 lg:py-10">
         {/* Title */}
         <div className="text-center mb-6 lg:mb-10">
-          <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-black tracking-[0.15em] sm:tracking-[0.2em] lg:tracking-widest mb-2 relative">
-            <GlitchText text="BROWSER BRAWL" className="neon-cyan" />
-          </h1>
-          <div
-            className="flex justify-center gap-3 sm:gap-6 text-xs sm:text-sm font-mono"
-            style={{ color: 'var(--color-text-secondary)', opacity: 0.6 }}
-          >
-            <span className="neon-cyan">AI ATTACKER</span>
-            <span>vs</span>
-            <span className="neon-red">AI DEFENDER</span>
-          </div>
+          <BrandLogo size="lg" />
         </div>
 
         {/* Two-column layout with VS divider */}

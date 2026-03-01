@@ -51,176 +51,184 @@ export default function HistoryPage() {
 
   return (
     <div
-      className="min-h-screen flex flex-col px-6 py-8"
+      className="boxy-ui min-h-screen flex flex-col px-6 py-8"
       style={{ background: 'var(--color-bg-deep)' }}
     >
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="font-display text-3xl font-black tracking-widest neon-cyan">
-            PRIOR TRACES
-          </h1>
-          <p className="font-game text-sm mt-1" style={{ color: 'var(--color-text-secondary)' }}>
-            Past sessions &middot; Training data
-          </p>
+      <div
+        className="sticky top-0 z-30 -mx-6 px-6 pt-8 pb-4"
+        style={{
+          background: 'var(--color-bg-deep)',
+          borderBottom: '2px solid var(--color-border)',
+        }}
+      >
+        {/* Header */}
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+          <div>
+            <h1 className="font-display text-3xl font-black tracking-widest neon-cyan">
+              PRIOR TRACES
+            </h1>
+            <p className="font-game text-sm mt-1" style={{ color: 'var(--color-text-secondary)' }}>
+              Past sessions &middot; Training data
+            </p>
+          </div>
+          <div className="flex gap-3 flex-wrap items-center">
+            {/* Download Traces — exports selected sessions as ShareGPT JSONL */}
+            <div className="relative group/dl">
+              <button
+                onClick={() => {
+                  if (selected.size === 0) return;
+                  window.location.href = `/api/export/training?gameIds=${gameIdsParam}`;
+                }}
+                disabled={selected.size === 0}
+                className="font-display text-xs font-bold tracking-widest uppercase px-4 py-2 rounded transition-all duration-200 hover:scale-105 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
+                style={{
+                  background: 'var(--color-bg-card)',
+                  color: 'var(--color-attacker)',
+                  border:
+                    selected.size > 0
+                      ? '2px solid var(--color-attacker)'
+                      : '2px solid var(--color-border)',
+                }}
+              >
+                Download Traces{selected.size > 0 ? ` (${selected.size})` : ''}
+              </button>
+              <div
+                className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 rounded text-xs font-mono whitespace-nowrap opacity-0 group-hover/dl:opacity-100 transition-opacity duration-200 pointer-events-none z-50"
+                style={{
+                  background: 'var(--color-bg-card)',
+                  color: 'var(--color-attacker)',
+                  border: '1px solid var(--color-attacker)',
+                  boxShadow: '0 0 10px rgba(0, 255, 255, 0.15)',
+                }}
+              >
+                {selected.size === 0
+                  ? 'Select sessions to download'
+                  : `Download ${selected.size} session${selected.size !== 1 ? 's' : ''} as ShareGPT JSONL`}
+                <div
+                  className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0"
+                  style={{
+                    borderLeft: '6px solid transparent',
+                    borderRight: '6px solid transparent',
+                    borderTop: '6px solid var(--color-attacker)',
+                  }}
+                />
+              </div>
+            </div>
+            {/* Kickoff Finetune button with tooltip */}
+            <div className="relative group/tooltip">
+              <button
+                onClick={() => {
+                  if (selected.size === 0) return;
+                  // TODO: wire to actual finetune pipeline trigger
+                  window.location.href = `/api/export/training?gameIds=${gameIdsParam}`;
+                }}
+                disabled={selected.size === 0}
+                className="font-display text-xs font-bold tracking-widest uppercase px-4 py-2 rounded transition-all duration-200 hover:scale-105 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
+                style={{
+                  background:
+                    selected.size > 0
+                      ? 'linear-gradient(135deg, #131325, #1a1a35)'
+                      : 'var(--color-bg-card)',
+                  color: '#cc44ff',
+                  border:
+                    selected.size > 0
+                      ? '2px solid #cc44ff'
+                      : '2px solid var(--color-border)',
+                  boxShadow:
+                    selected.size > 0
+                      ? '0 0 12px rgba(204, 68, 255, 0.3)'
+                      : 'none',
+                }}
+              >
+                Kickoff Finetune
+              </button>
+              <div
+                className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 rounded text-xs font-mono whitespace-nowrap opacity-0 group-hover/tooltip:opacity-100 transition-opacity duration-200 pointer-events-none z-50"
+                style={{
+                  background: 'var(--color-bg-card)',
+                  color: '#cc44ff',
+                  border: '1px solid #cc44ff',
+                  boxShadow: '0 0 10px rgba(204, 68, 255, 0.25)',
+                }}
+              >
+                {selected.size === 0
+                  ? 'Select sessions to kick off a finetune'
+                  : `Kick off a finetune pipeline with Qwen2.5 — ${selected.size} session${selected.size !== 1 ? 's' : ''} as ShareGPT JSONL`}
+                <div
+                  className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0"
+                  style={{
+                    borderLeft: '6px solid transparent',
+                    borderRight: '6px solid transparent',
+                    borderTop: '6px solid #cc44ff',
+                  }}
+                />
+              </div>
+            </div>
+            <Link
+              href="/"
+              className="font-display text-xs font-bold tracking-widest uppercase px-4 py-2 rounded transition-all duration-200 hover:scale-105"
+              style={{
+                background: 'var(--color-bg-card)',
+                color: 'var(--color-text-secondary)',
+                border: '2px solid var(--color-border)',
+              }}
+            >
+              Back to Lobby
+            </Link>
+          </div>
         </div>
-        <div className="flex gap-3 items-center">
-          {/* Download Traces — exports selected sessions as ShareGPT JSONL */}
-          <div className="relative group/dl">
-            <button
-              onClick={() => {
-                if (selected.size === 0) return;
-                window.location.href = `/api/export/training?gameIds=${gameIdsParam}`;
-              }}
-              disabled={selected.size === 0}
-              className="font-display text-xs font-bold tracking-widest uppercase px-4 py-2 rounded transition-all duration-200 hover:scale-105 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
-              style={{
-                background: 'var(--color-bg-card)',
-                color: 'var(--color-attacker)',
-                border:
-                  selected.size > 0
-                    ? '1px solid var(--color-attacker)'
-                    : '1px solid var(--color-border)',
-              }}
-            >
-              Download Traces{selected.size > 0 ? ` (${selected.size})` : ''}
-            </button>
-            <div
-              className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 rounded text-xs font-mono whitespace-nowrap opacity-0 group-hover/dl:opacity-100 transition-opacity duration-200 pointer-events-none z-50"
-              style={{
-                background: 'var(--color-bg-card)',
-                color: 'var(--color-attacker)',
-                border: '1px solid var(--color-attacker)',
-                boxShadow: '0 0 10px rgba(0, 255, 255, 0.15)',
-              }}
-            >
-              {selected.size === 0
-                ? 'Select sessions to download'
-                : `Download ${selected.size} session${selected.size !== 1 ? 's' : ''} as ShareGPT JSONL`}
-              <div
-                className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0"
-                style={{
-                  borderLeft: '6px solid transparent',
-                  borderRight: '6px solid transparent',
-                  borderTop: '6px solid var(--color-attacker)',
-                }}
-              />
-            </div>
-          </div>
-          {/* Kickoff Finetune button with tooltip */}
-          <div className="relative group/tooltip">
-            <button
-              onClick={() => {
-                if (selected.size === 0) return;
-                // TODO: wire to actual finetune pipeline trigger
-                window.location.href = `/api/export/training?gameIds=${gameIdsParam}`;
-              }}
-              disabled={selected.size === 0}
-              className="font-display text-xs font-bold tracking-widest uppercase px-4 py-2 rounded transition-all duration-200 hover:scale-105 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
-              style={{
-                background:
-                  selected.size > 0
-                    ? 'linear-gradient(135deg, #131325, #1a1a35)'
-                    : 'var(--color-bg-card)',
-                color: '#cc44ff',
-                border:
-                  selected.size > 0
-                    ? '1px solid #cc44ff'
-                    : '1px solid var(--color-border)',
-                boxShadow:
-                  selected.size > 0
-                    ? '0 0 12px rgba(204, 68, 255, 0.3)'
-                    : 'none',
-              }}
-            >
-              Kickoff Finetune
-            </button>
-            <div
-              className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 rounded text-xs font-mono whitespace-nowrap opacity-0 group-hover/tooltip:opacity-100 transition-opacity duration-200 pointer-events-none z-50"
-              style={{
-                background: 'var(--color-bg-card)',
-                color: '#cc44ff',
-                border: '1px solid #cc44ff',
-                boxShadow: '0 0 10px rgba(204, 68, 255, 0.25)',
-              }}
-            >
-              {selected.size === 0
-                ? 'Select sessions to kick off a finetune'
-                : `Kick off a finetune pipeline with Qwen2.5 — ${selected.size} session${selected.size !== 1 ? 's' : ''} as ShareGPT JSONL`}
-              <div
-                className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0"
-                style={{
-                  borderLeft: '6px solid transparent',
-                  borderRight: '6px solid transparent',
-                  borderTop: '6px solid #cc44ff',
-                }}
-              />
-            </div>
-          </div>
-          <Link
-            href="/"
-            className="font-display text-xs font-bold tracking-widest uppercase px-4 py-2 rounded transition-all duration-200 hover:scale-105"
+
+        {/* Filters */}
+        <div className="flex gap-4 mt-4 flex-wrap">
+          <select
+            value={diffFilter}
+            onChange={(e) => {
+              setDiffFilter(e.target.value as Difficulty | '');
+              setSelected(new Set());
+            }}
+            className="font-mono text-xs px-3 py-2 rounded appearance-none cursor-pointer"
             style={{
               background: 'var(--color-bg-card)',
-              color: 'var(--color-text-secondary)',
-              border: '1px solid var(--color-border)',
+              color: 'var(--color-text-primary)',
+              border: '2px solid var(--color-border)',
             }}
           >
-            Back to Lobby
-          </Link>
+            <option value="">All Difficulties</option>
+            <option value="easy">Easy</option>
+            <option value="medium">Medium</option>
+            <option value="hard">Hard</option>
+            <option value="nightmare">Nightmare</option>
+          </select>
+
+          <select
+            value={winnerFilter}
+            onChange={(e) => {
+              setWinnerFilter(e.target.value as Winner | '');
+              setSelected(new Set());
+            }}
+            className="font-mono text-xs px-3 py-2 rounded appearance-none cursor-pointer"
+            style={{
+              background: 'var(--color-bg-card)',
+              color: 'var(--color-text-primary)',
+              border: '2px solid var(--color-border)',
+            }}
+          >
+            <option value="">All Winners</option>
+            <option value="attacker">Attacker Won</option>
+            <option value="defender">Defender Won</option>
+          </select>
+
+          {sessions && (
+            <span className="font-mono text-xs self-center" style={{ color: 'var(--color-text-secondary)' }}>
+              {sessions.length} session{sessions.length !== 1 ? 's' : ''}
+            </span>
+          )}
+          {selected.size > 0 && (
+            <span className="font-mono text-xs self-center neon-cyan">
+              {selected.size} selected
+            </span>
+          )}
         </div>
-      </div>
-
-      {/* Filters */}
-      <div className="flex gap-4 mb-6">
-        <select
-          value={diffFilter}
-          onChange={(e) => {
-            setDiffFilter(e.target.value as Difficulty | '');
-            setSelected(new Set());
-          }}
-          className="font-mono text-xs px-3 py-2 rounded appearance-none cursor-pointer"
-          style={{
-            background: 'var(--color-bg-card)',
-            color: 'var(--color-text-primary)',
-            border: '1px solid var(--color-border)',
-          }}
-        >
-          <option value="">All Difficulties</option>
-          <option value="easy">Easy</option>
-          <option value="medium">Medium</option>
-          <option value="hard">Hard</option>
-          <option value="nightmare">Nightmare</option>
-        </select>
-
-        <select
-          value={winnerFilter}
-          onChange={(e) => {
-            setWinnerFilter(e.target.value as Winner | '');
-            setSelected(new Set());
-          }}
-          className="font-mono text-xs px-3 py-2 rounded appearance-none cursor-pointer"
-          style={{
-            background: 'var(--color-bg-card)',
-            color: 'var(--color-text-primary)',
-            border: '1px solid var(--color-border)',
-          }}
-        >
-          <option value="">All Winners</option>
-          <option value="attacker">Attacker Won</option>
-          <option value="defender">Defender Won</option>
-        </select>
-
-        {sessions && (
-          <span className="font-mono text-xs self-center" style={{ color: 'var(--color-text-secondary)' }}>
-            {sessions.length} session{sessions.length !== 1 ? 's' : ''}
-          </span>
-        )}
-        {selected.size > 0 && (
-          <span className="font-mono text-xs self-center neon-cyan">
-            {selected.size} selected
-          </span>
-        )}
       </div>
 
       {/* Table */}
@@ -228,7 +236,7 @@ export default function HistoryPage() {
         className="rounded-xl overflow-hidden"
         style={{
           background: 'var(--color-bg-panel)',
-          border: '1px solid var(--color-border)',
+          border: '2px solid var(--color-border)',
         }}
       >
         <table className="w-full font-game text-sm">
@@ -332,7 +340,7 @@ export default function HistoryPage() {
                       style={{
                         background: 'var(--color-bg-card)',
                         color: 'var(--color-attacker)',
-                        border: '1px solid var(--color-attacker)',
+                        border: '2px solid var(--color-attacker)',
                       }}
                     >
                       Replay

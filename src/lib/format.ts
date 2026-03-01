@@ -4,7 +4,7 @@ import { REASON_LABELS } from './constants';
  * Format seconds as "Xm Ys" or "Xs" for display.
  */
 export function formatDuration(seconds: number | undefined): string {
-  if (!seconds) return '—';
+  if (seconds == null) return '—';
   const m = Math.floor(seconds / 60);
   const s = seconds % 60;
   return m > 0 ? `${m}m ${s}s` : `${s}s`;
