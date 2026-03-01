@@ -4,7 +4,6 @@ import { useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import Link from 'next/link';
 import { useState } from 'react';
-import { formatDuration } from '@/lib/format';
 
 type JobStatus = 'preparing' | 'uploading' | 'training' | 'merging' | 'deploying' | 'ready' | 'failed';
 
@@ -206,17 +205,23 @@ export default function TrainingPage() {
 
                   {/* Right: output info */}
                   {status === 'ready' && (
-                    <div className="flex flex-col gap-2 shrink-0 max-w-[420px]">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2 shrink-0 w-full max-w-[760px]">
                       {job.serveUrl && (
                         <div
                           className="font-mono text-xs p-2 rounded"
                           style={{ background: '#cc44ff10', border: '1px solid #cc44ff30' }}
                         >
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="font-bold" style={{ color: '#cc44ff' }}>Serve URL</span>
+                          <div className="flex items-center gap-2 min-w-0">
+                            <span className="font-bold shrink-0" style={{ color: '#cc44ff' }}>Serve URL</span>
+                            <span
+                              className="truncate min-w-0 flex-1"
+                              style={{ color: 'var(--color-text-primary)' }}
+                              title={job.serveUrl}
+                            >
+                              {job.serveUrl}
+                            </span>
                             <CopyButton text={job.serveUrl} />
                           </div>
-                          <div className="break-all" style={{ color: 'var(--color-text-primary)' }}>{job.serveUrl}</div>
                           <div className="mt-1" style={{ color: 'var(--color-text-secondary)' }}>
                             First request cold-starts (~2min)
                           </div>
@@ -226,9 +231,16 @@ export default function TrainingPage() {
                         className="font-mono text-xs p-2 rounded"
                         style={{ background: 'var(--color-bg-card)', border: '1px solid var(--color-border)' }}
                       >
-                        <div className="font-bold mb-1" style={{ color: 'var(--color-text-secondary)' }}>Model path</div>
-                        <div style={{ color: 'var(--color-text-primary)' }}>
-                          /checkpoints/experiments/{job.experimentName}/merged_model
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="font-bold shrink-0" style={{ color: 'var(--color-text-secondary)' }}>Model path</span>
+                          <span
+                            className="truncate min-w-0 flex-1"
+                            style={{ color: 'var(--color-text-primary)' }}
+                            title={`/checkpoints/experiments/${job.experimentName}/merged_model`}
+                          >
+                            /checkpoints/experiments/{job.experimentName}/merged_model
+                          </span>
+                          <CopyButton text={`/checkpoints/experiments/${job.experimentName}/merged_model`} />
                         </div>
                       </div>
                     </div>
