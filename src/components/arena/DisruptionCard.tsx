@@ -16,6 +16,7 @@ const ICONS: Record<string, string> = {
   'element-removal': '💀',
   'animation-flood': '⚡',
   'coordinated-assault': '☠️',
+  'custom-injection': '🎯',
 };
 
 export function DisruptionCard({ event, isNew }: Props) {
