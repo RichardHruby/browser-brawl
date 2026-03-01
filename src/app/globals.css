@@ -43,7 +43,8 @@ body {
   background: var(--color-bg-deep);
   color: var(--color-text-primary);
   font-family: 'Rajdhani', sans-serif;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 /* ─── Keyframes ──────────────────────────────────────────────────── */
