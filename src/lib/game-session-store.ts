@@ -8,6 +8,7 @@ export interface ServerGameSession {
   liveViewUrl: string;
   task: Task;
   difficulty: Difficulty;
+  attackerType: AttackerType;
   phase: GamePhase;
   health: number;
   startedAt: string;
@@ -17,7 +18,6 @@ export interface ServerGameSession {
   attackerSteps: AgentEvent[];
   defenderDisruptions: DisruptionEvent[];
   winner: 'attacker' | 'defender' | null;
-  attackerType: AttackerType;
   winReason: 'task_complete' | 'health_depleted' | 'aborted' | null;
   // Runtime-only fields
   sseClients: Set<ReadableStreamDefaultController>;

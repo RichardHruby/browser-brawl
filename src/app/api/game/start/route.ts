@@ -35,13 +35,13 @@ export async function POST(req: NextRequest) {
 
   try {
     if (attackerType === 'browser-use') {
-      // Agent session: has both cdpUrl (for defender) and can run AI tasks
+      // Agent session: has both cdpUrl (for defender) and AI task execution
       const agentSession = await createAgentSession();
       browserSessionId = agentSession.id;
       cdpUrl = agentSession.cdpUrl;
       liveViewUrl = agentSession.liveUrl;
     } else {
-      // Raw browser: CDP access for Playwright MCP attacker + defender
+      // Raw browser: CDP access for Playwright MCP/Stagehand attacker + defender
       const browser = await createBrowser(240);
       browserSessionId = browser.id;
       cdpUrl = browser.cdpUrl;
@@ -99,7 +99,7 @@ export async function POST(req: NextRequest) {
       }
     });
   } else {
-    // Playwright MCP agent on the raw browser
+    // Local attacker loop routes to Playwright MCP or Stagehand
     runAttackerLoop(gameId, abort.signal).catch(err => {
       console.error('[start] attacker loop error:', err);
       const s = getSession(gameId);

@@ -12,6 +12,17 @@ interface Props {
   onStart: (difficulty: Difficulty, task: Task, attackerType: AttackerType) => void;
 }
 
+function attackerLabel(attackerType: AttackerType): string {
+  switch (attackerType) {
+    case 'browser-use':
+      return 'browser-use cloud';
+    case 'stagehand':
+      return 'Stagehand';
+    default:
+      return 'Playwright MCP';
+  }
+}
+
 export function LobbyScreen({ onStart }: Props) {
   const [difficulty, setDifficulty] = useState<Difficulty>('easy');
   const [task, setTask] = useState<Task | null>(null);
@@ -57,7 +68,7 @@ export function LobbyScreen({ onStart }: Props) {
         {/* Info row */}
         <div className="flex gap-6 text-xs font-mono"
           style={{ color: 'var(--color-text-secondary)' }}>
-          <span>Attacker: <span className="neon-cyan">{attackerType === 'browser-use' ? 'browser-use cloud' : 'Playwright MCP'}</span></span>
+          <span>Attacker: <span className="neon-cyan">{attackerLabel(attackerType)}</span></span>
           <span>Defender: <span className="neon-red">Claude AI</span></span>
           <span>Session: <span style={{ color: 'var(--color-text-primary)' }}>browser-use</span></span>
         </div>
