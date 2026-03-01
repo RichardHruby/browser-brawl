@@ -20,7 +20,7 @@ export function WinnerBanner({ winner, reason, sessionId, onPlayAgain }: Props) 
 
   return (
     <div
-      className="fixed inset-0 boxy-ui flex flex-col items-center justify-center gap-8 animate-fade-in px-6"
+      className="fixed inset-0 z-[999] boxy-ui flex flex-col items-center justify-center gap-8 animate-fade-in px-6"
       style={{ background: 'rgba(5,5,8,0.97)' }}
     >
       <BrandLogo size="sm" />

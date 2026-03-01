@@ -153,7 +153,7 @@ export default function HistoryPage() {
                 Download Traces{selected.size > 0 ? ` (${selected.size})` : ''}
               </button>
               <div
-                className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 rounded text-xs font-mono whitespace-nowrap opacity-0 group-hover/dl:opacity-100 transition-opacity duration-200 pointer-events-none z-50"
+                className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-3 py-2 rounded text-xs font-mono whitespace-nowrap opacity-0 group-hover/dl:opacity-100 transition-opacity duration-200 pointer-events-none z-50"
                 style={{
                   background: 'var(--color-bg-card)',
                   color: 'var(--color-attacker)',
@@ -165,11 +165,11 @@ export default function HistoryPage() {
                   ? 'Select sessions to download'
                   : `Download ${selected.size} session${selected.size !== 1 ? 's' : ''} as ShareGPT JSONL`}
                 <div
-                  className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0"
+                  className="absolute bottom-full left-1/2 -translate-x-1/2 w-0 h-0"
                   style={{
                     borderLeft: '6px solid transparent',
                     borderRight: '6px solid transparent',
-                    borderTop: '6px solid var(--color-attacker)',
+                    borderBottom: '6px solid var(--color-attacker)',
                   }}
                 />
               </div>
@@ -211,7 +211,7 @@ export default function HistoryPage() {
                 {isKickingOff ? 'Starting...' : 'Kickoff Finetune'}
               </button>
               <div
-                className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 rounded text-xs font-mono whitespace-nowrap opacity-0 group-hover/tooltip:opacity-100 transition-opacity duration-200 pointer-events-none z-50"
+                className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-3 py-2 rounded text-xs font-mono whitespace-nowrap opacity-0 group-hover/tooltip:opacity-100 transition-opacity duration-200 pointer-events-none z-50"
                 style={{
                   background: 'var(--color-bg-card)',
                   color: '#cc44ff',
@@ -223,11 +223,11 @@ export default function HistoryPage() {
                   ? 'Select sessions to kick off a finetune'
                   : `Kick off a finetune pipeline with Qwen2.5 — ${selected.size} session${selected.size !== 1 ? 's' : ''} as ShareGPT JSONL`}
                 <div
-                  className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0"
+                  className="absolute bottom-full left-1/2 -translate-x-1/2 w-0 h-0"
                   style={{
                     borderLeft: '6px solid transparent',
                     borderRight: '6px solid transparent',
-                    borderTop: '6px solid #cc44ff',
+                    borderBottom: '6px solid #cc44ff',
                   }}
                 />
               </div>

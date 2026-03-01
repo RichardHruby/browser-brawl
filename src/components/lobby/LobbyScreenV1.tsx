@@ -58,7 +58,7 @@ export function LobbyScreenV1({ onStart }: Props) {
             <GlitchText text="BROWSER BRAWL" className="neon-cyan" />
           </h1>
           <p className="font-mono text-xs sm:text-sm" style={{ color: 'var(--color-text-secondary)', opacity: 0.7 }}>
-            Two AI agents battle on live websites — one completes tasks, the other sabotages the DOM.
+            Two AI agents battle on live websites — one completes tasks, the other sabotages the DOM, you train on the data.
           </p>
         </div>
 
@@ -249,7 +249,7 @@ export function LobbyScreenV1({ onStart }: Props) {
             </Link>
             <Link
               href="/training"
-              className="font-mono text-[10px] tracking-wider transition-all duration-200 hover:underline"
+              className="font-mono text-sm tracking-widest font-bold transition-all duration-200 hover:underline"
               style={{ color: '#cc44ff', opacity: 0.6 }}
             >
               [ FINE TUNING RUNS ]

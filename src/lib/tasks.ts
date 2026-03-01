@@ -18,14 +18,6 @@ export const TASKS: Task[] = [
     tags: ['travel', 'search'],
   },
   {
-    id: 'hackernews-upvote',
-    label: 'Hacker News Upvote',
-    description:
-      'Go to Hacker News (news.ycombinator.com) and click the upvote arrow on the top post.',
-    startUrl: 'https://news.ycombinator.com',
-    tags: ['social', 'news'],
-  },
-  {
     id: 'techcrunch-newsletter',
     label: 'TechCrunch Newsletter',
     description:

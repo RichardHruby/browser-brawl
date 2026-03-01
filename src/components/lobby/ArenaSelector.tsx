@@ -22,11 +22,6 @@ const ARENA_CONFIGS: { taskId: string; name: string; subtitle: string }[] = [
     subtitle: 'google.com/flights',
   },
   {
-    taskId: 'hackernews-upvote',
-    name: 'THE FORUM',
-    subtitle: 'news.ycombinator.com',
-  },
-  {
     taskId: 'techcrunch-newsletter',
     name: 'THE NEWSROOM',
     subtitle: 'techcrunch.com',
