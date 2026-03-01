@@ -17,7 +17,7 @@ export function ArenaScreen({ state, onAbort }: Props) {
 
   return (
     <div
-      className="flex flex-col h-screen"
+      className="boxy-ui flex flex-col h-screen"
       style={{ background: 'var(--color-bg-deep)' }}
     >
       <ArenaHeader
@@ -40,6 +40,7 @@ export function ArenaScreen({ state, onAbort }: Props) {
         <AttackerPanel
           steps={state.attackerSteps}
           status={state.attackerStatus}
+          attackerType={state.attackerType}
         />
         <BrowserFrame
           liveViewUrl={state.liveViewUrl ?? ''}
