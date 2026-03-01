@@ -17,6 +17,14 @@
   --color-health-mid:   #ffaa00;
   --color-health-low:   #ff2200;
 
+  --color-attacker-border: rgba(0, 212, 255, 0.25);
+  --color-defender-border: rgba(255, 0, 60, 0.25);
+
+  --color-status-thinking: #ffaa00;
+  --color-status-plotting: #cc44ff;
+
+  --color-hit-flash:       rgba(255, 0, 60, 0.45);
+
   --color-text-primary: #e8e8f0;
   --color-text-secondary: #6e6e99;
   --color-text-mono:    #a0ffa0;
@@ -206,4 +214,11 @@ body {
   color: var(--color-defender);
   animation-delay: 0.15s;
   animation-direction: reverse;
+}
+
+/* Code block (replay page pre elements) */
+.code-block {
+  background: var(--color-bg-card);
+  color: var(--color-text-primary);
+  border: 1px solid var(--color-border);
 }

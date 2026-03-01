@@ -28,7 +28,7 @@ const initial: ClientGameState = {
   defenderDisruptions: [],
   winner: null,
   winReason: null,
-  lastHit: false,
+  lastHitAt: 0,
   currentTurn: null,
   turnNumber: 0,
   attackerStepsThisTurn: 0,
@@ -103,13 +103,13 @@ function reducer(state: ClientGameState, action: Action): ClientGameState {
             ...state,
             defenderStatus: 'striking',
             defenderDisruptions: [...state.defenderDisruptions, newDisruption],
-            lastHit: true,
+            lastHitAt: p.success ? Math.max(Date.now(), state.lastHitAt + 1) : state.lastHitAt,
           };
         }
 
         case 'health_update': {
           const p = envelope.payload as HealthUpdatePayload;
-          return { ...state, health: p.currentHealth, lastHit: false };
+          return { ...state, health: p.currentHealth };
         }
 
         case 'status_update': {

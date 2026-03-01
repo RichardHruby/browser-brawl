@@ -5,10 +5,10 @@ import { api } from '../../../../convex/_generated/api';
 import { use, useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import type { Id } from '../../../../convex/_generated/dataModel';
-
-function formatTime(iso: string): string {
-  return new Date(iso).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-}
+import type { Difficulty } from '@/types/game';
+import { DIFFICULTY_COLORS, WINNER_SHORT } from '@/lib/constants';
+import { formatTime, formatDuration, formatWinReason } from '@/lib/format';
+import { HealthBar } from '@/components/arena/HealthBar';
 
 function ScreenshotViewer({ storageId }: { storageId: Id<'_storage'> | undefined }) {
   const url = useQuery(api.screenshots.getUrl, storageId ? { storageId } : 'skip');
@@ -17,7 +17,7 @@ function ScreenshotViewer({ storageId }: { storageId: Id<'_storage'> | undefined
     <img
       src={url}
       alt="Screenshot"
-      className="w-full rounded-lg"
+      className="w-full rounded"
       style={{ border: '1px solid var(--color-border)' }}
     />
   );
@@ -88,7 +88,7 @@ function ScreencastPlayer({ storageId }: { storageId: Id<'_storage'> }) {
 
   return (
     <div className="space-y-3">
-      <div className="rounded-lg overflow-hidden" style={{ border: '1px solid var(--color-border)' }}>
+      <div className="rounded overflow-hidden" style={{ border: '1px solid var(--color-border)' }}>
         {frame && (
           <img
             src={`data:image/jpeg;base64,${frame.d}`}
@@ -102,21 +102,21 @@ function ScreencastPlayer({ storageId }: { storageId: Id<'_storage'> }) {
       <div className="flex items-center gap-3">
         <button
           onClick={() => setPlaying(!playing)}
-          className="font-mono text-xs px-3 py-1.5 rounded"
+          className="font-display text-xs font-bold tracking-widest uppercase px-3 py-1.5 rounded transition-all duration-200 hover:scale-105"
           style={{ background: 'var(--color-bg-card)', color: 'var(--color-attacker)', border: '1px solid var(--color-attacker)' }}
         >
           {playing ? 'Pause' : 'Play'}
         </button>
         <button
           onClick={() => { setFrameIndex(Math.max(0, frameIndex - 1)); setPlaying(false); }}
-          className="font-mono text-xs px-2 py-1.5 rounded"
+          className="font-mono text-xs px-2 py-1.5 rounded transition-colors"
           style={{ background: 'var(--color-bg-card)', color: 'var(--color-text-primary)', border: '1px solid var(--color-border)' }}
         >
           Prev
         </button>
         <button
           onClick={() => { setFrameIndex(Math.min(recording.frames.length - 1, frameIndex + 1)); setPlaying(false); }}
-          className="font-mono text-xs px-2 py-1.5 rounded"
+          className="font-mono text-xs px-2 py-1.5 rounded transition-colors"
           style={{ background: 'var(--color-bg-card)', color: 'var(--color-text-primary)', border: '1px solid var(--color-border)' }}
         >
           Next
@@ -127,7 +127,7 @@ function ScreencastPlayer({ storageId }: { storageId: Id<'_storage'> }) {
           <button
             key={s}
             onClick={() => setSpeed(s)}
-            className="font-mono text-[10px] px-2 py-1 rounded"
+            className="font-mono text-[10px] px-2 py-1 rounded transition-colors"
             style={{
               background: speed === s ? 'var(--color-attacker)' : 'var(--color-bg-card)',
               color: speed === s ? '#000' : 'var(--color-text-secondary)',
@@ -178,69 +178,65 @@ export default function ReplayPage({ params }: { params: Promise<{ gameId: strin
     return (
       <div className="min-h-screen flex flex-col items-center justify-center gap-4" style={{ background: 'var(--color-bg-deep)' }}>
         <span className="font-mono text-lg" style={{ color: 'var(--color-text-secondary)' }}>Session not found</span>
-        <Link href="/history" className="font-mono text-sm neon-cyan">Back to History</Link>
+        <Link href="/history" className="font-display text-xs font-bold tracking-widest uppercase px-4 py-2 rounded transition-all duration-200 hover:scale-105 neon-cyan"
+          style={{ background: 'var(--color-bg-card)', border: '1px solid var(--color-border)' }}>
+          Back to History
+        </Link>
       </div>
     );
   }
 
+  const diffColor = DIFFICULTY_COLORS[session.difficulty as Difficulty];
   const selectedStepData = selectedStep != null ? steps?.find(s => s.stepNumber === selectedStep) : null;
   const selectedActionData = selectedAction != null ? actions?.find(a => a.actionNumber === selectedAction) : null;
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: 'var(--color-bg-deep)' }}>
-      {/* Header */}
-      <div className="px-6 py-4 flex items-center justify-between" style={{ borderBottom: '1px solid var(--color-border)' }}>
-        <div>
-          <div className="flex items-center gap-4">
-            <Link href="/history" className="font-mono text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-              &larr; History
-            </Link>
-            <h1 className="font-display text-xl font-black tracking-wider neon-cyan">
-              {session.taskLabel}
-            </h1>
-          </div>
-          <div className="flex gap-4 mt-1 font-mono text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-            <span>ID: {session.gameId}</span>
-            <span>{session.mode}</span>
-            <span style={{ color: session.difficulty === 'easy' ? '#22c55e' : session.difficulty === 'nightmare' ? '#a855f7' : '#f59e0b' }}>
-              {session.difficulty}
-            </span>
+      {/* Header — matches arena header style */}
+      <div className="px-4 py-3 flex items-center justify-between shrink-0"
+        style={{ borderBottom: '1px solid var(--color-border)', background: 'var(--color-bg-panel)' }}>
+        <div className="flex items-center gap-4">
+          <Link href="/history"
+            className="font-display text-xs font-bold tracking-widest uppercase px-3 py-1.5 rounded transition-all duration-200 hover:scale-105"
+            style={{ background: 'var(--color-bg-card)', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}>
+            &larr; HISTORY
+          </Link>
+          <h1 className="font-display text-lg font-black tracking-wider neon-cyan">
+            {session.taskLabel}
+          </h1>
+        </div>
+
+        <div className="flex items-center gap-3 font-mono text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+          <span>{session.mode}</span>
+          <span className="px-1.5 py-0.5 rounded uppercase text-[10px]"
+            style={{ color: diffColor, background: `${diffColor}18` }}>
+            {session.difficulty}
+          </span>
+          {session.winner && (
             <span>
               Winner: <span className={session.winner === 'attacker' ? 'neon-cyan' : 'neon-red'}>
-                {session.winner === 'attacker' ? 'Mouse' : session.winner === 'defender' ? 'Cat' : '—'}
+                {WINNER_SHORT[session.winner as 'attacker' | 'defender']}
               </span>
             </span>
-            <span>{session.winReason?.replace(/_/g, ' ')}</span>
-            {session.durationSeconds && <span>{session.durationSeconds}s</span>}
-            {session.healthFinal != null && <span>HP: {Math.round(session.healthFinal)}%</span>}
-          </div>
+          )}
+          <span>{formatWinReason(session.winReason)}</span>
+          {session.durationSeconds && <span>{formatDuration(session.durationSeconds)}</span>}
         </div>
       </div>
 
       {/* Health bar */}
       {healthTimeline && healthTimeline.length > 0 && (
-        <div className="px-6 py-3" style={{ borderBottom: '1px solid var(--color-border)' }}>
+        <div className="px-4 py-2 shrink-0" style={{ borderBottom: '1px solid var(--color-border)', background: 'var(--color-bg-panel)' }}>
           <div className="flex items-center gap-3">
-            <span className="font-mono text-xs" style={{ color: 'var(--color-text-secondary)' }}>Health:</span>
-            <div className="flex-1 h-3 rounded-full overflow-hidden" style={{ background: 'var(--color-bg-card)' }}>
-              <div
-                className="h-full rounded-full transition-all"
-                style={{
-                  width: `${session.healthFinal ?? 100}%`,
-                  background: (session.healthFinal ?? 100) > 50 ? '#22c55e' : (session.healthFinal ?? 100) > 20 ? '#f59e0b' : '#ef4444',
-                }}
-              />
-            </div>
-            <span className="font-mono text-xs" style={{ color: 'var(--color-text-primary)' }}>
-              {Math.round(session.healthFinal ?? 100)}%
-            </span>
+            <span className="font-mono text-xs" style={{ color: 'var(--color-text-secondary)' }}>HP</span>
+            <HealthBar health={session.healthFinal ?? 100} variant="static" />
           </div>
           {/* Health timeline markers */}
-          <div className="flex gap-2 mt-2 flex-wrap">
+          <div className="flex gap-2 mt-1.5 flex-wrap">
             {healthTimeline.map((h, i) => (
               <span key={i} className="font-mono text-[10px] px-1.5 py-0.5 rounded" style={{
                 background: 'var(--color-bg-card)',
-                color: h.delta < 0 ? '#ef4444' : '#22c55e',
+                color: h.delta < 0 ? 'var(--color-health-low)' : 'var(--color-health-high)',
               }}>
                 {h.delta > 0 ? '+' : ''}{h.delta} ({h.cause})
               </span>
@@ -252,13 +248,17 @@ export default function ReplayPage({ params }: { params: Promise<{ gameId: strin
       {/* Three-column layout */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left: Attacker Steps */}
-        <div className="w-80 flex-shrink-0 overflow-y-auto feed-scroll" style={{ borderRight: '1px solid var(--color-border)' }}>
-          <div className="px-4 py-3 font-mono text-xs uppercase tracking-wider sticky top-0" style={{
-            color: 'var(--color-attacker)',
-            background: 'var(--color-bg-deep)',
-            borderBottom: '1px solid var(--color-border)',
-          }}>
-            Attacker Steps ({steps?.length ?? 0})
+        <div className="w-80 flex-shrink-0 overflow-y-auto feed-scroll"
+          style={{ borderRight: '1px solid var(--color-border)', background: 'var(--color-bg-panel)' }}>
+          <div className="px-4 py-3 font-display text-xs font-bold tracking-widest sticky top-0 shrink-0"
+            style={{
+              background: 'var(--color-bg-panel)',
+              borderBottom: '1px solid var(--color-attacker-border)',
+            }}>
+            <span className="neon-cyan">⚔ ATTACKER STEPS</span>
+            <span className="font-mono text-[10px] ml-2" style={{ color: 'var(--color-text-secondary)' }}>
+              ({steps?.length ?? 0})
+            </span>
           </div>
           {steps?.map((step) => (
             <button
@@ -267,7 +267,7 @@ export default function ReplayPage({ params }: { params: Promise<{ gameId: strin
               className="w-full text-left px-4 py-3 transition-colors"
               style={{
                 borderBottom: '1px solid var(--color-border)',
-                background: selectedStep === step.stepNumber ? 'rgba(0,212,255,0.1)' : 'transparent',
+                background: selectedStep === step.stepNumber ? 'var(--color-attacker-dim)' : 'transparent',
               }}
             >
               <div className="flex items-center gap-2">
@@ -281,7 +281,7 @@ export default function ReplayPage({ params }: { params: Promise<{ gameId: strin
               </div>
               {step.toolName && (
                 <span className="font-mono text-[10px] px-1.5 py-0.5 rounded mt-1 inline-block" style={{
-                  background: 'rgba(0,212,255,0.15)',
+                  background: 'var(--color-attacker-dim)',
                   color: 'var(--color-attacker)',
                 }}>
                   {step.toolName}
@@ -318,11 +318,7 @@ export default function ReplayPage({ params }: { params: Promise<{ gameId: strin
                   <h3 className="font-mono text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--color-text-secondary)' }}>
                     Tool Input
                   </h3>
-                  <pre className="font-mono text-xs p-3 rounded-lg overflow-x-auto" style={{
-                    background: 'var(--color-bg-card)',
-                    color: 'var(--color-text-primary)',
-                    border: '1px solid var(--color-border)',
-                  }}>
+                  <pre className="font-mono text-xs p-3 rounded overflow-x-auto code-block">
                     {(() => { try { return JSON.stringify(JSON.parse(selectedStepData.toolInput!), null, 2); } catch { return selectedStepData.toolInput; } })()}
                   </pre>
                 </div>
@@ -333,12 +329,7 @@ export default function ReplayPage({ params }: { params: Promise<{ gameId: strin
                   <h3 className="font-mono text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--color-text-secondary)' }}>
                     Result
                   </h3>
-                  <pre className="font-mono text-xs p-3 rounded-lg overflow-x-auto whitespace-pre-wrap" style={{
-                    background: 'var(--color-bg-card)',
-                    color: 'var(--color-text-primary)',
-                    border: '1px solid var(--color-border)',
-                    maxHeight: '300px',
-                  }}>
+                  <pre className="font-mono text-xs p-3 rounded overflow-x-auto whitespace-pre-wrap code-block" style={{ maxHeight: '300px' }}>
                     {selectedStepData.toolResultSummary}
                   </pre>
                 </div>
@@ -350,14 +341,14 @@ export default function ReplayPage({ params }: { params: Promise<{ gameId: strin
                   <h3 className="font-mono text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--color-text-secondary)' }}>
                     DOM Snapshot ({JSON.parse(selectedStepData.domSnapshot).length} elements)
                   </h3>
-                  <div className="max-h-64 overflow-y-auto feed-scroll rounded-lg" style={{
+                  <div className="max-h-64 overflow-y-auto feed-scroll rounded" style={{
                     background: 'var(--color-bg-card)',
                     border: '1px solid var(--color-border)',
                   }}>
                     {(JSON.parse(selectedStepData.domSnapshot) as Array<{ tag: string; text: string; id?: string; pos: { x: number; y: number; w: number; h: number } }>).map((el, i) => (
                       <div key={i} className="px-3 py-1.5 font-mono text-[11px] flex gap-3" style={{ borderBottom: '1px solid var(--color-border)' }}>
                         <span style={{ color: 'var(--color-attacker)' }}>&lt;{el.tag}&gt;</span>
-                        {el.id && <span style={{ color: '#f59e0b' }}>#{el.id}</span>}
+                        {el.id && <span style={{ color: 'var(--color-status-thinking)' }}>#{el.id}</span>}
                         <span className="truncate flex-1" style={{ color: 'var(--color-text-primary)' }}>{el.text || '(empty)'}</span>
                         <span style={{ color: 'var(--color-text-secondary)' }}>{el.pos.x},{el.pos.y}</span>
                       </div>
@@ -377,12 +368,12 @@ export default function ReplayPage({ params }: { params: Promise<{ gameId: strin
 
               <div className="flex gap-3">
                 <span className="font-mono text-xs px-2 py-0.5 rounded" style={{
-                  background: selectedActionData.success ? 'rgba(239,68,68,0.2)' : 'rgba(100,100,100,0.2)',
-                  color: selectedActionData.success ? '#ef4444' : '#888',
+                  background: selectedActionData.success ? 'var(--color-defender-dim)' : 'rgba(100, 100, 100, 0.15)',
+                  color: selectedActionData.success ? 'var(--color-defender)' : 'var(--color-text-secondary)',
                 }}>
                   {selectedActionData.success ? 'HIT' : 'MISS'}
                 </span>
-                <span className="font-mono text-xs" style={{ color: '#ef4444' }}>
+                <span className="font-mono text-xs" style={{ color: 'var(--color-health-low)' }}>
                   -{selectedActionData.healthDamage} HP
                 </span>
               </div>
@@ -392,7 +383,7 @@ export default function ReplayPage({ params }: { params: Promise<{ gameId: strin
                 <h3 className="font-mono text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--color-text-secondary)' }}>
                   Reasoning
                 </h3>
-                <p className="font-game text-sm p-3 rounded-lg" style={{
+                <p className="font-game text-sm p-3 rounded" style={{
                   background: 'var(--color-bg-card)',
                   color: 'var(--color-text-primary)',
                   border: '1px solid var(--color-border)',
@@ -423,12 +414,7 @@ export default function ReplayPage({ params }: { params: Promise<{ gameId: strin
                   <h3 className="font-mono text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--color-text-secondary)' }}>
                     Injection Payload
                   </h3>
-                  <pre className="font-mono text-xs p-3 rounded-lg overflow-x-auto whitespace-pre-wrap" style={{
-                    background: 'var(--color-bg-card)',
-                    color: 'var(--color-text-primary)',
-                    border: '1px solid var(--color-border)',
-                    maxHeight: '400px',
-                  }}>
+                  <pre className="font-mono text-xs p-3 rounded overflow-x-auto whitespace-pre-wrap code-block" style={{ maxHeight: '400px' }}>
                     {selectedActionData.injectionPayload}
                   </pre>
                 </div>
@@ -440,12 +426,7 @@ export default function ReplayPage({ params }: { params: Promise<{ gameId: strin
                   <h3 className="font-mono text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--color-text-secondary)' }}>
                     DOM Snapshot
                   </h3>
-                  <pre className="font-mono text-xs p-3 rounded-lg overflow-x-auto whitespace-pre-wrap" style={{
-                    background: 'var(--color-bg-card)',
-                    color: 'var(--color-text-primary)',
-                    border: '1px solid var(--color-border)',
-                    maxHeight: '300px',
-                  }}>
+                  <pre className="font-mono text-xs p-3 rounded overflow-x-auto whitespace-pre-wrap code-block" style={{ maxHeight: '300px' }}>
                     {selectedActionData.domSnapshot}
                   </pre>
                 </div>
@@ -464,13 +445,17 @@ export default function ReplayPage({ params }: { params: Promise<{ gameId: strin
         </div>
 
         {/* Right: Defender Actions */}
-        <div className="w-80 flex-shrink-0 overflow-y-auto feed-scroll" style={{ borderLeft: '1px solid var(--color-border)' }}>
-          <div className="px-4 py-3 font-mono text-xs uppercase tracking-wider sticky top-0" style={{
-            color: 'var(--color-defender)',
-            background: 'var(--color-bg-deep)',
-            borderBottom: '1px solid var(--color-border)',
-          }}>
-            Defender Actions ({actions?.length ?? 0})
+        <div className="w-80 flex-shrink-0 overflow-y-auto feed-scroll"
+          style={{ borderLeft: '1px solid var(--color-border)', background: 'var(--color-bg-panel)' }}>
+          <div className="px-4 py-3 font-display text-xs font-bold tracking-widest sticky top-0 shrink-0"
+            style={{
+              background: 'var(--color-bg-panel)',
+              borderBottom: '1px solid var(--color-defender-border)',
+            }}>
+            <span className="neon-red">DEFENDER ACTIONS 🛡</span>
+            <span className="font-mono text-[10px] ml-2" style={{ color: 'var(--color-text-secondary)' }}>
+              ({actions?.length ?? 0})
+            </span>
           </div>
           {actions?.map((action) => (
             <button
@@ -479,7 +464,7 @@ export default function ReplayPage({ params }: { params: Promise<{ gameId: strin
               className="w-full text-left px-4 py-3 transition-colors"
               style={{
                 borderBottom: '1px solid var(--color-border)',
-                background: selectedAction === action.actionNumber ? 'rgba(255,0,60,0.1)' : 'transparent',
+                background: selectedAction === action.actionNumber ? 'var(--color-defender-dim)' : 'transparent',
               }}
             >
               <div className="flex items-center gap-2">
@@ -488,8 +473,8 @@ export default function ReplayPage({ params }: { params: Promise<{ gameId: strin
                   {formatTime(action.timestamp)}
                 </span>
                 <span className="font-mono text-[10px] px-1 rounded" style={{
-                  color: action.success ? '#ef4444' : '#666',
-                  background: action.success ? 'rgba(239,68,68,0.15)' : 'rgba(100,100,100,0.1)',
+                  color: action.success ? 'var(--color-defender)' : 'var(--color-text-secondary)',
+                  background: action.success ? 'var(--color-defender-dim)' : 'rgba(100, 100, 100, 0.1)',
                 }}>
                   {action.success ? 'HIT' : 'MISS'}
                 </span>

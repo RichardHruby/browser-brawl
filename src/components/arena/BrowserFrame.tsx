@@ -1,23 +1,11 @@
 'use client';
 
-import { useState, useEffect } from 'react';
-
 interface Props {
   liveViewUrl: string;
-  hit: boolean;
+  hitAt: number;
 }
 
-export function BrowserFrame({ liveViewUrl, hit }: Props) {
-  const [flash, setFlash] = useState(false);
-
-  useEffect(() => {
-    if (hit) {
-      setFlash(true);
-      const t = setTimeout(() => setFlash(false), 350);
-      return () => clearTimeout(t);
-    }
-  }, [hit]);
-
+export function BrowserFrame({ liveViewUrl, hitAt }: Props) {
   return (
     <div className="relative flex-1 min-w-0 flex flex-col rounded overflow-hidden"
       style={{ border: '1px solid var(--color-border)', background: '#111' }}>
@@ -30,10 +18,8 @@ export function BrowserFrame({ liveViewUrl, hit }: Props) {
           <div className="w-3 h-3 rounded-full" style={{ background: '#febc2e' }} />
           <div className="w-3 h-3 rounded-full" style={{ background: '#28c840' }} />
         </div>
-        <div className="flex-1 rounded px-3 py-0.5 text-xs font-mono truncate"
-          style={{ background: 'var(--color-bg-card)', color: 'var(--color-text-secondary)' }}>
-          LIVE SESSION
-        </div>
+        <div className="flex-1 rounded px-3 py-0.5"
+          style={{ background: 'var(--color-bg-card)' }} />
         <div className="text-xs font-mono" style={{ color: 'var(--color-attacker)', opacity: 0.7 }}>
           ● LIVE
         </div>
@@ -53,10 +39,11 @@ export function BrowserFrame({ liveViewUrl, hit }: Props) {
         <div className="crt-overlay" />
 
         {/* Hit flash */}
-        {flash && (
+        {hitAt > 0 && (
           <div
+            key={hitAt}
             className="absolute inset-0 z-20 pointer-events-none hit-flash"
-            style={{ background: 'rgba(255, 0, 60, 0.45)' }}
+            style={{ background: 'var(--color-hit-flash)' }}
           />
         )}
 

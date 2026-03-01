@@ -4,28 +4,11 @@ import { useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { useState } from 'react';
 import Link from 'next/link';
+import { DIFFICULTY_COLORS, WINNER_SHORT } from '@/lib/constants';
+import { formatDuration, formatDate, formatWinReason } from '@/lib/format';
+import type { Difficulty } from '@/types/game';
 
-type Difficulty = 'easy' | 'medium' | 'hard' | 'nightmare';
 type Winner = 'attacker' | 'defender';
-
-const DIFFICULTY_COLORS: Record<string, string> = {
-  easy: '#22c55e',
-  medium: '#f59e0b',
-  hard: '#ef4444',
-  nightmare: '#a855f7',
-};
-
-function formatDuration(seconds: number | undefined): string {
-  if (!seconds) return '—';
-  const m = Math.floor(seconds / 60);
-  const s = seconds % 60;
-  return m > 0 ? `${m}m ${s}s` : `${s}s`;
-}
-
-function formatDate(iso: string): string {
-  const d = new Date(iso);
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
-}
 
 export default function HistoryPage() {
   const [diffFilter, setDiffFilter] = useState<Difficulty | ''>('');
@@ -56,30 +39,30 @@ export default function HistoryPage() {
           <a
             href="/api/export/sessions"
             download
-            className="font-mono text-xs px-3 py-2 rounded-lg transition-colors"
+            className="font-display text-xs font-bold tracking-widest uppercase px-4 py-2 rounded transition-all duration-200 hover:scale-105"
             style={{
               background: 'var(--color-bg-card)',
               color: 'var(--color-attacker)',
               border: '1px solid var(--color-border)',
             }}
           >
-            Export Sessions CSV
+            Export Sessions
           </a>
           <a
             href="/api/export/disruptions"
             download
-            className="font-mono text-xs px-3 py-2 rounded-lg transition-colors"
+            className="font-display text-xs font-bold tracking-widest uppercase px-4 py-2 rounded transition-all duration-200 hover:scale-105"
             style={{
               background: 'var(--color-bg-card)',
               color: 'var(--color-defender)',
               border: '1px solid var(--color-border)',
             }}
           >
-            Export Disruptions CSV
+            Export Disruptions
           </a>
           <Link
             href="/"
-            className="font-mono text-sm px-4 py-2 rounded-lg transition-colors"
+            className="font-display text-xs font-bold tracking-widest uppercase px-4 py-2 rounded transition-all duration-200 hover:scale-105"
             style={{
               background: 'var(--color-bg-card)',
               color: 'var(--color-text-secondary)',
@@ -96,7 +79,7 @@ export default function HistoryPage() {
         <select
           value={diffFilter}
           onChange={(e) => setDiffFilter(e.target.value as Difficulty | '')}
-          className="font-mono text-sm px-3 py-2 rounded-lg"
+          className="font-mono text-xs px-3 py-2 rounded appearance-none cursor-pointer"
           style={{
             background: 'var(--color-bg-card)',
             color: 'var(--color-text-primary)',
@@ -113,7 +96,7 @@ export default function HistoryPage() {
         <select
           value={winnerFilter}
           onChange={(e) => setWinnerFilter(e.target.value as Winner | '')}
-          className="font-mono text-sm px-3 py-2 rounded-lg"
+          className="font-mono text-xs px-3 py-2 rounded appearance-none cursor-pointer"
           style={{
             background: 'var(--color-bg-card)',
             color: 'var(--color-text-primary)',
@@ -187,8 +170,8 @@ export default function HistoryPage() {
                     <span
                       className="font-mono text-xs px-2 py-0.5 rounded"
                       style={{
-                        color: DIFFICULTY_COLORS[s.difficulty] ?? '#888',
-                        background: `${DIFFICULTY_COLORS[s.difficulty] ?? '#888'}20`,
+                        color: DIFFICULTY_COLORS[s.difficulty as Difficulty] ?? '#888',
+                        background: `${DIFFICULTY_COLORS[s.difficulty as Difficulty] ?? '#888'}20`,
                       }}
                     >
                       {s.difficulty}
@@ -197,14 +180,14 @@ export default function HistoryPage() {
                   <td className="px-4 py-3">
                     {s.winner ? (
                       <span className={s.winner === 'attacker' ? 'neon-cyan' : 'neon-red'}>
-                        {s.winner === 'attacker' ? 'Mouse' : 'Cat'}
+                        {WINNER_SHORT[s.winner as 'attacker' | 'defender']}
                       </span>
                     ) : (
                       <span style={{ color: 'var(--color-text-secondary)' }}>—</span>
                     )}
                   </td>
                   <td className="px-4 py-3 font-mono text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-                    {s.winReason?.replace(/_/g, ' ') ?? '—'}
+                    {formatWinReason(s.winReason)}
                   </td>
                   <td className="px-4 py-3 text-right font-mono text-xs" style={{ color: 'var(--color-text-primary)' }}>
                     {s.healthFinal != null ? `${Math.round(s.healthFinal)}%` : '—'}
@@ -215,7 +198,7 @@ export default function HistoryPage() {
                   <td className="px-4 py-3 text-right">
                     <Link
                       href={`/history/${s.gameId}`}
-                      className="font-mono text-xs px-3 py-1 rounded transition-colors"
+                      className="font-mono text-xs px-3 py-1 rounded transition-all duration-200 hover:scale-105"
                       style={{
                         background: 'var(--color-bg-card)',
                         color: 'var(--color-attacker)',

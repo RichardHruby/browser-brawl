@@ -7,7 +7,10 @@ type Handler = (envelope: SSEEnvelope) => void;
 
 export function useGameSSE(sessionId: string | null, onEvent: Handler) {
   const handlerRef = useRef(onEvent);
-  handlerRef.current = onEvent;
+
+  useEffect(() => {
+    handlerRef.current = onEvent;
+  }, [onEvent]);
 
   useEffect(() => {
     if (!sessionId) return;
