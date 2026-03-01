@@ -252,14 +252,43 @@ conversations: {
 - **Test file:** `src/lib/__tests__/conversation-persistence.test.ts` — 8 tests covering JSON serialization roundtrip, truncation limits, and graceful degradation when Convex is unavailable
 - **Run:** `npx vitest run`
 
-### Pipeline Phases (Planned)
+### Data Extraction & Format Conversion Scripts
 
-1. **Data extraction** — `scripts/extract-training-data.ts`: Convex → raw JSONL (one trajectory per line) with screenshots
-2. **Format conversion** — `scripts/convert-to-sharegpt.ts`: Anthropic tool format → ShareGPT with OpenAI-style function calling for Axolotl
-3. **Data farming** — Headless game runner to generate 500+ successful trajectories
-4. **Fine-tuning** — Axolotl + Unsloth on Modal A100, QLoRA on Qwen2.5-VL-3B-Instruct
-5. **Evaluation** — In-distribution (Browser Brawl held-out set) + out-of-distribution (MiniWob++)
-6. **Adversarial specialization** — DPO with successful vs failed trajectories, disruption-annotated data
+**Extraction** — `scripts/extract-training-data.ts`:
+- Standalone Node.js script using `ConvexHttpClient`
+- Queries successful sessions, fetches latest conversation row per game, downloads screenshot URLs
+- Outputs raw JSONL (one trajectory per line) with full Anthropic messages + metadata
+- Usage: `npx tsx scripts/extract-training-data.ts --game <id> -o data/raw.jsonl`
+
+**Conversion** — `scripts/convert-to-sharegpt.ts`:
+- Converts Anthropic tool format → Qwen2.5-compatible ShareGPT format
+- `tool_use` blocks → `<tool_call>` XML tags in `gpt` messages
+- `tool_result` blocks → `<tool_response>` XML tags in `tool` messages (not `human`)
+- Tool definitions → `<tools>` XML with OpenAI function format in system prompt
+- Extracts task text from the original system prompt
+- Quality filters: minimum tool call count (default 3)
+- Usage: `npx tsx scripts/convert-to-sharegpt.ts -i data/raw.jsonl -o data/train.jsonl`
+
+**Output format** (ShareGPT roles):
+```
+system  → Tool definitions + agent instructions
+human   → Task description (appears once)
+gpt     → Reasoning text + <tool_call> tags
+tool    → <tool_response> tags
+gpt     → More reasoning + <tool_call> tags
+...
+gpt     → Final "TASK COMPLETE" message
+```
+
+**Tests:** `scripts/__tests__/convert-to-sharegpt.test.ts` — 16 tests covering tool def conversion, system prompt generation, assistant message formatting, tool response formatting, role mapping, metadata population, and quality filters.
+
+### Pipeline Phases
+
+1. **Data extraction + conversion** — `scripts/extract-training-data.ts` + `scripts/convert-to-sharegpt.ts` (done, verified end-to-end)
+2. **Data farming** — Headless game runner to generate 500+ successful trajectories
+3. **Fine-tuning** — Axolotl + Unsloth on Modal A100, QLoRA on Qwen2.5-VL-3B-Instruct
+4. **Evaluation** — In-distribution (Browser Brawl held-out set) + out-of-distribution (MiniWob++)
+5. **Adversarial specialization** — DPO with successful vs failed trajectories, disruption-annotated data
 
 ## Current Status
 
