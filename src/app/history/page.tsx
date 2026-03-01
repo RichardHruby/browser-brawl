@@ -22,97 +22,105 @@ export default function HistoryPage() {
 
   return (
     <div
-      className="min-h-screen flex flex-col px-6 py-8"
+      className="boxy-ui min-h-screen flex flex-col px-6 py-8"
       style={{ background: 'var(--color-bg-deep)' }}
     >
-      {/* Header */}
-      <div className="flex items-center justify-between mb-8">
-        <div>
-          <h1 className="font-display text-3xl font-black tracking-widest neon-cyan">
-            GAME HISTORY
-          </h1>
-          <p className="font-game text-sm mt-1" style={{ color: 'var(--color-text-secondary)' }}>
-            Past sessions &middot; Training data
-          </p>
+      <div
+        className="sticky top-0 z-30 -mx-6 px-6 pt-8 pb-4"
+        style={{
+          background: 'var(--color-bg-deep)',
+          borderBottom: '2px solid var(--color-border)',
+        }}
+      >
+        {/* Header */}
+        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+          <div>
+            <h1 className="font-display text-3xl font-black tracking-widest neon-cyan">
+              GAME HISTORY
+            </h1>
+            <p className="font-game text-sm mt-1" style={{ color: 'var(--color-text-secondary)' }}>
+              Past sessions &middot; Training data
+            </p>
+          </div>
+          <div className="flex gap-3 flex-wrap">
+            <a
+              href="/api/export/sessions"
+              download
+              className="font-display text-xs font-bold tracking-widest uppercase px-4 py-2 rounded transition-all duration-200 hover:scale-105"
+              style={{
+                background: 'var(--color-bg-card)',
+                color: 'var(--color-attacker)',
+                border: '2px solid var(--color-border)',
+              }}
+            >
+              Export Sessions
+            </a>
+            <a
+              href="/api/export/disruptions"
+              download
+              className="font-display text-xs font-bold tracking-widest uppercase px-4 py-2 rounded transition-all duration-200 hover:scale-105"
+              style={{
+                background: 'var(--color-bg-card)',
+                color: 'var(--color-defender)',
+                border: '2px solid var(--color-border)',
+              }}
+            >
+              Export Disruptions
+            </a>
+            <Link
+              href="/"
+              className="font-display text-xs font-bold tracking-widest uppercase px-4 py-2 rounded transition-all duration-200 hover:scale-105"
+              style={{
+                background: 'var(--color-bg-card)',
+                color: 'var(--color-text-secondary)',
+                border: '2px solid var(--color-border)',
+              }}
+            >
+              Back to Lobby
+            </Link>
+          </div>
         </div>
-        <div className="flex gap-3">
-          <a
-            href="/api/export/sessions"
-            download
-            className="font-display text-xs font-bold tracking-widest uppercase px-4 py-2 rounded transition-all duration-200 hover:scale-105"
+
+        {/* Filters */}
+        <div className="flex gap-4 mt-4 flex-wrap">
+          <select
+            value={diffFilter}
+            onChange={(e) => setDiffFilter(e.target.value as Difficulty | '')}
+            className="font-mono text-xs px-3 py-2 rounded appearance-none cursor-pointer"
             style={{
               background: 'var(--color-bg-card)',
-              color: 'var(--color-attacker)',
-              border: '1px solid var(--color-border)',
+              color: 'var(--color-text-primary)',
+              border: '2px solid var(--color-border)',
             }}
           >
-            Export Sessions
-          </a>
-          <a
-            href="/api/export/disruptions"
-            download
-            className="font-display text-xs font-bold tracking-widest uppercase px-4 py-2 rounded transition-all duration-200 hover:scale-105"
+            <option value="">All Difficulties</option>
+            <option value="easy">Easy</option>
+            <option value="medium">Medium</option>
+            <option value="hard">Hard</option>
+            <option value="nightmare">Nightmare</option>
+          </select>
+
+          <select
+            value={winnerFilter}
+            onChange={(e) => setWinnerFilter(e.target.value as Winner | '')}
+            className="font-mono text-xs px-3 py-2 rounded appearance-none cursor-pointer"
             style={{
               background: 'var(--color-bg-card)',
-              color: 'var(--color-defender)',
-              border: '1px solid var(--color-border)',
+              color: 'var(--color-text-primary)',
+              border: '2px solid var(--color-border)',
             }}
           >
-            Export Disruptions
-          </a>
-          <Link
-            href="/"
-            className="font-display text-xs font-bold tracking-widest uppercase px-4 py-2 rounded transition-all duration-200 hover:scale-105"
-            style={{
-              background: 'var(--color-bg-card)',
-              color: 'var(--color-text-secondary)',
-              border: '1px solid var(--color-border)',
-            }}
-          >
-            Back to Lobby
-          </Link>
+            <option value="">All Winners</option>
+            <option value="attacker">Attacker Won</option>
+            <option value="defender">Defender Won</option>
+          </select>
+
+          {sessions && (
+            <span className="font-mono text-xs self-center" style={{ color: 'var(--color-text-secondary)' }}>
+              {sessions.length} session{sessions.length !== 1 ? 's' : ''}
+            </span>
+          )}
         </div>
-      </div>
-
-      {/* Filters */}
-      <div className="flex gap-4 mb-6">
-        <select
-          value={diffFilter}
-          onChange={(e) => setDiffFilter(e.target.value as Difficulty | '')}
-          className="font-mono text-xs px-3 py-2 rounded appearance-none cursor-pointer"
-          style={{
-            background: 'var(--color-bg-card)',
-            color: 'var(--color-text-primary)',
-            border: '1px solid var(--color-border)',
-          }}
-        >
-          <option value="">All Difficulties</option>
-          <option value="easy">Easy</option>
-          <option value="medium">Medium</option>
-          <option value="hard">Hard</option>
-          <option value="nightmare">Nightmare</option>
-        </select>
-
-        <select
-          value={winnerFilter}
-          onChange={(e) => setWinnerFilter(e.target.value as Winner | '')}
-          className="font-mono text-xs px-3 py-2 rounded appearance-none cursor-pointer"
-          style={{
-            background: 'var(--color-bg-card)',
-            color: 'var(--color-text-primary)',
-            border: '1px solid var(--color-border)',
-          }}
-        >
-          <option value="">All Winners</option>
-          <option value="attacker">Attacker Won</option>
-          <option value="defender">Defender Won</option>
-        </select>
-
-        {sessions && (
-          <span className="font-mono text-xs self-center" style={{ color: 'var(--color-text-secondary)' }}>
-            {sessions.length} session{sessions.length !== 1 ? 's' : ''}
-          </span>
-        )}
       </div>
 
       {/* Table */}
@@ -120,7 +128,7 @@ export default function HistoryPage() {
         className="rounded-xl overflow-hidden"
         style={{
           background: 'var(--color-bg-panel)',
-          border: '1px solid var(--color-border)',
+          border: '2px solid var(--color-border)',
         }}
       >
         <table className="w-full font-game text-sm">
@@ -202,7 +210,7 @@ export default function HistoryPage() {
                       style={{
                         background: 'var(--color-bg-card)',
                         color: 'var(--color-attacker)',
-                        border: '1px solid var(--color-attacker)',
+                        border: '2px solid var(--color-attacker)',
                       }}
                     >
                       Replay

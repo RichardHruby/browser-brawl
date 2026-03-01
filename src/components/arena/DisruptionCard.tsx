@@ -15,6 +15,7 @@ export function DisruptionCard({ event, isNew }: Props) {
       style={{
         background: event.success ? 'rgba(255,0,60,0.08)' : 'var(--color-bg-card)',
         borderColor: event.success ? 'var(--color-defender-border)' : 'var(--color-border)',
+        borderWidth: '2px',
       }}
     >
       <div className="flex items-start justify-between gap-2">

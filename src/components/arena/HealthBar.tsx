@@ -14,9 +14,9 @@ export function HealthBar({ health, variant = 'arena' }: Props) {
   if (isStatic) {
     return (
       <div className="flex items-center gap-3 flex-1">
-        <div className="flex-1 h-3 rounded-full overflow-hidden" style={{ background: 'var(--color-bg-card)' }}>
+        <div className="flex-1 h-3 overflow-hidden" style={{ background: 'var(--color-bg-card)' }}>
           <div
-            className="h-full rounded-full"
+            className="h-full"
             style={{
               width: `${Math.max(0, health)}%`,
               background: color,

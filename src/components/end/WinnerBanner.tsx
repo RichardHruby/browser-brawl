@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { REASON_LABELS } from '@/lib/constants';
+import { BrandLogo } from '@/components/shared/BrandLogo';
 
 interface Props {
   winner: 'attacker' | 'defender';
@@ -19,14 +20,18 @@ export function WinnerBanner({ winner, reason, sessionId, onPlayAgain }: Props) 
 
   return (
     <div
-      className="fixed inset-0 flex flex-col items-center justify-center gap-8 animate-fade-in"
+      className="fixed inset-0 boxy-ui flex flex-col items-center justify-center gap-8 animate-fade-in px-6"
       style={{ background: 'rgba(5,5,8,0.97)' }}
     >
+      <BrandLogo size="sm" />
+
       {/* Winner text */}
       <div
-        className="font-display text-7xl font-black tracking-widest text-center animate-winner"
+        className="font-display text-5xl sm:text-7xl font-black tracking-widest text-center animate-winner px-6 py-4"
         style={{
           color,
+          background: 'var(--color-bg-panel)',
+          border: `2px solid ${color}`,
           textShadow: `0 0 40px ${color}, 0 0 80px ${color}44`,
         }}
       >
@@ -50,10 +55,10 @@ export function WinnerBanner({ winner, reason, sessionId, onPlayAgain }: Props) 
       />
 
       {/* Actions */}
-      <div className="flex gap-4">
+      <div className="flex flex-col sm:flex-row gap-4">
         <button
           onClick={onPlayAgain}
-          className="px-12 py-4 rounded font-display text-xl font-bold tracking-widest transition-all duration-200 hover:scale-105"
+          className="px-12 py-4 font-display text-xl font-bold tracking-widest transition-all duration-200 hover:scale-105"
           style={{
             background: `${color}18`,
             border: `2px solid ${color}`,
@@ -66,7 +71,7 @@ export function WinnerBanner({ winner, reason, sessionId, onPlayAgain }: Props) 
         {sessionId && (
           <Link
             href={`/history/${sessionId}`}
-            className="px-8 py-4 rounded font-display text-xl font-bold tracking-widest transition-all duration-200 hover:scale-105 flex items-center"
+            className="px-8 py-4 font-display text-xl font-bold tracking-widest transition-all duration-200 hover:scale-105 flex items-center"
             style={{
               background: 'var(--color-bg-card)',
               border: '2px solid var(--color-border)',

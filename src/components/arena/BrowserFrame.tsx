@@ -8,11 +8,11 @@ interface Props {
 export function BrowserFrame({ liveViewUrl, hitAt }: Props) {
   return (
     <div className="relative flex-1 min-w-0 flex flex-col rounded overflow-hidden"
-      style={{ border: '1px solid var(--color-border)', background: '#111' }}>
+      style={{ border: '2px solid var(--color-border)', background: '#111' }}>
 
       {/* Browser chrome bar */}
       <div className="flex items-center gap-2 px-3 py-2 shrink-0"
-        style={{ background: 'var(--color-bg-panel)', borderBottom: '1px solid var(--color-border)' }}>
+        style={{ background: 'var(--color-bg-panel)', borderBottom: '2px solid var(--color-border)' }}>
         <div className="flex gap-1.5">
           <div className="w-3 h-3 rounded-full" style={{ background: '#ff5f57' }} />
           <div className="w-3 h-3 rounded-full" style={{ background: '#febc2e' }} />
