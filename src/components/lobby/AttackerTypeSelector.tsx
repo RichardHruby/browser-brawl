@@ -5,13 +5,13 @@ import type { AttackerType } from '@/types/game';
 const OPTIONS: { value: AttackerType; label: string; desc: string }[] = [
   {
     value: 'playwright-mcp',
-    label: 'PLAYWRIGHT MCP',
+    label: 'CLAUDE + PLAYWRIGHT',
     desc: 'Local agent via Claude + Playwright',
   },
   {
-    value: 'stagehand',
-    label: 'STAGEHAND',
-    desc: 'Local agent via Stagehand runtime',
+    value: 'browserbase',
+    label: 'BROWSERBASE',
+    desc: 'Managed cloud browsers via Browserbase',
   },
   {
     value: 'browser-use',

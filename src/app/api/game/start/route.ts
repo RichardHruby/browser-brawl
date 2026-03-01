@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
       cdpUrl = agentSession.cdpUrl;
       liveViewUrl = agentSession.liveUrl;
     } else {
-      // Raw browser: CDP access for Playwright MCP/Stagehand attacker + defender
+      // Raw browser: CDP access for Claude+Playwright/Browserbase attacker + defender
       const browser = await createBrowser(240);
       browserSessionId = browser.id;
       cdpUrl = browser.cdpUrl;
@@ -148,7 +148,7 @@ export async function POST(req: NextRequest) {
       }
     });
   } else {
-    // Local attacker loop routes to Playwright MCP or Stagehand
+    // Local attacker loop routes to Claude+Playwright or Browserbase
     runAttackerLoop(gameId, abort.signal).catch(err => {
       console.error('[start] attacker loop error:', err);
       const s = getSession(gameId);

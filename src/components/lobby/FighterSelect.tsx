@@ -15,10 +15,10 @@ interface Fighter {
 const FIGHTERS: Fighter[] = [
   {
     value: 'playwright-mcp',
-    name: 'PLAYWRIGHT MCP',
+    name: 'CLAUDE + PLAYWRIGHT',
     image: '/fighters/playwright-mcp.jpg',
     color: '#cc2244',
-    desc: 'The Director — scripts every move with surgical precision via local Playwright automation.',
+    desc: 'The Director — Claude reasons and acts with surgical precision via Playwright browser automation.',
     stats: [
       { label: 'SPD', value: 4, max: 6 },
       { label: 'PRC', value: 5, max: 6 },
@@ -38,11 +38,11 @@ const FIGHTERS: Fighter[] = [
     ],
   },
   {
-    value: 'stagehand',
-    name: 'STAGEHAND',
+    value: 'browserbase',
+    name: 'BROWSERBASE',
     image: '/fighters/stagehand.jpg',
     color: '#ccaa00',
-    desc: 'The Naturalist — reads the battlefield by instinct, fast and adaptive.',
+    desc: 'The Platform — managed cloud browsers with built-in resilience and session replay.',
     stats: [
       { label: 'SPD', value: 5, max: 6 },
       { label: 'PRC', value: 3, max: 6 },

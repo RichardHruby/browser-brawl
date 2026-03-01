@@ -56,8 +56,8 @@ export const REASON_LABELS: Record<string, string> = {
 // ── Winner labels (compact, for tables) ──
 
 export const WINNER_SHORT: Record<'attacker' | 'defender', string> = {
-  attacker: 'Mouse',
-  defender: 'Cat',
+  attacker: 'Attacker',
+  defender: 'Defender',
 };
 
 // ── Disruption icons ──

@@ -10,7 +10,7 @@ const MAX_STEPS = 50;
 
 /**
  * Discover the browser-level WebSocket debugger URL from a CDP HTTP endpoint.
- * Browser-Use gives us `https://SESSION.cdp0.browser-use.com` but Stagehand
+ * Browser-Use gives us `https://SESSION.cdp0.browser-use.com` but Browserbase/Stagehand
  * needs the actual WebSocket URL (e.g. `ws://HOST/devtools/browser/GUID`).
  */
 async function discoverWsUrl(cdpHttpUrl: string): Promise<string> {
@@ -42,9 +42,9 @@ async function discoverWsUrl(cdpHttpUrl: string): Promise<string> {
 }
 
 /**
- * Run the attacker agent loop using Stagehand (streaming mode):
+ * Run the attacker agent loop using Browserbase (Stagehand streaming mode):
  * 1. Connect to the remote browser via CDP
- * 2. Use Stagehand's streaming agent for autonomous task completion
+ * 2. Use Browserbase's Stagehand streaming agent for autonomous task completion
  * 3. Emit reasoning via text stream BEFORE tools run (thinking phase)
  * 4. Emit tool call summaries via onStepFinish AFTER tools run (acting phase)
  */
@@ -53,7 +53,7 @@ export async function runAttackerLoop(gameId: string, signal: AbortSignal): Prom
   if (!session) return;
 
   const wsUrl = await discoverWsUrl(session.cdpUrl);
-  console.log('[stagehand] discovered WebSocket URL:', wsUrl);
+  console.log('[browserbase] discovered WebSocket URL:', wsUrl);
 
   const stagehand = new Stagehand({
     env: 'LOCAL',

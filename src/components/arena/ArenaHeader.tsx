@@ -6,8 +6,8 @@ import { DIFFICULTY_COLORS } from '@/lib/constants';
 import type { Task, AttackerStatus, DefenderStatus, GameMode, TurnOwner, Difficulty, AttackerType } from '@/types/game';
 
 const ATTACKER_TYPE_LABELS: Record<AttackerType, string> = {
-  'playwright-mcp': 'Playwright MCP',
-  'stagehand':      'Stagehand',
+  'playwright-mcp': 'Claude + Playwright',
+  'browserbase':    'Browserbase',
   'browser-use':    'Browser-Use',
 };
 

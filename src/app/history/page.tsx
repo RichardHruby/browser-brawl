@@ -29,7 +29,7 @@ export default function HistoryPage() {
       <div className="flex items-center justify-between mb-8">
         <div>
           <h1 className="font-display text-3xl font-black tracking-widest neon-cyan">
-            GAME HISTORY
+            PRIOR TRACES
           </h1>
           <p className="font-game text-sm mt-1" style={{ color: 'var(--color-text-secondary)' }}>
             Past sessions &middot; Training data

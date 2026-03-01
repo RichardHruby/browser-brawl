@@ -7,7 +7,7 @@ import type { AttackerStatus } from '@/types/game';
 
 /**
  * Unified logger for attacker steps across all attacker modes
- * (Playwright MCP, Stagehand, Browser-Use).
+ * (Claude+Playwright, Browserbase, Browser-Use).
  *
  * Encapsulates the 4 concerns each step needs:
  * 1. Increment step counter
