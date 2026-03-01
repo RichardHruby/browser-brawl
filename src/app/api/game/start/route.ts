@@ -14,12 +14,13 @@ import type { AttackerType, Difficulty } from '@/types/game';
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { taskId, difficulty = 'easy', customTask, mode = 'realtime', attackerType = 'playwright-mcp' } = body as {
+  const { taskId, difficulty = 'easy', customTask, mode = 'realtime', attackerType = 'playwright-mcp', noDefender = false } = body as {
     taskId?: string;
     difficulty?: Difficulty;
     customTask?: string;
     mode?: string;
     attackerType?: AttackerType;
+    noDefender?: boolean;
   };
   const gameMode = mode === 'turnbased' ? 'turnbased' : 'realtime' as const;
 
@@ -162,15 +163,17 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // 6. Start defender loop
+  // 6. Start defender loop (skip if noDefender=true, e.g. for eval runs)
   // Turn-based: start immediately — defender just waits for attacker's signal, no browser needed yet
   // Realtime: delay 8s to let the browser load before injecting disruptions
-  if (gameMode === 'turnbased') {
-    startDefenderLoop(gameId);
-  } else {
-    setTimeout(() => {
+  if (!noDefender) {
+    if (gameMode === 'turnbased') {
       startDefenderLoop(gameId);
-    }, 8000);
+    } else {
+      setTimeout(() => {
+        startDefenderLoop(gameId);
+      }, 8000);
+    }
   }
 
   return NextResponse.json({ sessionId: gameId, liveViewUrl, mode: gameMode });
