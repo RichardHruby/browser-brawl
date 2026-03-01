@@ -1,6 +1,6 @@
 export type Difficulty = 'easy' | 'medium' | 'hard' | 'nightmare';
 export type GameMode = 'realtime' | 'turnbased';
-export type AttackerType = 'playwright-mcp' | 'browser-use';
+export type AttackerType = 'playwright-mcp' | 'browser-use' | 'stagehand';
 export type GamePhase = 'lobby' | 'loading' | 'arena' | 'game_over';
 export type AttackerStatus = 'idle' | 'thinking' | 'acting' | 'complete' | 'failed';
 export type DefenderStatus = 'idle' | 'plotting' | 'striking' | 'cooling_down';

@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
+    "@browserbasehq/stagehand": "^3.1.0",
     "@lmnr-ai/lmnr": "^0.8.14",
     "@modelcontextprotocol/sdk": "^1.27.1",
     "@playwright/mcp": "^0.0.68",

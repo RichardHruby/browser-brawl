@@ -38,6 +38,18 @@ const FIGHTERS: Fighter[] = [
       { label: 'RES', value: 5, max: 6 },
     ],
   },
+  {
+    value: 'stagehand',
+    name: 'STAGEHAND',
+    image: '/fighters/stagehand.jpg',
+    color: '#ccaa00',
+    desc: 'The Naturalist — reads the battlefield by instinct, fast and adaptive.',
+    stats: [
+      { label: 'SPD', value: 5, max: 6 },
+      { label: 'PRC', value: 3, max: 6 },
+      { label: 'RES', value: 4, max: 6 },
+    ],
+  },
 ];
 
 function StatBar({ label, value, max, color }: { label: string; value: number; max: number; color: string }) {
@@ -88,7 +100,7 @@ export function FighterSelect({ value, onChange }: Props) {
   return (
     <div className="flex flex-col items-center gap-6 w-full">
       {/* Fighter portraits */}
-      <div className="grid grid-cols-2 gap-2 sm:gap-4 justify-items-center w-full">
+      <div className="grid grid-cols-3 gap-2 sm:gap-4 justify-items-center w-full">
         {FIGHTERS.map((fighter) => {
           const isSelected = value === fighter.value;
           return (

@@ -43,7 +43,7 @@ flowchart LR
   end
 
   subgraph Arena
-    A1[Attacker<br/>Playwright MCP / Browser-Use]
+    A1[Attacker<br/>Playwright MCP / Browser-Use / Stagehand]
     A2[Cloud browser live view]
     A3[Defender<br/>Haiku + CDP injection]
     A1 --> A2
@@ -136,6 +136,7 @@ The attacker agent is framework-agnostic — pick the one you prefer:
 |-----------|-------------|
 | [**Playwright MCP**](https://github.com/anthropics/mcp) | Spawns a Playwright MCP server connected to the cloud browser via CDP. Full tool suite (click, type, navigate, snapshot, etc.) |
 | [**Browser-Use SDK**](https://browser-use.com) | Uses Browser-Use's built-in agent API for browser control |
+| [**Stagehand**](https://github.com/browserbase/stagehand) | Browserbase's AI-native browser automation framework |
 
 ---
 
@@ -226,6 +227,7 @@ src/
 ├── hooks/                        # useGameState, useGameSSE, useArenaTimer, useHealthBar
 ├── lib/
 │   ├── attacker-playwright.ts    # Attacker: Playwright MCP + Claude Sonnet loop
+│   ├── attacker-stagehand.ts     # Attacker: Stagehand alternative
 │   ├── browser-use-attacker.ts   # Attacker: Browser-Use SDK alternative
 │   ├── defender-agent.ts         # Defender: Haiku + JS injection loop
 │   ├── disruptions.ts            # 9 prebuilt disruptions + cooldown system

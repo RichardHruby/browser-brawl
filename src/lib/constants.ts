@@ -49,12 +49,14 @@ export const DEFENDER_STATUS_COLORS: Record<DefenderStatus, string> = {
 
 export const ATTACKER_TYPE_LABELS: Record<AttackerType, string> = {
   'playwright-mcp': 'Playwright MCP',
+  'stagehand':      'Stagehand',
   'browser-use':    'Browser-Use',
 };
 
 export const ATTACKER_TYPE_COLORS: Record<AttackerType, string> = {
   'playwright-mcp': '#cc2244',
   'browser-use':    '#dd8800',
+  'stagehand':      '#ccaa00',
 };
 
 // ── Win reason labels ──
