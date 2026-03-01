@@ -18,7 +18,7 @@ const FIGHTERS: Fighter[] = [
     value: 'playwright-mcp',
     name: 'PLAYWRIGHT MCP',
     image: '/fighters/playwright-mcp.jpg',
-    color: '#cc2244',
+    color: '#22cc44',
     desc: 'The Director — Anthropic Claude reasons and acts with surgical precision via Playwright browser automation.',
     stats: [
       { label: 'SPD', value: 4, max: 6 },

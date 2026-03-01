@@ -55,7 +55,7 @@ export const ATTACKER_TYPE_LABELS: Record<AttackerType, string> = {
 };
 
 export const ATTACKER_TYPE_COLORS: Record<AttackerType, string> = {
-  'playwright-mcp': '#cc2244',
+  'playwright-mcp': '#22cc44',
   'browser-use':    '#dd8800',
   'stagehand':      '#ccaa00',
   'finetuned':      '#aa44ff',
