@@ -59,7 +59,7 @@ export function ArenaSelector({ value, onChange }: Props) {
     if (!custom.trim()) return;
     onChange({
       id: 'custom',
-      label: 'Custom Arena',
+      label: 'Custom Task',
       description: custom.trim(),
       startUrl: '',
       tags: [],
@@ -74,65 +74,82 @@ export function ArenaSelector({ value, onChange }: Props) {
       {ARENAS.map((arena) => {
         const selected = value?.id === arena.task.id;
         return (
-          <button
-            key={arena.task.id}
-            onClick={() => { onChange(arena.task); setShowCustom(false); }}
-            className="flex items-center gap-3 py-2 px-3 transition-all duration-150 cursor-pointer text-left"
-            style={{
-              background: selected ? `${HIGHLIGHT_COLOR}12` : 'transparent',
-              borderLeft: selected ? `2px solid ${HIGHLIGHT_COLOR}` : '2px solid transparent',
-            }}
-          >
-            <span
-              className="font-display text-xs w-3 flex-shrink-0"
-              style={{ color: selected ? HIGHLIGHT_COLOR : 'transparent' }}
-            >
-              ▶
-            </span>
-            <span
-              className="font-display text-[11px] font-bold tracking-wider flex-1"
+          <div key={arena.task.id} className="relative group">
+            <button
+              onClick={() => { onChange(arena.task); setShowCustom(false); }}
+              className="w-full flex items-center gap-3 py-2 px-3 transition-all duration-150 cursor-pointer text-left"
               style={{
-                color: selected ? HIGHLIGHT_COLOR : 'var(--color-text-primary)',
-                textShadow: selected ? `0 0 8px ${HIGHLIGHT_COLOR}` : 'none',
+                background: selected ? `${HIGHLIGHT_COLOR}12` : 'transparent',
+                borderLeft: selected ? `2px solid ${HIGHLIGHT_COLOR}` : '2px solid transparent',
               }}
             >
-              {arena.name}
-            </span>
-            <span
-              className="font-mono text-[9px] flex-shrink-0"
-              style={{ color: 'var(--color-text-secondary)', opacity: 0.5 }}
+              <span
+                className="font-display text-xs w-3 flex-shrink-0"
+                style={{ color: selected ? HIGHLIGHT_COLOR : 'transparent' }}
+              >
+                ▶
+              </span>
+              <span
+                className="font-display text-[11px] font-bold tracking-wider flex-1"
+                style={{
+                  color: selected ? HIGHLIGHT_COLOR : 'var(--color-text-primary)',
+                  textShadow: selected ? `0 0 8px ${HIGHLIGHT_COLOR}` : 'none',
+                }}
+              >
+                {arena.name}
+              </span>
+              <span
+                className="font-mono text-[9px] flex-shrink-0"
+                style={{ color: 'var(--color-text-secondary)', opacity: 0.5 }}
+              >
+                {arena.subtitle}
+              </span>
+            </button>
+            {/* Tooltip */}
+            <div
+              className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block z-50 w-56 px-2 py-1.5 font-mono text-[10px] leading-relaxed text-center"
+              style={{ background: 'var(--color-bg-deep)', border: '1px solid var(--color-attacker)', color: 'var(--color-text-secondary)' }}
             >
-              {arena.subtitle}
-            </span>
-          </button>
+              {arena.task.description}
+            </div>
+          </div>
         );
       })}
 
-      {/* Custom arena row */}
-      <button
-        onClick={handleCustomToggle}
-        className="flex items-center gap-3 py-2 px-3 transition-all duration-150 cursor-pointer text-left"
-        style={{
-          background: isCustomSelected ? `${HIGHLIGHT_COLOR}12` : 'transparent',
-          borderLeft: isCustomSelected ? `2px solid ${HIGHLIGHT_COLOR}` : '2px solid transparent',
-        }}
-      >
-        <span
-          className="font-display text-xs w-3 flex-shrink-0"
-          style={{ color: isCustomSelected ? HIGHLIGHT_COLOR : 'transparent' }}
-        >
-          ▶
-        </span>
-        <span
-          className="font-display text-[11px] font-bold tracking-wider flex-1"
+      {/* Custom task row */}
+      <div className="relative group">
+        <button
+          onClick={handleCustomToggle}
+          className="w-full flex items-center gap-3 py-2 px-3 transition-all duration-150 cursor-pointer text-left"
           style={{
-            color: isCustomSelected ? HIGHLIGHT_COLOR : 'var(--color-text-primary)',
-            textShadow: isCustomSelected ? `0 0 8px ${HIGHLIGHT_COLOR}` : 'none',
+            background: isCustomSelected ? `${HIGHLIGHT_COLOR}12` : 'transparent',
+            borderLeft: isCustomSelected ? `2px solid ${HIGHLIGHT_COLOR}` : '2px solid transparent',
           }}
         >
-          CUSTOM ARENA...
-        </span>
-      </button>
+          <span
+            className="font-display text-xs w-3 flex-shrink-0"
+            style={{ color: isCustomSelected ? HIGHLIGHT_COLOR : 'transparent' }}
+          >
+            ▶
+          </span>
+          <span
+            className="font-display text-[11px] font-bold tracking-wider flex-1"
+            style={{
+              color: isCustomSelected ? HIGHLIGHT_COLOR : 'var(--color-text-primary)',
+              textShadow: isCustomSelected ? `0 0 8px ${HIGHLIGHT_COLOR}` : 'none',
+            }}
+          >
+            CUSTOM TASK...
+          </span>
+        </button>
+        {/* Tooltip */}
+        <div
+          className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block z-50 w-56 px-2 py-1.5 font-mono text-[10px] leading-relaxed text-center"
+          style={{ background: 'var(--color-bg-deep)', border: '1px solid var(--color-attacker)', color: 'var(--color-text-secondary)' }}
+        >
+          Enter any task for the attacker agent to complete on any website.
+        </div>
+      </div>
 
       {/* Custom arena input */}
       {showCustom && (

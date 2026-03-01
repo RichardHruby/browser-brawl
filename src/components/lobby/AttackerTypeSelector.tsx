@@ -5,7 +5,7 @@ import type { AttackerType } from '@/types/game';
 const OPTIONS: { value: AttackerType; label: string; desc: string }[] = [
   {
     value: 'playwright-mcp',
-    label: 'PLAYWRIGHT MCP',
+    label: 'CLAUDE + PLAYWRIGHT',
     desc: 'Local agent via Claude + Playwright',
   },
   {

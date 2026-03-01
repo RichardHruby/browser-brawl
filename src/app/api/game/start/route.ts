@@ -7,10 +7,9 @@ import { emitEvent } from '@/lib/sse-emitter';
 import { TASKS } from '@/lib/tasks';
 import { runAttackerLoop } from '@/lib/attacker-agent';
 import { createGameRecord, recordNetworkRequest } from '@/lib/data-collector';
-import { startNetworkCapture } from '@/lib/cdp';
+import { startNetworkCapture } from '@/lib/browserbase';
 import { startScreencast } from '@/lib/screencast';
 import { runBrowserUseAttackerLoop } from '@/lib/browser-use-attacker';
-import { log, logError } from '@/lib/log';
 import type { AttackerType, Difficulty } from '@/types/game';
 
 export async function POST(req: NextRequest) {
@@ -58,13 +57,13 @@ export async function POST(req: NextRequest) {
       throw new Error('Session created without required browser URLs');
     }
 
-    log('[start] session created:', browserSessionId);
-    log('[start] CDP URL:', cdpUrl);
-    log('[start] live view:', liveViewUrl);
-    log('[start] mode:', gameMode, '| difficulty:', difficulty, '| attackerType:', attackerType);
+    console.log('[start] session created:', browserSessionId);
+    console.log('[start] CDP URL:', cdpUrl);
+    console.log('[start] live view:', liveViewUrl);
+    console.log('[start] mode:', gameMode, '| difficulty:', difficulty, '| attackerType:', attackerType);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    logError('[start] browser-use create error:', message);
+    console.error('[start] browser-use create error:', message);
     if (message.includes('BROWSER_USE_API_KEY')) {
       return NextResponse.json({ error: 'Server is missing BROWSER_USE_API_KEY' }, { status: 500 });
     }
@@ -138,7 +137,7 @@ export async function POST(req: NextRequest) {
   if (attackerType === 'browser-use') {
     // Browser-Use AI agent on the agent session
     runBrowserUseAttackerLoop(gameId, abort.signal).catch(err => {
-      logError('[start] browser-use attacker error:', err);
+      console.error('[start] browser-use attacker error:', err);
       const s = getSession(gameId);
       if (s && s.phase === 'arena') {
         s.attackerStatus = 'failed';
@@ -151,7 +150,7 @@ export async function POST(req: NextRequest) {
   } else {
     // Local attacker loop routes to Playwright MCP or Stagehand
     runAttackerLoop(gameId, abort.signal).catch(err => {
-      logError('[start] attacker loop error:', err);
+      console.error('[start] attacker loop error:', err);
       const s = getSession(gameId);
       if (s && s.phase === 'arena') {
         s.attackerStatus = 'failed';
