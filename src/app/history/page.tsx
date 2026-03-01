@@ -2,7 +2,8 @@
 
 import { useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
-import { useCallback, useState } from 'react';
+import { useCallback, useState, useTransition } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { DIFFICULTY_COLORS, WINNER_SHORT } from '@/lib/constants';
 import { formatDuration, formatDate, formatWinReason } from '@/lib/format';
@@ -14,6 +15,8 @@ export default function HistoryPage() {
   const [diffFilter, setDiffFilter] = useState<Difficulty | ''>('');
   const [winnerFilter, setWinnerFilter] = useState<Winner | ''>('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [isKickingOff, setIsKickingOff] = useState(false);
+  const router = useRouter();
 
   const sessions = useQuery(api.sessions.list, {
     difficulty: diffFilter || undefined,
@@ -117,12 +120,28 @@ export default function HistoryPage() {
             {/* Kickoff Finetune button with tooltip */}
             <div className="relative group/tooltip">
               <button
-                onClick={() => {
-                  if (selected.size === 0) return;
-                  // TODO: wire to actual finetune pipeline trigger
-                  window.location.href = `/api/export/training?gameIds=${gameIdsParam}`;
+                onClick={async () => {
+                  if (selected.size === 0 || isKickingOff) return;
+                  setIsKickingOff(true);
+                  try {
+                    const res = await fetch('/api/training/start', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ gameIds: Array.from(selected), textOnly: true }),
+                    });
+                    const data = await res.json();
+                    if (res.ok) {
+                      router.push('/training');
+                    } else {
+                      alert(`Failed to start training: ${data.error || 'Unknown error'}`);
+                    }
+                  } catch (err) {
+                    alert(`Network error: ${err}`);
+                  } finally {
+                    setIsKickingOff(false);
+                  }
                 }}
-                disabled={selected.size === 0}
+                disabled={selected.size === 0 || isKickingOff}
                 className="font-display text-xs font-bold tracking-widest uppercase px-4 py-2 rounded transition-all duration-200 hover:scale-105 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
                 style={{
                   background:
@@ -140,7 +159,7 @@ export default function HistoryPage() {
                       : 'none',
                 }}
               >
-                Kickoff Finetune
+                {isKickingOff ? 'Starting...' : 'Kickoff Finetune'}
               </button>
               <div
                 className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 rounded text-xs font-mono whitespace-nowrap opacity-0 group-hover/tooltip:opacity-100 transition-opacity duration-200 pointer-events-none z-50"

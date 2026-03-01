@@ -99,4 +99,32 @@ export default defineSchema({
     toolDefinitions: v.optional(v.string()), // JSON — tool schemas from MCP
     timestamp: v.string(),
   }).index('by_gameId', ['gameId', 'stepNumber']),
+
+  // Training pipeline job tracking
+  trainingJobs: defineTable({
+    experimentName: v.string(),
+    status: v.union(
+      v.literal('preparing'),
+      v.literal('uploading'),
+      v.literal('training'),
+      v.literal('merging'),
+      v.literal('deploying'),
+      v.literal('ready'),
+      v.literal('failed'),
+    ),
+    gameIds: v.array(v.string()),
+    gameCount: v.number(),
+    textOnly: v.boolean(),
+    startedAt: v.string(),
+    completedAt: v.optional(v.string()),
+    error: v.optional(v.string()),
+    // Training metrics (updated by Modal callback)
+    currentStep: v.optional(v.number()),
+    totalSteps: v.optional(v.number()),
+    currentLoss: v.optional(v.number()),
+    // Deployment info
+    serveUrl: v.optional(v.string()),
+    // Convex file storage for the training JSONL
+    trainingDataStorageId: v.optional(v.id('_storage')),
+  }).index('by_experimentName', ['experimentName']),
 });

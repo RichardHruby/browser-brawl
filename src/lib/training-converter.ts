@@ -305,3 +305,44 @@ export function convertTrajectory(
     },
   };
 }
+
+// ── OpenAI Messages conversion (for Unsloth training) ─────────────────────
+
+export interface OpenAIMessageContent {
+  type: 'text';
+  text: string;
+}
+
+export interface OpenAIMessage {
+  role: 'system' | 'user' | 'assistant' | 'tool';
+  content: OpenAIMessageContent[];
+}
+
+export interface OpenAITrainingExample {
+  messages: OpenAIMessage[];
+  metadata: ShareGPTTrainingExample['metadata'];
+}
+
+const ROLE_MAP: Record<string, OpenAIMessage['role']> = {
+  system: 'system',
+  human: 'user',
+  gpt: 'assistant',
+  tool: 'tool',
+};
+
+/**
+ * Convert a ShareGPT training example to OpenAI Messages format
+ * required by Unsloth FastLanguageModel / FastVisionModel.
+ *
+ * Maps roles and wraps text values in typed content arrays.
+ */
+export function toOpenAIMessages(
+  sharegpt: ShareGPTTrainingExample,
+): OpenAITrainingExample {
+  const messages: OpenAIMessage[] = sharegpt.conversations.map((msg) => ({
+    role: ROLE_MAP[msg.from] || (msg.from as OpenAIMessage['role']),
+    content: [{ type: 'text', text: msg.value }],
+  }));
+
+  return { messages, metadata: sharegpt.metadata };
+}

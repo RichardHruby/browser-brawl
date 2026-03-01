@@ -293,42 +293,109 @@ Converts ShareGPT JSONL → OpenAI Messages JSONL required by Unsloth `FastVisio
 
 **Critical:** Both Unsloth `FastVisionModel` and Axolotl multimodal require OpenAI Messages format — NOT ShareGPT `from`/`value` format. The ShareGPT converter output is intermediate only.
 
-### Fine-Tuning — `scripts/modal_finetune.py`
+### Shared Training Converter — `src/lib/training-converter.ts`
 
-Runs QLoRA fine-tuning on Modal A10G (24GB VRAM). Two modes:
-- **Text-only** (`--text-only`): `Qwen2.5-3B-Instruct` + `FastLanguageModel` — fastest validation path
-- **Multimodal** (default): `Qwen2.5-VL-3B-Instruct` + `FastVisionModel` — screenshots + DOM text
+Shared module used by both CLI scripts and API routes. Contains all conversion logic:
+- `convertTrajectory(raw, minToolCalls)` — Anthropic native messages → ShareGPT format
+- `toOpenAIMessages(sharegpt)` — ShareGPT → OpenAI Messages format (ported from Python `prepare_training_data.py`)
+- `buildSystemPrompt()`, `convertAssistantMessage()`, `convertToolResultMessage()`
+- Types: `RawTrajectory`, `ShareGPTTrainingExample`, `OpenAITrainingExample`, `AnthropicToolDef`
 
-After training, automatically merges LoRA weights into base model (`merged_model/`) — required for vLLM serving.
+**Important:** Only processes Anthropic native format (`tool_use` content blocks). Games played with the fine-tuned model store `<tool_call>` XML strings instead — the converter correctly skips these (0 tool calls detected).
 
-Required training flags for VLM: `remove_unused_columns=False`, `dataset_text_field=""`, `dataset_kwargs={"skip_prepare_dataset": True}`
+**Tests:** `src/lib/__tests__/training-converter.test.ts` — 11 tests covering role mapping, content wrapping, end-to-end pipeline, and Unsloth format validation.
 
-Modal volumes: `browser-brawl-training-data`, `browser-brawl-model-cache`, `browser-brawl-checkpoints`
+### One-Click Training — `/history` → "Kickoff Finetune"
 
-Usage:
+Select games on the history page and click "Kickoff Finetune" to trigger the full pipeline automatically:
+
+1. **`POST /api/training/start`** (`src/app/api/training/start/route.ts`) — Orchestration endpoint
+   - Creates `trainingJobs` record in Convex (status: `preparing`)
+   - Fetches conversation data for each gameId from Convex
+   - Converts: Anthropic native → ShareGPT → OpenAI Messages (all in TypeScript, no Python)
+   - Uploads JSONL to Convex file storage → gets download URL
+   - Calls Modal `/kickoff` endpoint (fire-and-forget)
+   - Returns `{ experimentName, gameCount, status }`
+
+2. **Modal `kickoff`** (`scripts/modal_train_pipeline.py`) — Web endpoint
+   - Receives `{ data_url, experiment_name, text_only, convex_site_url }`
+   - Spawns async GPU `train()` function via `Function.from_name().spawn()` (150s web endpoint timeout workaround)
+   - Returns immediately with `{ call_id }`
+
+3. **Modal `train`** — GPU function (A10G, 6h timeout)
+   - Downloads JSONL from Convex storage URL
+   - Runs Unsloth QLoRA fine-tune (Qwen2.5-3B-Instruct)
+   - Merges LoRA weights into base model
+   - Calls Convex HTTP endpoint at each phase for real-time status updates
+
+4. **`/training` page** (`src/app/training/page.tsx`) — Real-time dashboard
+   - Uses `useQuery(api.training.list)` for live updates (no polling needed)
+   - Shows: experiment name, status badge, progress bar, step/loss metrics, errors
+
+**Env vars required:**
+- `MODAL_TRAIN_ENDPOINT` — deployed Modal kickoff URL (`https://mehulkalia--browser-brawl-train-pipeline-kickoff.modal.run`)
+- `NEXT_PUBLIC_CONVEX_SITE_URL` — Convex HTTP endpoint URL for Modal callbacks
+
+**Deploy Modal pipeline:**
 ```bash
-# Upload data (run locally first — MSYS_NO_PATHCONV=1 on Windows Git Bash)
+modal deploy scripts/modal_train_pipeline.py
+```
+
+### Convex Training Tables & HTTP Endpoint
+
+**Table: `trainingJobs`** (`convex/schema.ts`) — Tracks training experiments:
+- Status: `preparing` → `uploading` → `training` → `merging` → `ready` | `failed`
+- Real-time metrics: `currentStep`, `totalSteps`, `currentLoss`
+- Indexed by `experimentName`
+
+**Mutations/queries:** `convex/training.ts` — `create`, `updateStatus`, `setTrainingData`, `list`, `get`, `getTrainingDataUrl`
+
+**HTTP endpoint:** `convex/http.ts` — `POST /api/training-status` — unauthenticated endpoint that Modal calls to push status updates back to Convex.
+
+### Training Pipeline Output
+
+All output is on the Modal `browser-brawl-checkpoints` volume:
+
+```
+/checkpoints/experiments/{experiment_name}/
+├── checkpoint-*/          ← SFTTrainer epoch checkpoints
+├── final_model/           ← LoRA adapter (adapter_config.json, adapter_model.bin, tokenizer)
+└── merged_model/          ← Full merged model for vLLM serving (~6GB, bfloat16 safetensors)
+```
+
+**Modal volumes:**
+- `browser-brawl-model-cache` — HuggingFace model cache (mounted at `/model_cache`)
+- `browser-brawl-training-data` — Training data input (mounted at `/data`)
+- `browser-brawl-checkpoints` — Outputs: LoRA adapters + merged models (mounted at `/checkpoints`)
+
+**To serve a trained model:**
+```bash
+modal deploy scripts/modal_serve.py --name <experiment-name>
+# FINETUNED_MODEL_URL=https://mehulkalia--<name>-model-chat.modal.run?experiment_name=<name>
+```
+
+**To download locally:**
+```bash
+MSYS_NO_PATHCONV=1 modal volume get browser-brawl-checkpoints /experiments/<name>/merged_model ./local_model/
+```
+
+### CLI Fine-Tuning — `scripts/modal_finetune.py`
+
+Manual CLI alternative to the one-click pipeline. Runs QLoRA fine-tuning on Modal A10G (24GB VRAM):
+- **Text-only** (`--text-only`): `Qwen2.5-3B-Instruct` + `FastLanguageModel`
+- **Multimodal** (default): `Qwen2.5-VL-3B-Instruct` + `FastVisionModel`
+
+```bash
+# Upload data manually
 MSYS_NO_PATHCONV=1 modal volume put browser-brawl-training-data data/openai_messages.jsonl /train.jsonl
 
 # Train
 modal run scripts/modal_finetune.py --text-only
-modal run --detach scripts/modal_finetune.py --text-only   # background
-```
-
-### Serving — `scripts/modal_serve.py`
-
-Serves merged model via vLLM on Modal A10G with an OpenAI-compatible POST `/chat` endpoint. Context length set to 32K (Qwen2.5 native) — the system prompt with all 22 Playwright MCP tool definitions is ~9K tokens.
-
-```bash
-modal deploy scripts/modal_serve.py --name <experiment-name>
-# Returns URL → set as FINETUNED_MODEL_URL in .env.local
-# IMPORTANT: must include ?experiment_name=<name> query param (modal.parameter is NOT set by --name)
-# FINETUNED_MODEL_URL=https://mehulkalia--<name>-model-chat.modal.run?experiment_name=<name>
 ```
 
 ### Merge (one-off) — `scripts/modal_merge.py`
 
-Merges LoRA adapter into base model for checkpoints that were trained before the auto-merge step was added. Pins `trl==0.19.1` to match `unsloth_zoo` requirements.
+Merges LoRA adapter into base model for checkpoints trained before auto-merge was added. Pins `trl==0.19.1` to match `unsloth_zoo` requirements.
 
 ### Fine-Tuned Attacker — `src/lib/attacker-finetuned.ts`
 
@@ -360,14 +427,15 @@ The `noDefender=true` flag is also accepted by `/api/game/start` directly.
 
 1. **Data extraction** — `scripts/extract-training-data.ts` ✅
 2. **ShareGPT conversion** — `scripts/convert-to-sharegpt.ts` ✅
-3. **OpenAI Messages post-processing** — `scripts/prepare_training_data.py` ✅
-4. **Fine-tuning on Modal** — `scripts/modal_finetune.py` ✅ (verified: model loads, trains, merges)
+3. **OpenAI Messages post-processing** — `scripts/prepare_training_data.py` ✅ (also ported to TS in `src/lib/training-converter.ts`)
+4. **Fine-tuning on Modal** — `scripts/modal_finetune.py` ✅ (CLI) / `scripts/modal_train_pipeline.py` ✅ (one-click)
 5. **Model serving** — `scripts/modal_serve.py` ✅ (deployed, vLLM on A10G, 32K context)
 6. **LoRA merge** — `scripts/modal_merge.py` ✅ (one-off for pre-merge checkpoints)
 7. **Fine-tuned attacker** — `src/lib/attacker-finetuned.ts` ✅
 8. **Eval harness** — `scripts/eval_browser_brawl.py` ✅ (smoke test passed: 2/2 wins on hackernews-upvote)
-9. **Data farming** — Need ~50-150 successful attacker games before meaningful results
-10. **Adversarial specialization** — DPO with successful vs failed trajectories (post-PoC)
+9. **One-click pipeline** — `/history` → Kickoff Finetune → `/training` dashboard ✅ (verified end-to-end)
+10. **Data farming** — Need ~50-150 successful attacker games before meaningful results
+11. **Adversarial specialization** — DPO with successful vs failed trajectories (post-PoC)
 
 ## Current Status
 
@@ -379,13 +447,15 @@ The game is fully playable end-to-end:
 - SSE streaming, live browser view, and game over detection all functional
 - Full training data pipeline: Laminar traces LLM calls, Convex stores structured game data, full Claude conversations, screenshots, DOM snapshots, network requests, and screencast recordings
 - Full conversation persistence to Convex `conversations` table — complete messages array with reasoning, tool calls, and untruncated tool results persisted after each Claude turn
-- History/replay UI with session list, filters, step-by-step replay, video playback, and CSV export
+- History/replay UI with session list, multi-select, step-by-step replay, video playback, and CSV export
 - Full fine-tuning pipeline built, deployed, and smoke-tested end-to-end: extract → convert → post-process → Modal train → merge → vLLM serve → fine-tuned attacker → eval (2/2 wins with 1 training example)
+- **One-click training pipeline:** Select games on `/history` → click "Kickoff Finetune" → data conversion + upload + Modal GPU training + LoRA merge all automated → real-time status on `/training` page via Convex subscriptions. Verified end-to-end: `preparing → uploading → training → merging → ready` in ~2 minutes.
 
 ### Known Issues
 - Attacker can still complete tasks on easy/medium difficulty before health runs out
 - Fine-tuning pipeline verified with 1 training example only — need 50-150 games for meaningful eval
 - Modal cold start takes ~2 min for vLLM model loading; warm up endpoint before running eval
+- Only Claude Sonnet games produce valid training data (Anthropic native `tool_use` format). Fine-tuned model games store `<tool_call>` XML and are correctly skipped by the converter.
 
 ## Future Directions
 

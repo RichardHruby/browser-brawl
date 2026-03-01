@@ -51,12 +51,14 @@ export const ATTACKER_TYPE_LABELS: Record<AttackerType, string> = {
   'playwright-mcp': 'Playwright MCP',
   'stagehand':      'Stagehand',
   'browser-use':    'Browser-Use',
+  'finetuned':      'Fine-tuned Qwen',
 };
 
 export const ATTACKER_TYPE_COLORS: Record<AttackerType, string> = {
   'playwright-mcp': '#cc2244',
   'browser-use':    '#dd8800',
   'stagehand':      '#ccaa00',
+  'finetuned':      '#cc44ff',
 };
 
 // ── Win reason labels ──
