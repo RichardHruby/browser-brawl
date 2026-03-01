@@ -71,27 +71,44 @@ export async function runBrowserUseAttackerLoop(
       // Log the full step object to see what data we actually get
       console.log('[browser-use attacker] step received:', JSON.stringify(step, null, 2));
 
-      const description = step.memory || step.nextGoal || step.evaluationPreviousGoal || `Step ${step.number}`;
+      // Phase 1: Emit reasoning as a "thinking" step
+      const thinkingText = step.nextGoal || step.evaluationPreviousGoal || step.memory;
+      if (thinkingText) {
+        const thinkStep = step.number * 2 - 1;
+        s.attackerSteps.push({
+          id: nanoid(8),
+          step: thinkStep,
+          description: thinkingText.slice(0, 300),
+          timestamp: new Date().toISOString(),
+          agentStatus: 'thinking',
+        });
+        emitEvent<AttackerStepPayload>(gameId, 'attacker_step', {
+          step: thinkStep,
+          description: thinkingText.slice(0, 300),
+          agentStatus: 'thinking',
+          isComplete: false,
+        });
+      }
 
+      // Phase 2: Emit actions as an "acting" step
+      const actionDesc = step.actions?.length
+        ? step.actions.join(', ')
+        : step.memory || `Step ${step.number}`;
+      const actStep = step.number * 2;
       s.attackerSteps.push({
         id: nanoid(8),
-        step: step.number,
-        description,
+        step: actStep,
+        description: actionDesc.slice(0, 300),
         timestamp: new Date().toISOString(),
         agentStatus: 'acting',
       });
-
       emitEvent<AttackerStepPayload>(gameId, 'attacker_step', {
-        step: step.number,
-        description,
+        step: actStep,
+        description: actionDesc.slice(0, 300),
         agentStatus: 'acting',
         isComplete: false,
-        nextGoal: step.nextGoal,
-        memory: step.memory,
-        evaluationPreviousGoal: step.evaluationPreviousGoal,
         url: step.url,
         screenshotUrl: step.screenshotUrl ?? undefined,
-        actions: step.actions,
       });
     }
 
@@ -101,7 +118,9 @@ export async function runBrowserUseAttackerLoop(
     if (!s || s.phase !== 'arena') return;
 
     const isSuccess = result?.isSuccess === true;
-    const stepNumber = (s.attackerSteps.length || 0) + 1;
+    const stepNumber = s.attackerSteps.reduce((max, existingStep) => (
+      Math.max(max, existingStep.step)
+    ), 0) + 1;
     const finalDescription = typeof result?.output === 'string'
       ? result.output.slice(0, 200)
       : isSuccess ? 'Task completed' : 'Task ended';

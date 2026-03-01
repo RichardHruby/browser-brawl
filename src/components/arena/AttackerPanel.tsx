@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect } from 'react';
+import React, { useRef, useEffect } from 'react';
 import type { AgentEvent, AttackerStatus } from '@/types/game';
 
 const STATUS_LABELS: Record<AttackerStatus, string> = {
@@ -66,30 +66,36 @@ export function AttackerPanel({ steps, status }: Props) {
             Waiting for attacker...
           </div>
         ) : (
-          steps.map((step, i) => (
-            <div
-              key={step.id}
-              className={`mb-2 ${i === steps.length - 1 ? 'animate-slide-left' : ''}`}
-            >
-              <div className="flex items-start gap-2">
-                <span className="text-xs font-mono shrink-0 mt-0.5"
-                  style={{ color: 'var(--color-attacker)', opacity: 0.6 }}>
-                  {String(step.step).padStart(2, '0')}
-                </span>
-                <span className="text-xs font-mono leading-relaxed"
-                  style={{ color: 'var(--color-text-mono)' }}>
-                  {step.description}
-                </span>
+          steps.reduce<{ actionNum: number; elements: React.ReactNode[] }>((acc, step, i) => {
+            const isThinking = step.agentStatus === 'thinking';
+            if (!isThinking) acc.actionNum++;
+            const displayNum = acc.actionNum;
+            acc.elements.push(
+              <div
+                key={step.id}
+                className={`mb-2 ${i === steps.length - 1 ? 'animate-slide-left' : ''}`}
+              >
+                <div className="flex items-start gap-2">
+                  <span className="text-xs font-mono shrink-0 mt-0.5"
+                    style={{ color: isThinking ? '#ffaa00' : 'var(--color-attacker)', opacity: 0.6 }}>
+                    {isThinking ? '>>' : String(displayNum).padStart(2, '0')}
+                  </span>
+                  <span className={`text-xs font-mono leading-relaxed ${isThinking ? 'italic' : ''}`}
+                    style={{ color: isThinking ? 'rgba(255,170,0,0.7)' : 'var(--color-text-mono)' }}>
+                    {step.description}
+                  </span>
+                </div>
               </div>
-            </div>
-          ))
+            );
+            return acc;
+          }, { actionNum: 0, elements: [] }).elements
         )}
       </div>
 
       {/* Footer */}
       <div className="px-4 py-2 shrink-0 text-xs font-mono"
         style={{ borderTop: '1px solid rgba(0,212,255,0.1)', color: 'var(--color-text-secondary)' }}>
-        {steps.length} step{steps.length !== 1 ? 's' : ''}
+        {steps.filter(s => s.agentStatus !== 'thinking').length} action{steps.filter(s => s.agentStatus !== 'thinking').length !== 1 ? 's' : ''}
       </div>
     </div>
   );
