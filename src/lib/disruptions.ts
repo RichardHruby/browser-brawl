@@ -151,6 +151,15 @@ export const DISRUPTIONS: DisruptionDefinition[] = [
     `,
   },
   {
+    id: 'custom-injection',
+    name: 'Custom Injection',
+    description: 'AI-generated targeted disruption based on current DOM state and attacker behavior',
+    minDifficulty: 'medium',
+    healthDamage: 15,
+    cooldownMs: 20000,
+    generatePayload: () => '', // placeholder — real payload comes from generateCustomInjection()
+  },
+  {
     id: 'coordinated-assault',
     name: 'Coordinated Assault',
     description: 'Hides navigation, fakes a redirect countdown, and blocks all clicks for 10s',
@@ -189,9 +198,9 @@ export const DISRUPTIONS: DisruptionDefinition[] = [
 
 export const DIFFICULTY_DISRUPTIONS: Record<string, string[]> = {
   easy:      ['popup-overlay', 'fake-loading-spinner'],
-  medium:    ['popup-overlay', 'fake-loading-spinner', 'button-camouflage', 'scroll-hijack'],
-  hard:      ['popup-overlay', 'fake-loading-spinner', 'button-camouflage', 'scroll-hijack', 'modal-dialog', 'element-removal'],
-  nightmare: ['popup-overlay', 'fake-loading-spinner', 'button-camouflage', 'scroll-hijack', 'modal-dialog', 'element-removal', 'animation-flood', 'coordinated-assault'],
+  medium:    ['popup-overlay', 'fake-loading-spinner', 'button-camouflage', 'scroll-hijack', 'custom-injection'],
+  hard:      ['popup-overlay', 'fake-loading-spinner', 'button-camouflage', 'scroll-hijack', 'modal-dialog', 'element-removal', 'custom-injection'],
+  nightmare: ['popup-overlay', 'fake-loading-spinner', 'button-camouflage', 'scroll-hijack', 'modal-dialog', 'element-removal', 'animation-flood', 'coordinated-assault', 'custom-injection'],
 };
 
 export function getDisruptionById(id: string): DisruptionDefinition | undefined {

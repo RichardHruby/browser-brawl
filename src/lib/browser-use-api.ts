@@ -1,99 +1,110 @@
-const BU_API = 'https://api.browser-use.com/api/v2';
+import { BrowserUse } from 'browser-use-sdk';
 
-function headers() {
+let buClient: BrowserUse | null = null;
+
+export function getBuClient(): BrowserUse {
+  if (buClient) return buClient;
+
+  const apiKey = process.env.BROWSER_USE_API_KEY?.trim();
+  if (!apiKey) {
+    throw new Error('BROWSER_USE_API_KEY is not configured');
+  }
+
+  buClient = new BrowserUse({ apiKey });
+  return buClient;
+}
+
+// ── Shared result type ──────────────────────────────────────────────
+
+export interface BUSession {
+  id: string;
+  cdpUrl: string;
+  liveUrl: string;
+}
+
+// ── Browser Infrastructure (for Playwright MCP mode) ────────────────
+
+export async function createBrowser(timeoutSecs = 900): Promise<BUSession> {
+  const session = await getBuClient().browsers.create({ timeout: Math.ceil(timeoutSecs / 60) });
+  const cdpUrl = session.cdpUrl ?? '';
+  const liveUrl = session.liveUrl ?? '';
+  if (!cdpUrl || !liveUrl) {
+    throw new Error('[createBrowser] Browser session missing CDP or live URL');
+  }
   return {
-    'Content-Type': 'application/json',
-    'X-Browser-Use-API-Key': process.env.BROWSER_USE_API_KEY!,
+    id: session.id,
+    cdpUrl,
+    liveUrl,
   };
 }
 
-// ── Browser Management ──────────────────────────────────────────────
-
-export interface BUBrowser {
-  id: string;
-  status: string;
-  cdpUrl: string;
-  liveUrl: string;
-  timeoutAt: string;
-  startedAt: string;
-}
-
-export async function createBrowser(timeoutSecs = 900): Promise<BUBrowser> {
-  const res = await fetch(`${BU_API}/browsers`, {
-    method: 'POST',
-    headers: headers(),
-    body: JSON.stringify({ timeout: timeoutSecs }),
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`browser-use createBrowser failed: ${res.status} ${text}`);
-  }
-  return res.json();
-}
-
 export async function stopBrowser(browserId: string): Promise<void> {
-  await fetch(`${BU_API}/browsers/${browserId}?action=stop`, {
-    method: 'PATCH',
-    headers: headers(),
-    body: JSON.stringify({ action: 'stop' }),
-  });
+  await getBuClient().browsers.stop(browserId);
 }
 
-// ── Task Management (kept for future use / browser-use agent mode) ──
+// ── Agent Session (for browser-use mode) ────────────────────────────
+// Session URLs can appear shortly after creation, so we poll briefly.
 
-export interface BUTask {
-  id: string;
-  sessionId: string;
+export async function createAgentSession(): Promise<BUSession> {
+  const session = await getBuClient().sessions.create({ keepAlive: true });
+  const { liveUrl, cdpUrl } = await waitForSessionUrls(session.id, session.liveUrl ?? '');
+
+  console.log('[createAgentSession] id:', session.id, 'liveUrl:', liveUrl, 'cdpUrl:', cdpUrl || '(EMPTY)');
+  return {
+    id: session.id,
+    cdpUrl,
+    liveUrl,
+  };
 }
 
-export interface BUTaskDetails {
-  id: string;
-  sessionId: string;
-  task: string;
-  status: 'started' | 'paused' | 'finished' | 'stopped';
-  output?: string | null;
-  isSuccess?: boolean | null;
-  steps?: {
-    number: number;
-    memory?: string;
-    evaluationPreviousGoal?: string;
-    nextGoal?: string;
-    url?: string;
-    actions?: string[];
-  }[];
-}
+async function waitForSessionUrls(
+  sessionId: string,
+  initialLiveUrl: string,
+): Promise<{ liveUrl: string; cdpUrl: string }> {
+  let liveUrl = initialLiveUrl;
 
-export async function startTask(task: string, startUrl?: string): Promise<BUTask> {
-  const body: Record<string, unknown> = { task };
-  if (startUrl) body.startUrl = startUrl;
+  for (let attempt = 0; attempt < 8; attempt++) {
+    const cdpUrl = extractCdpFromLiveUrl(liveUrl);
+    if (liveUrl && cdpUrl) {
+      return { liveUrl, cdpUrl };
+    }
 
-  const res = await fetch(`${BU_API}/tasks`, {
-    method: 'POST',
-    headers: headers(),
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`browser-use startTask failed: ${res.status} ${text}`);
+    await sleep(500);
+    const latest = await getBuClient().sessions.get(sessionId);
+    liveUrl = latest.liveUrl ?? '';
   }
-  return res.json();
+
+  throw new Error(`[createAgentSession] Session ${sessionId} missing liveUrl/cdpUrl`);
 }
 
-export async function getTaskDetails(taskId: string): Promise<BUTaskDetails> {
-  const res = await fetch(`${BU_API}/tasks/${taskId}`, {
-    headers: headers(),
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`browser-use getTaskDetails failed: ${res.status} ${text}`);
+/**
+ * Extract the CDP endpoint from a browser-use liveUrl.
+ * liveUrl format: https://live.browser-use.com?wss=https%3A%2F%2F{id}.cdpN.browser-use.com
+ * Returns the wss parameter value as-is (https://... format), which injectJS can handle.
+ */
+function extractCdpFromLiveUrl(liveUrl: string): string {
+  if (!liveUrl) return '';
+  try {
+    const url = new URL(liveUrl);
+    const wss = url.searchParams.get('wss');
+    if (wss) {
+      console.log('[extractCdpFromLiveUrl] extracted wss param:', wss);
+      return wss;
+    }
+  } catch {
+    // ignore
   }
-  return res.json();
+  return '';
 }
 
 export async function stopTask(taskId: string): Promise<void> {
-  await fetch(`${BU_API}/tasks/${taskId}`, {
-    method: 'PUT',
-    headers: headers(),
-    body: JSON.stringify({ action: 'stop' }),
-  });
+  await getBuClient().tasks.stop(taskId);
+}
+
+export async function stopSession(sessionId: string): Promise<void> {
+  await getBuClient().sessions.stop(sessionId);
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }

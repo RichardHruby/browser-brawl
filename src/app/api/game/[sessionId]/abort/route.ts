@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSession } from '@/lib/game-session-store';
 import { endGame } from '@/lib/defender-agent';
-import { stopBrowser } from '@/lib/browser-use-api';
+import { stopBrowser, stopSession, stopTask } from '@/lib/browser-use-api';
 
 export async function POST(
   _req: NextRequest,
@@ -19,9 +19,18 @@ export async function POST(
     session.attackerAbort.abort();
   }
 
-  // Stop the browser-use browser session
+  // Stop the browser-use AI task if running
+  if (session.buTaskId) {
+    stopTask(session.buTaskId).catch(() => {});
+  }
+
+  // Stop the browser/session
   if (session.browserSessionId) {
-    stopBrowser(session.browserSessionId).catch(() => {});
+    if (session.attackerType === 'browser-use') {
+      stopSession(session.browserSessionId).catch(() => {});
+    } else {
+      stopBrowser(session.browserSessionId).catch(() => {});
+    }
   }
 
   // End game

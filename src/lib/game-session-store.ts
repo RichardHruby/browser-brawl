@@ -1,4 +1,4 @@
-import type { AgentEvent, AttackerMode, DisruptionEvent, Difficulty, GamePhase, AttackerStatus, DefenderStatus, Task } from '@/types/game';
+import type { AgentEvent, DisruptionEvent, Difficulty, GamePhase, AttackerStatus, AttackerType, DefenderStatus, Task } from '@/types/game';
 
 // Server-side extended session with runtime fields
 export interface ServerGameSession {
@@ -8,7 +8,7 @@ export interface ServerGameSession {
   liveViewUrl: string;
   task: Task;
   difficulty: Difficulty;
-  attackerMode: AttackerMode;
+  attackerType: AttackerType;
   phase: GamePhase;
   health: number;
   startedAt: string;
@@ -26,6 +26,8 @@ export interface ServerGameSession {
   healthDecayHandle: ReturnType<typeof setInterval> | null;
   attackerAbort: AbortController | null;
   knownStepIds: Set<string>;
+  buTaskId: string | null;
+  buSessionId: string | null;
 }
 
 // Global singleton store — survives across API route invocations in the same process
@@ -44,11 +46,10 @@ export function createSession(params: {
   liveViewUrl: string;
   task: Task;
   difficulty: Difficulty;
-  attackerMode?: AttackerMode;
+  attackerType: AttackerType;
 }): ServerGameSession {
   const session: ServerGameSession = {
     ...params,
-    attackerMode: params.attackerMode ?? 'playwright',
     phase: 'loading' as GamePhase,
     health: 100,
     startedAt: new Date().toISOString(),
@@ -65,6 +66,8 @@ export function createSession(params: {
     healthDecayHandle: null,
     attackerAbort: null,
     knownStepIds: new Set(),
+    buTaskId: null,
+    buSessionId: null,
   };
   sessions.set(params.gameId, session);
   return session;

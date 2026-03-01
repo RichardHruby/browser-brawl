@@ -3,15 +3,16 @@ import { runAttackerLoop as runPlaywright } from './attacker-playwright';
 import { runAttackerLoop as runStagehand } from './attacker-stagehand';
 
 /**
- * Run the attacker agent loop using the selected mode.
- * Delegates to either Playwright MCP or Stagehand implementation.
+ * Run the local attacker loop based on the selected attacker type.
+ * Browser-use attacker runs through a separate loop in start/route.ts.
  */
 export async function runAttackerLoop(gameId: string, signal: AbortSignal): Promise<void> {
   const session = getSession(gameId);
   if (!session) return;
 
-  if (session.attackerMode === 'stagehand') {
+  if (session.attackerType === 'stagehand') {
     return runStagehand(gameId, signal);
   }
+
   return runPlaywright(gameId, signal);
 }

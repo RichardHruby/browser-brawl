@@ -2,20 +2,31 @@
 
 import { useState } from 'react';
 import { GlitchText } from '@/components/shared/GlitchText';
-import { AttackerModeSelector } from './AttackerModeSelector';
+import { AttackerTypeSelector } from './AttackerTypeSelector';
 import { DifficultySelector } from './DifficultySelector';
 import { TaskSelector } from './TaskSelector';
 import { StartButton } from './StartButton';
-import type { AttackerMode, Difficulty, Task } from '@/types/game';
+import type { AttackerType, Difficulty, Task } from '@/types/game';
 
 interface Props {
-  onStart: (difficulty: Difficulty, task: Task, attackerMode: AttackerMode) => void;
+  onStart: (difficulty: Difficulty, task: Task, attackerType: AttackerType) => void;
+}
+
+function attackerLabel(attackerType: AttackerType): string {
+  switch (attackerType) {
+    case 'browser-use':
+      return 'browser-use cloud';
+    case 'stagehand':
+      return 'Stagehand';
+    default:
+      return 'Playwright MCP';
+  }
 }
 
 export function LobbyScreen({ onStart }: Props) {
   const [difficulty, setDifficulty] = useState<Difficulty>('easy');
   const [task, setTask] = useState<Task | null>(null);
-  const [attackerMode, setAttackerMode] = useState<AttackerMode>('playwright');
+  const [attackerType, setAttackerType] = useState<AttackerType>('playwright-mcp');
 
   const canStart = !!task;
 
@@ -51,18 +62,18 @@ export function LobbyScreen({ onStart }: Props) {
         }}
       >
         <TaskSelector value={task} onChange={setTask} />
-        <AttackerModeSelector value={attackerMode} onChange={setAttackerMode} />
+        <AttackerTypeSelector value={attackerType} onChange={setAttackerType} />
         <DifficultySelector value={difficulty} onChange={setDifficulty} />
 
         {/* Info row */}
         <div className="flex gap-6 text-xs font-mono"
           style={{ color: 'var(--color-text-secondary)' }}>
-          <span>Attacker: <span className="neon-cyan">{attackerMode === 'stagehand' ? 'Stagehand' : 'Playwright MCP'}</span></span>
+          <span>Attacker: <span className="neon-cyan">{attackerLabel(attackerType)}</span></span>
           <span>Defender: <span className="neon-red">Claude AI</span></span>
-          <span>Session: <span style={{ color: 'var(--color-text-primary)' }}>Browserbase</span></span>
+          <span>Session: <span style={{ color: 'var(--color-text-primary)' }}>browser-use</span></span>
         </div>
 
-        <StartButton onClick={() => task && onStart(difficulty, task, attackerMode)} disabled={!canStart} />
+        <StartButton onClick={() => task && onStart(difficulty, task, attackerType)} disabled={!canStart} />
       </div>
 
       {/* Footer */}

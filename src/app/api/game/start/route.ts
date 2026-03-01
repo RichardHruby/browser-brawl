@@ -1,15 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { nanoid } from 'nanoid';
-import { createBrowser } from '@/lib/browser-use-api';
+import { createBrowser, createAgentSession } from '@/lib/browser-use-api';
 import { createSession, getSession } from '@/lib/game-session-store';
-import { startDefenderLoop, endGame } from '@/lib/defender-agent';
+import { startDefenderLoop } from '@/lib/defender-agent';
 import { emitEvent } from '@/lib/sse-emitter';
 import { TASKS } from '@/lib/tasks';
 import { runAttackerLoop } from '@/lib/attacker-agent';
+import { runBrowserUseAttackerLoop } from '@/lib/browser-use-attacker';
+import type { AttackerType, Difficulty } from '@/types/game';
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { taskId, difficulty = 'easy', customTask, attackerMode = 'playwright' } = body;
+  const { taskId, difficulty = 'easy', customTask, attackerType = 'playwright-mcp' } = body as {
+    taskId?: string;
+    difficulty?: Difficulty;
+    customTask?: string;
+    attackerType?: AttackerType;
+  };
 
   const task =
     customTask
@@ -22,26 +29,41 @@ export async function POST(req: NextRequest) {
 
   const gameId = nanoid(10);
 
-  // 1. Create a managed browser via browser-use (gives us CDP + live view)
   let browserSessionId = '';
   let cdpUrl = '';
   let liveViewUrl = '';
+
   try {
-    const browser = await createBrowser(240); // 4 min timeout (API max)
-    browserSessionId = browser.id;
-    // Keep cdpUrl as https:// — Playwright's connectOverCDP needs the HTTP endpoint
-    // to discover targets via /json before connecting via WebSocket
-    cdpUrl = browser.cdpUrl;
-    liveViewUrl = browser.liveUrl;
-    console.log('[start] browser created:', browserSessionId);
+    if (attackerType === 'browser-use') {
+      // Agent session: has both cdpUrl (for defender) and AI task execution
+      const agentSession = await createAgentSession();
+      browserSessionId = agentSession.id;
+      cdpUrl = agentSession.cdpUrl;
+      liveViewUrl = agentSession.liveUrl;
+    } else {
+      // Raw browser: CDP access for Playwright MCP/Stagehand attacker + defender
+      const browser = await createBrowser(240);
+      browserSessionId = browser.id;
+      cdpUrl = browser.cdpUrl;
+      liveViewUrl = browser.liveUrl;
+    }
+
+    if (!browserSessionId || !cdpUrl || !liveViewUrl) {
+      throw new Error('Session created without required browser URLs');
+    }
+
+    console.log('[start] session created:', browserSessionId);
     console.log('[start] CDP URL:', cdpUrl);
     console.log('[start] live view:', liveViewUrl);
   } catch (err) {
-    console.error('[start] browser-use createBrowser error:', err);
+    const message = err instanceof Error ? err.message : String(err);
+    console.error('[start] browser-use create error:', message);
+    if (message.includes('BROWSER_USE_API_KEY')) {
+      return NextResponse.json({ error: 'Server is missing BROWSER_USE_API_KEY' }, { status: 500 });
+    }
     return NextResponse.json({ error: 'Failed to create browser session' }, { status: 500 });
   }
 
-  // 2. Create game session in store
   const session = createSession({
     gameId,
     browserSessionId,
@@ -49,10 +71,9 @@ export async function POST(req: NextRequest) {
     liveViewUrl,
     task,
     difficulty,
-    attackerMode,
+    attackerType,
   });
 
-  // 3. Transition to arena
   session.phase = 'arena';
   session.attackerStatus = 'thinking';
 
@@ -61,23 +82,38 @@ export async function POST(req: NextRequest) {
     defenderStatus: 'idle',
   });
 
-  // 4. Start attacker agent loop (Playwright MCP + Anthropic) — non-blocking
   const abort = new AbortController();
   session.attackerAbort = abort;
 
-  runAttackerLoop(gameId, abort.signal).catch(err => {
-    console.error('[start] attacker loop error:', err);
-    const s = getSession(gameId);
-    if (s && s.phase === 'arena') {
-      s.attackerStatus = 'failed';
-      emitEvent(gameId, 'status_update', {
-        attackerStatus: 'failed',
-        defenderStatus: s.defenderStatus,
-      });
-    }
-  });
+  if (attackerType === 'browser-use') {
+    // Browser-Use AI agent on the agent session
+    runBrowserUseAttackerLoop(gameId, abort.signal).catch(err => {
+      console.error('[start] browser-use attacker error:', err);
+      const s = getSession(gameId);
+      if (s && s.phase === 'arena') {
+        s.attackerStatus = 'failed';
+        emitEvent(gameId, 'status_update', {
+          attackerStatus: 'failed',
+          defenderStatus: s.defenderStatus,
+        });
+      }
+    });
+  } else {
+    // Local attacker loop routes to Playwright MCP or Stagehand
+    runAttackerLoop(gameId, abort.signal).catch(err => {
+      console.error('[start] attacker loop error:', err);
+      const s = getSession(gameId);
+      if (s && s.phase === 'arena') {
+        s.attackerStatus = 'failed';
+        emitEvent(gameId, 'status_update', {
+          attackerStatus: 'failed',
+          defenderStatus: s.defenderStatus,
+        });
+      }
+    });
+  }
 
-  // 5. Start defender loop (after a delay to let the browser load)
+  // Defender starts after delay to let the browser spin up
   setTimeout(() => {
     startDefenderLoop(gameId);
   }, 8000);

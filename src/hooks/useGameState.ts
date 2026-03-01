@@ -1,7 +1,7 @@
 'use client';
 
 import { useReducer, useCallback } from 'react';
-import type { ClientGameState, Difficulty, Task, AgentEvent, DisruptionEvent } from '@/types/game';
+import type { ClientGameState, AttackerType, Difficulty, Task, AgentEvent, DisruptionEvent } from '@/types/game';
 import type {
   SSEEnvelope,
   AttackerStepPayload,
@@ -17,6 +17,7 @@ const initial: ClientGameState = {
   liveViewUrl: null,
   task: null,
   difficulty: 'easy',
+  attackerType: 'playwright-mcp',
   health: 100,
   elapsedSeconds: 0,
   attackerStatus: 'idle',
@@ -29,7 +30,7 @@ const initial: ClientGameState = {
 };
 
 type Action =
-  | { type: 'START_LOADING'; difficulty: Difficulty; task: Task }
+  | { type: 'START_LOADING'; difficulty: Difficulty; task: Task; attackerType: AttackerType }
   | { type: 'ARENA_READY'; sessionId: string; liveViewUrl: string }
   | { type: 'SSE_EVENT'; envelope: SSEEnvelope }
   | { type: 'RESET' };
@@ -42,6 +43,7 @@ function reducer(state: ClientGameState, action: Action): ClientGameState {
         phase: 'loading',
         difficulty: action.difficulty,
         task: action.task,
+        attackerType: action.attackerType,
       };
 
     case 'ARENA_READY':
@@ -128,6 +130,11 @@ function reducer(state: ClientGameState, action: Action): ClientGameState {
           };
         }
 
+        case 'live_url_ready': {
+          const p = envelope.payload as { liveUrl: string };
+          return { ...state, liveViewUrl: p.liveUrl };
+        }
+
         default:
           return state;
       }
@@ -144,8 +151,8 @@ function reducer(state: ClientGameState, action: Action): ClientGameState {
 export function useGameState() {
   const [state, dispatch] = useReducer(reducer, initial);
 
-  const startGame = useCallback((difficulty: Difficulty, task: Task) => {
-    dispatch({ type: 'START_LOADING', difficulty, task });
+  const startGame = useCallback((difficulty: Difficulty, task: Task, attackerType: AttackerType) => {
+    dispatch({ type: 'START_LOADING', difficulty, task, attackerType });
   }, []);
 
   const setArenaReady = useCallback((sessionId: string, liveViewUrl: string) => {

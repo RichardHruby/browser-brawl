@@ -7,7 +7,8 @@ export type SSEEventType =
   | 'health_update'
   | 'status_update'
   | 'timer_tick'
-  | 'game_over';
+  | 'game_over'
+  | 'live_url_ready';
 
 export interface SSEEnvelope<T = unknown> {
   type: SSEEventType;
@@ -21,6 +22,13 @@ export interface AttackerStepPayload {
   description: string;
   agentStatus: AttackerStatus;
   isComplete?: boolean;
+  // Rich step data (browser-use mode only)
+  nextGoal?: string;
+  memory?: string;
+  evaluationPreviousGoal?: string;
+  url?: string;
+  screenshotUrl?: string;
+  actions?: string[];
 }
 
 export interface DefenderDisruptionPayload {
