@@ -33,6 +33,10 @@ export function startDefenderLoop(gameId: string): void {
   const session = getSession(gameId);
   if (!session) return;
 
+  console.log('[defender] starting loop for game:', gameId);
+  console.log('[defender] cdpUrl:', session.cdpUrl || '(EMPTY)');
+  console.log('[defender] difficulty:', session.difficulty);
+
   if (session.mode === 'turnbased') {
     // Turn-based: no timers, no health decay — defender waits for signal from attacker
     runTurnBasedDefenderLoop(gameId).catch(err => {
@@ -331,8 +335,9 @@ async function runDefenderTurn(gameId: string): Promise<void> {
   const beforeScreenshotId = await captureAndUploadScreenshot(session.cdpUrl).catch(() => null);
   const domSnap = await snapshotDOM(session.cdpUrl).catch(() => null);
 
+  console.log('[defender] injecting disruption:', disruption.name, 'via cdpUrl:', session.cdpUrl || '(EMPTY)');
   const success = await injectJS(session.cdpUrl, payload);
-  console.log(`[defender] ${disruption.name} → ${success ? 'HIT' : 'MISS'} (${disruption.healthDamage} HP)`);
+  console.log('[defender] injection result:', success ? 'SUCCESS' : 'FAILED');
 
   // Screenshot after injection (brief delay to let DOM changes render)
   const afterScreenshotId = success

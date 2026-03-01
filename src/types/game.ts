@@ -1,5 +1,6 @@
 export type Difficulty = 'easy' | 'medium' | 'hard' | 'nightmare';
 export type GameMode = 'realtime' | 'turnbased';
+export type AttackerType = 'playwright-mcp' | 'browser-use' | 'stagehand';
 export type GamePhase = 'lobby' | 'loading' | 'arena' | 'game_over';
 export type AttackerStatus = 'idle' | 'thinking' | 'acting' | 'complete' | 'failed';
 export type DefenderStatus = 'idle' | 'plotting' | 'striking' | 'cooling_down';
@@ -39,6 +40,7 @@ export interface GameSession {
   liveViewUrl: string;
   task: Task;
   difficulty: Difficulty;
+  attackerType: AttackerType;
   phase: GamePhase;
   health: number;
   startedAt: string;
@@ -58,6 +60,7 @@ export interface ClientGameState {
   task: Task | null;
   difficulty: Difficulty;
   mode: GameMode;
+  attackerType: AttackerType;
   health: number;
   elapsedSeconds: number;
   attackerStatus: AttackerStatus;

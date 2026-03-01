@@ -12,6 +12,8 @@ export async function injectJS(cdpUrl: string, script: string): Promise<boolean>
     return false;
   }
 
+  console.log('[injectJS] cdpUrl received:', cdpUrl);
+
   try {
     const wsUrl = await getPageTargetWsUrl(cdpUrl);
     if (!wsUrl) {

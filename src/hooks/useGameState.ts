@@ -1,7 +1,7 @@
 'use client';
 
 import { useReducer, useCallback } from 'react';
-import type { ClientGameState, Difficulty, GameMode, Task, AgentEvent, DisruptionEvent } from '@/types/game';
+import type { ClientGameState, AttackerType, Difficulty, GameMode, Task, AgentEvent, DisruptionEvent } from '@/types/game';
 import type {
   SSEEnvelope,
   AttackerStepPayload,
@@ -19,6 +19,7 @@ const initial: ClientGameState = {
   task: null,
   difficulty: 'easy',
   mode: 'realtime',
+  attackerType: 'playwright-mcp',
   health: 100,
   elapsedSeconds: 0,
   attackerStatus: 'idle',
@@ -35,7 +36,7 @@ const initial: ClientGameState = {
 };
 
 type Action =
-  | { type: 'START_LOADING'; difficulty: Difficulty; task: Task; mode: GameMode }
+  | { type: 'START_LOADING'; difficulty: Difficulty; task: Task; mode: GameMode; attackerType: AttackerType }
   | { type: 'ARENA_READY'; sessionId: string; liveViewUrl: string }
   | { type: 'SSE_EVENT'; envelope: SSEEnvelope }
   | { type: 'RESET' };
@@ -49,6 +50,7 @@ function reducer(state: ClientGameState, action: Action): ClientGameState {
         difficulty: action.difficulty,
         task: action.task,
         mode: action.mode,
+        attackerType: action.attackerType,
       };
 
     case 'ARENA_READY':
@@ -67,16 +69,17 @@ function reducer(state: ClientGameState, action: Action): ClientGameState {
 
         case 'attacker_step': {
           const p = envelope.payload as AttackerStepPayload;
+          const existing = state.attackerSteps.find(s => s.step === p.step);
+          if (existing) {
+            return { ...state, attackerStatus: p.agentStatus };
+          }
           const newStep: AgentEvent = {
-            id: `${Date.now()}`,
+            id: crypto.randomUUID(),
             step: p.step,
             description: p.description,
             timestamp: envelope.timestamp,
             agentStatus: p.agentStatus,
           };
-          // Deduplicate by step number
-          const existing = state.attackerSteps.find(s => s.step === p.step);
-          if (existing) return state;
           return {
             ...state,
             attackerStatus: p.agentStatus,
@@ -87,7 +90,7 @@ function reducer(state: ClientGameState, action: Action): ClientGameState {
         case 'defender_disruption': {
           const p = envelope.payload as DefenderDisruptionPayload;
           const newDisruption: DisruptionEvent = {
-            id: `${Date.now()}`,
+            id: crypto.randomUUID(),
             disruptionId: p.disruptionId,
             disruptionName: p.disruptionName,
             description: p.description,
@@ -145,6 +148,11 @@ function reducer(state: ClientGameState, action: Action): ClientGameState {
           };
         }
 
+        case 'live_url_ready': {
+          const p = envelope.payload as { liveUrl: string };
+          return { ...state, liveViewUrl: p.liveUrl };
+        }
+
         default:
           return state;
       }
@@ -161,8 +169,8 @@ function reducer(state: ClientGameState, action: Action): ClientGameState {
 export function useGameState() {
   const [state, dispatch] = useReducer(reducer, initial);
 
-  const startGame = useCallback((difficulty: Difficulty, task: Task, mode: GameMode = 'realtime') => {
-    dispatch({ type: 'START_LOADING', difficulty, task, mode });
+  const startGame = useCallback((difficulty: Difficulty, task: Task, mode: GameMode, attackerType: AttackerType) => {
+    dispatch({ type: 'START_LOADING', difficulty, task, mode, attackerType });
   }, []);
 
   const setArenaReady = useCallback((sessionId: string, liveViewUrl: string) => {
