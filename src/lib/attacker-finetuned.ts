@@ -17,7 +17,7 @@ import { emitEvent } from './sse-emitter';
 import { endGame } from './defender-agent';
 import { nanoid } from 'nanoid';
 import { recordAttackerStep, recordConversation, captureAndUploadScreenshot } from './data-collector';
-import { snapshotDOM } from './browserbase';
+import { snapshotDOM } from './cdp';
 import type { AttackerStepPayload, TurnChangePayload } from '@/types/events';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
