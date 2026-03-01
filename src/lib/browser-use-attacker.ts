@@ -4,7 +4,7 @@ import { emitEvent } from './sse-emitter';
 import { endGame } from './defender-agent';
 import { initLaminar } from './laminar';
 import { downloadAndUploadScreenshot } from './data-collector';
-import { snapshotDOM } from './browserbase';
+import { snapshotDOM } from './cdp';
 import { AttackerStepLogger } from './attacker-step-logger';
 
 // Initialize Laminar so any underlying Anthropic calls are traced

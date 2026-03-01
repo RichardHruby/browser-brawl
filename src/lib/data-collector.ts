@@ -214,7 +214,7 @@ export async function captureAndUploadScreenshot(
   cdpUrl: string,
 ): Promise<string | null> {
   try {
-    const { captureScreenshot } = await import('./browserbase');
+    const { captureScreenshot } = await import('./cdp');
     const png = await captureScreenshot(cdpUrl);
     if (!png) return null;
     return await uploadScreenshot(png);

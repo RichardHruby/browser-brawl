@@ -7,7 +7,7 @@ import { emitEvent } from '@/lib/sse-emitter';
 import { TASKS } from '@/lib/tasks';
 import { runAttackerLoop } from '@/lib/attacker-agent';
 import { createGameRecord, recordNetworkRequest } from '@/lib/data-collector';
-import { startNetworkCapture } from '@/lib/browserbase';
+import { startNetworkCapture } from '@/lib/cdp';
 import { startScreencast } from '@/lib/screencast';
 import { runBrowserUseAttackerLoop } from '@/lib/browser-use-attacker';
 import type { AttackerType, Difficulty } from '@/types/game';
@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
       cdpUrl = agentSession.cdpUrl;
       liveViewUrl = agentSession.liveUrl;
     } else {
-      // Raw browser: CDP access for Playwright MCP/Stagehand attacker + defender
+      // Raw browser: CDP access for Playwright MCP attacker + defender
       const browser = await createBrowser(240);
       browserSessionId = browser.id;
       cdpUrl = browser.cdpUrl;
@@ -148,7 +148,7 @@ export async function POST(req: NextRequest) {
       }
     });
   } else {
-    // Local attacker loop routes to Playwright MCP or Stagehand
+    // Local attacker loop (Playwright MCP)
     runAttackerLoop(gameId, abort.signal).catch(err => {
       console.error('[start] attacker loop error:', err);
       const s = getSession(gameId);

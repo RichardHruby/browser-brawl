@@ -38,7 +38,7 @@
 
 ### Data Capture
 - [ ] Screenshot capture via CDP `Page.captureScreenshot`
-- [ ] DOM snapshots at every attacker step (function exists in `browserbase.ts`, just needs hooking)
+- [ ] DOM snapshots at every attacker step (function exists in `cdp.ts`, just needs hooking)
 - [ ] Network request capture via CDP `Network.enable`
 - [ ] CDP screencast video recording
 
