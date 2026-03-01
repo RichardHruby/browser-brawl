@@ -114,6 +114,7 @@ export class AttackerStepLogger {
 
     this.pushToSession(step, description, agentStatus, timestamp);
     this.emitStep(step, description, agentStatus, opts.success);
+    this.emitStatus(agentStatus);
 
     recordAttackerStep({
       gameId: this.gameId,
