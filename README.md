@@ -33,19 +33,31 @@ The result: a scalable, configurable pipeline that turns a fun game into high-qu
 
 ## How It Works
 
-```
- Lobby                        Arena                           Training Pipeline
-┌──────────────────┐    ┌──────────────────────────┐    ┌───────────────────────────┐
-│ Pick task         │    │ Attacker     │  Cloud     │    │ Convex DB                 │
-│ Pick difficulty   │───>│ (Playwright  │  Browser   │───>│ ├─ conversations (full)   │
-│ Pick framework    │    │  MCP /       │  live view)│    │ ├─ steps + screenshots    │
-│ Start match       │    │  Browser-Use │            │    │ ├─ disruptions + DOM      │
-│                   │    │  / Stagehand)│            │    │ └─ health timeline        │
-└──────────────────┘    │              │ SSE ──────────> │                           │
-                         │ Defender     │ stream     │    │ extract → convert →       │
-                         │ (Haiku + CDP │            │    │ ShareGPT JSONL for        │
-                         │  injection)  │            │    │ Qwen2.5-VL fine-tuning    │
-                         └──────────────────────────┘    └───────────────────────────┘
+```mermaid
+flowchart LR
+  subgraph Lobby
+    L1[Pick task]
+    L2[Pick difficulty]
+    L3[Pick framework]
+    L4[Start match]
+  end
+
+  subgraph Arena
+    A1[Attacker\nPlaywright MCP / Browser-Use / Stagehand]
+    A2[Cloud browser live view]
+    A3[Defender\nHaiku + CDP injection]
+    A1 --> A2
+    A3 --> A2
+    A2 -. SSE stream .-> C1
+  end
+
+  subgraph TrainingPipeline["Training Pipeline"]
+    C1[Convex DB\nconversations, steps/screenshots,\ndisruptions/DOM, health timeline]
+    C2[extract -> convert -> ShareGPT JSONL]
+    C1 --> C2
+  end
+
+  L4 --> A1
 ```
 
 1. **Lobby** — Pick a task (Amazon shopping, Google Flights, Hacker News, etc.) and difficulty level
