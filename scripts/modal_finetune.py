@@ -168,13 +168,24 @@ def finetune_vlm(experiment_name: str = "qwen25vl-3b"):
     print("[train] Starting training...", flush=True)
     trainer.train()
 
-    # Save final model
+    # Save LoRA adapter (small, fast — useful for resuming training)
     final_dir = checkpoint_dir / "final_model"
-    print(f"[train] Saving to {final_dir}...", flush=True)
+    print(f"[train] Saving LoRA adapter to {final_dir}...", flush=True)
     model.save_pretrained(str(final_dir))
     tokenizer.save_pretrained(str(final_dir))
 
-    print(f"[train] Done! Model at /checkpoints/experiments/{experiment_name}/final_model", flush=True)
+    # Merge LoRA weights into base model (required for vLLM serving)
+    merged_dir = checkpoint_dir / "merged_model"
+    print(f"[train] Merging LoRA into base model → {merged_dir}...", flush=True)
+    model.save_pretrained_merged(
+        str(merged_dir),
+        tokenizer,
+        save_method="merged_16bit",  # bfloat16 full precision (~6GB)
+    )
+
+    print(f"[train] Done!", flush=True)
+    print(f"  LoRA adapter : /checkpoints/experiments/{experiment_name}/final_model", flush=True)
+    print(f"  Merged model : /checkpoints/experiments/{experiment_name}/merged_model", flush=True)
     return experiment_name
 
 
@@ -290,12 +301,24 @@ def finetune_text_only(experiment_name: str = "qwen25-3b-text"):
     print("[train] Starting training...", flush=True)
     trainer.train()
 
+    # Save LoRA adapter
     final_dir = checkpoint_dir / "final_model"
-    print(f"[train] Saving to {final_dir}...", flush=True)
+    print(f"[train] Saving LoRA adapter to {final_dir}...", flush=True)
     model.save_pretrained(str(final_dir))
     tokenizer.save_pretrained(str(final_dir))
 
-    print(f"[train] Done! Model at /checkpoints/experiments/{experiment_name}/final_model", flush=True)
+    # Merge LoRA weights into base model (required for vLLM serving)
+    merged_dir = checkpoint_dir / "merged_model"
+    print(f"[train] Merging LoRA into base model → {merged_dir}...", flush=True)
+    model.save_pretrained_merged(
+        str(merged_dir),
+        tokenizer,
+        save_method="merged_16bit",
+    )
+
+    print(f"[train] Done!", flush=True)
+    print(f"  LoRA adapter : /checkpoints/experiments/{experiment_name}/final_model", flush=True)
+    print(f"  Merged model : /checkpoints/experiments/{experiment_name}/merged_model", flush=True)
     return experiment_name
 
 
@@ -339,5 +362,8 @@ def main(
 
     print(f"Training complete: {result}")
     print()
-    print("Download model with:")
-    print(f"  modal volume get browser-brawl-checkpoints /experiments/{result}/final_model ./local_model/")
+    print("Download merged model (for vLLM serving):")
+    print(f"  MSYS_NO_PATHCONV=1 modal volume get browser-brawl-checkpoints /experiments/{result}/merged_model ./local_model/")
+    print()
+    print("Serve on Modal:")
+    print(f"  modal deploy scripts/modal_serve.py --name {result}")
