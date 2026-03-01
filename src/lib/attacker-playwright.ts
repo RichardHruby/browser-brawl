@@ -79,10 +79,11 @@ IMPORTANT:
     ];
 
     let stepNumber = 0;
+    let toolStepCount = 0;
     const MAX_STEPS = 50;
 
     // 4. Agentic loop
-    while (!signal.aborted && stepNumber < MAX_STEPS) {
+    while (!signal.aborted && toolStepCount < MAX_STEPS) {
       const s = getSession(gameId);
       if (!s || s.phase !== 'arena') break;
 
@@ -115,6 +116,29 @@ IMPORTANT:
       const toolUses = assistantContent.filter(
         (block): block is Anthropic.ToolUseBlock => block.type === 'tool_use'
       );
+
+      // Emit Claude's reasoning text as a "thinking" step
+      const textBlocks = assistantContent.filter(
+        (block): block is Anthropic.TextBlock => block.type === 'text'
+      );
+      const reasoningText = textBlocks.map(b => b.text).join('\n').trim();
+      if (reasoningText && toolUses.length > 0) {
+        stepNumber++;
+        const thinkDesc = reasoningText.slice(0, 300);
+        s.attackerSteps.push({
+          id: nanoid(8),
+          step: stepNumber,
+          description: thinkDesc,
+          timestamp: new Date().toISOString(),
+          agentStatus: 'thinking',
+        });
+        emitEvent<AttackerStepPayload>(gameId, 'attacker_step', {
+          step: stepNumber,
+          description: thinkDesc,
+          agentStatus: 'thinking',
+          isComplete: false,
+        });
+      }
 
       if (toolUses.length === 0) {
         // No tool calls — Claude is done or responding with text
@@ -171,7 +195,9 @@ IMPORTANT:
       for (const toolUse of toolUses) {
         // Check abort before each tool call so we stop promptly on game end
         if (signal.aborted) break;
+        if (toolStepCount >= MAX_STEPS) break;
 
+        toolStepCount++;
         stepNumber++;
 
         // Emit step event
