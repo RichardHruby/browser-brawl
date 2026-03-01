@@ -71,6 +71,13 @@ export interface TurnChangePayload {
   attackerStepsPerTurn: number;
 }
 
+export interface ConnectionEstablishedPayload {
+  phase: string;
+  health: number;
+  attackerStatus: AttackerStatus;
+  defenderStatus: DefenderStatus;
+}
+
 export interface GameOverPayload {
   winner: 'attacker' | 'defender';
   reason: string;

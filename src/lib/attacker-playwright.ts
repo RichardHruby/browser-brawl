@@ -35,9 +35,8 @@ export async function runAttackerLoop(gameId: string, signal: AbortSignal): Prom
   });
 
   const mcpClient = new Client({ name: 'browser-brawl-attacker', version: '1.0.0' });
-  await mcpClient.connect(transport);
 
-  // Proactively tear down MCP when the game is aborted to avoid orphaned processes
+  // Register abort handler BEFORE connect so a hanging connection can be cleaned up
   const onAbort = () => {
     mcpClient.close().catch(() => {});
     transport.close().catch(() => {});
@@ -45,6 +44,8 @@ export async function runAttackerLoop(gameId: string, signal: AbortSignal): Prom
   signal.addEventListener('abort', onAbort, { once: true });
 
   try {
+    await mcpClient.connect(transport);
+
     // 2. Discover available tools from Playwright MCP
     const { tools: mcpToolList } = await mcpClient.listTools();
 
@@ -106,8 +107,12 @@ IMPORTANT:
         defenderStatus: s.defenderStatus,
       });
 
-      // Start screenshot + DOM capture immediately so Claude call can run in parallel.
+      // Fire-and-forget screenshot upload. Backfilled after persistence if it completes late.
       const preScreenshotPromise = captureAndUploadScreenshot(session.cdpUrl).catch(() => null);
+      let preScreenshotId: string | null = null;
+      preScreenshotPromise
+        .then((id) => { preScreenshotId = id; })
+        .catch(() => {});
 
       // Start DOM snapshot concurrently with Claude call (fast, ~500ms)
       const domSnapPromise = snapshotDOM(session.cdpUrl).catch(() => null);
@@ -121,11 +126,8 @@ IMPORTANT:
         messages,
       }, { signal });
 
-      // Collect capture artifacts after Claude responds.
-      const [preScreenshotId, domSnap] = await Promise.all([
-        preScreenshotPromise,
-        domSnapPromise,
-      ]);
+      // DOM snapshot is fast (~500ms) — safe to await.
+      const domSnap = await domSnapPromise;
 
       // Process response content
       const assistantContent = response.content;
@@ -156,6 +158,7 @@ IMPORTANT:
         logger.logThinking({
           description: reasoningText.slice(0, 300),
           screenshotId: preScreenshotId,
+          screenshotPromise: preScreenshotPromise,
           domSnapshot: domSnap,
         });
       }
@@ -171,6 +174,7 @@ IMPORTANT:
             description: finalText.slice(0, 200),
             success: true,
             screenshotId: preScreenshotId,
+            screenshotPromise: preScreenshotPromise,
             domSnapshot: domSnap,
           });
           endGame(gameId, 'attacker', 'task_complete');
@@ -178,6 +182,7 @@ IMPORTANT:
           logger.logAction({
             description: finalText.slice(0, 200),
             screenshotId: preScreenshotId,
+            screenshotPromise: preScreenshotPromise,
             domSnapshot: domSnap,
           });
         }
@@ -236,6 +241,7 @@ IMPORTANT:
           toolInput: JSON.stringify(toolUse.input).slice(0, 2000),
           toolResult: toolResultSummary,
           screenshotId: preScreenshotId,
+          screenshotPromise: preScreenshotPromise,
           domSnapshot: domSnap,
         });
       }

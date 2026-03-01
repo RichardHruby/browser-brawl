@@ -121,6 +121,38 @@ export function recordDefenderAction(params: {
   fire(c.mutation(api.steps.recordDefenderAction, params));
 }
 
+export function setAttackerStepScreenshots(params: {
+  gameId: string;
+  stepNumber: number;
+  screenshotBeforeId?: string;
+  screenshotAfterId?: string;
+}): void {
+  const c = getClient();
+  if (!c) return;
+
+  fire(
+    c.mutation('steps:setAttackerStepScreenshots' as never, {
+      ...params,
+    } as never),
+  );
+}
+
+export function setDefenderActionScreenshots(params: {
+  gameId: string;
+  actionNumber: number;
+  screenshotBeforeId?: string;
+  screenshotAfterId?: string;
+}): void {
+  const c = getClient();
+  if (!c) return;
+
+  fire(
+    c.mutation('steps:setDefenderActionScreenshots' as never, {
+      ...params,
+    } as never),
+  );
+}
+
 // ── Conversation history (for training data) ──────────────────────
 
 export function recordConversation(params: {

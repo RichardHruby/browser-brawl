@@ -1,6 +1,6 @@
 import { getSession } from './game-session-store';
 import { emitEvent } from './sse-emitter';
-import { recordAttackerStep } from './data-collector';
+import { recordAttackerStep, setAttackerStepScreenshots } from './data-collector';
 import { nanoid } from 'nanoid';
 import type { AttackerStepPayload } from '@/types/events';
 import type { AttackerStatus } from '@/types/game';
@@ -32,6 +32,7 @@ export class AttackerStepLogger {
   logThinking(opts: {
     description: string;
     screenshotId?: string | null;
+    screenshotPromise?: Promise<string | null>;
     domSnapshot?: string | null;
   }): number {
     const step = ++this.stepNumber;
@@ -52,6 +53,7 @@ export class AttackerStepLogger {
       screenshotBeforeId: opts.screenshotId ?? undefined,
       domSnapshot: opts.domSnapshot ?? undefined,
     });
+    this.backfillScreenshot(step, opts.screenshotPromise);
 
     return step;
   }
@@ -63,6 +65,7 @@ export class AttackerStepLogger {
     toolInput?: string;
     toolResult?: string;
     screenshotId?: string | null;
+    screenshotPromise?: Promise<string | null>;
     domSnapshot?: string | null;
     screenshotUrl?: string;
   }): number {
@@ -95,6 +98,7 @@ export class AttackerStepLogger {
       screenshotBeforeId: opts.screenshotId ?? undefined,
       domSnapshot: opts.domSnapshot ?? undefined,
     });
+    this.backfillScreenshot(step, opts.screenshotPromise);
 
     return step;
   }
@@ -104,6 +108,7 @@ export class AttackerStepLogger {
     description: string;
     success: boolean;
     screenshotId?: string | null;
+    screenshotPromise?: Promise<string | null>;
     domSnapshot?: string | null;
   }): number {
     const step = ++this.stepNumber;
@@ -125,6 +130,7 @@ export class AttackerStepLogger {
       screenshotBeforeId: opts.screenshotId ?? undefined,
       domSnapshot: opts.domSnapshot ?? undefined,
     });
+    this.backfillScreenshot(step, opts.screenshotPromise);
 
     return step;
   }
@@ -170,5 +176,19 @@ export class AttackerStepLogger {
       attackerStatus,
       defenderStatus: session.defenderStatus,
     });
+  }
+
+  private backfillScreenshot(step: number, screenshotPromise?: Promise<string | null>): void {
+    if (!screenshotPromise) return;
+    screenshotPromise
+      .then((storageId) => {
+        if (!storageId) return;
+        setAttackerStepScreenshots({
+          gameId: this.gameId,
+          stepNumber: step,
+          screenshotBeforeId: storageId,
+        });
+      })
+      .catch(() => {});
   }
 }

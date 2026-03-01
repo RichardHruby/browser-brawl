@@ -69,3 +69,51 @@ export const listAllActions = query({
     return results.slice(0, args.limit ?? 5000);
   },
 });
+
+export const setAttackerStepScreenshots = mutation({
+  args: {
+    gameId: v.string(),
+    stepNumber: v.number(),
+    screenshotBeforeId: v.optional(v.id('_storage')),
+    screenshotAfterId: v.optional(v.id('_storage')),
+  },
+  handler: async (ctx, args) => {
+    const step = await ctx.db
+      .query('attackerSteps')
+      .withIndex('by_gameId', (q) => q.eq('gameId', args.gameId).eq('stepNumber', args.stepNumber))
+      .first();
+    if (!step) return null;
+
+    const patch: { screenshotBeforeId?: typeof args.screenshotBeforeId; screenshotAfterId?: typeof args.screenshotAfterId } = {};
+    if (args.screenshotBeforeId !== undefined) patch.screenshotBeforeId = args.screenshotBeforeId;
+    if (args.screenshotAfterId !== undefined) patch.screenshotAfterId = args.screenshotAfterId;
+    if (Object.keys(patch).length === 0) return step._id;
+
+    await ctx.db.patch(step._id, patch);
+    return step._id;
+  },
+});
+
+export const setDefenderActionScreenshots = mutation({
+  args: {
+    gameId: v.string(),
+    actionNumber: v.number(),
+    screenshotBeforeId: v.optional(v.id('_storage')),
+    screenshotAfterId: v.optional(v.id('_storage')),
+  },
+  handler: async (ctx, args) => {
+    const action = await ctx.db
+      .query('defenderActions')
+      .withIndex('by_gameId', (q) => q.eq('gameId', args.gameId).eq('actionNumber', args.actionNumber))
+      .first();
+    if (!action) return null;
+
+    const patch: { screenshotBeforeId?: typeof args.screenshotBeforeId; screenshotAfterId?: typeof args.screenshotAfterId } = {};
+    if (args.screenshotBeforeId !== undefined) patch.screenshotBeforeId = args.screenshotBeforeId;
+    if (args.screenshotAfterId !== undefined) patch.screenshotAfterId = args.screenshotAfterId;
+    if (Object.keys(patch).length === 0) return action._id;
+
+    await ctx.db.patch(action._id, patch);
+    return action._id;
+  },
+});

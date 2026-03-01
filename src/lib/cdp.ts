@@ -193,7 +193,7 @@ function screenshotViaCDP(wsUrl: string): Promise<Buffer | null> {
  * Resolve the WebSocket debugger URL for the first page target.
  * Caches the result per CDP endpoint for 60s.
  */
-async function getPageTargetWsUrl(cdpUrl: string): Promise<string | null> {
+export async function getPageTargetWsUrl(cdpUrl: string): Promise<string | null> {
   const t0 = Date.now();
 
   // Check cache first
@@ -209,22 +209,27 @@ async function getPageTargetWsUrl(cdpUrl: string): Promise<string | null> {
   const baseUrl = new URL(httpBase);
   const targetsUrl = `${baseUrl.protocol}//${baseUrl.host}/json`;
 
-  const targetsRes = await fetch(targetsUrl);
-  if (!targetsRes.ok) {
-    log(`[getPageTargetWsUrl] fetch FAILED (${targetsRes.status}) in ${Date.now() - t0}ms`);
+  try {
+    const targetsRes = await fetch(targetsUrl);
+    if (!targetsRes.ok) {
+      log(`[getPageTargetWsUrl] fetch FAILED (${targetsRes.status}) in ${Date.now() - t0}ms`);
+      return null;
+    }
+
+    const targets = await targetsRes.json();
+    const page = targets.find((t: { type: string; webSocketDebuggerUrl?: string }) => t.type === 'page');
+    const wsUrl = page?.webSocketDebuggerUrl ?? null;
+
+    if (wsUrl) {
+      wsUrlCache.set(cdpUrl, { url: wsUrl, resolvedAt: Date.now() });
+    }
+
+    log(`[getPageTargetWsUrl] resolved in ${Date.now() - t0}ms (cached=${!!wsUrl})`);
+    return wsUrl;
+  } catch (err) {
+    logError(`[getPageTargetWsUrl] error after ${Date.now() - t0}ms:`, err);
     return null;
   }
-
-  const targets = await targetsRes.json();
-  const page = targets.find((t: { type: string; webSocketDebuggerUrl?: string }) => t.type === 'page');
-  const wsUrl = page?.webSocketDebuggerUrl ?? null;
-
-  if (wsUrl) {
-    wsUrlCache.set(cdpUrl, { url: wsUrl, resolvedAt: Date.now() });
-  }
-
-  log(`[getPageTargetWsUrl] resolved in ${Date.now() - t0}ms (cached=${!!wsUrl})`);
-  return wsUrl;
 }
 
 async function runWithPageTargetRetry<T>(

@@ -4,6 +4,7 @@ import { useReducer, useCallback } from 'react';
 import type { ClientGameState, AttackerType, Difficulty, GameMode, Task, AgentEvent, DefenderStep, DisruptionEvent } from '@/types/game';
 import type {
   SSEEnvelope,
+  ConnectionEstablishedPayload,
   AttackerStepPayload,
   DefenderActivityPayload,
   DefenderDisruptionPayload,
@@ -67,8 +68,16 @@ function reducer(state: ClientGameState, action: Action): ClientGameState {
     case 'SSE_EVENT': {
       const { envelope } = action;
       switch (envelope.type) {
-        case 'connection_established':
-          return { ...state, phase: 'arena' };
+        case 'connection_established': {
+          const cp = envelope.payload as ConnectionEstablishedPayload;
+          return {
+            ...state,
+            phase: 'arena',
+            health: cp.health ?? state.health,
+            attackerStatus: cp.attackerStatus ?? state.attackerStatus,
+            defenderStatus: cp.defenderStatus ?? state.defenderStatus,
+          };
+        }
 
         case 'attacker_step': {
           const p = envelope.payload as AttackerStepPayload;

@@ -1,16 +1,49 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { nanoid } from 'nanoid';
 import { createBrowser, createAgentSession } from '@/lib/browser-use-api';
-import { createSession, getSession } from '@/lib/game-session-store';
+import { createSession, getSession, deleteSession } from '@/lib/game-session-store';
 import { startDefenderLoop } from '@/lib/defender-agent';
 import { emitEvent } from '@/lib/sse-emitter';
 import { TASKS } from '@/lib/tasks';
 import { runAttackerLoop } from '@/lib/attacker-agent';
 import { createGameRecord, recordNetworkRequest } from '@/lib/data-collector';
-import { startNetworkCapture } from '@/lib/cdp';
+import { startNetworkCapture, getPageTargetWsUrl } from '@/lib/cdp';
 import { startScreencast } from '@/lib/screencast';
 import { runBrowserUseAttackerLoop } from '@/lib/browser-use-attacker';
+import { stopBrowser, stopSession } from '@/lib/browser-use-api';
 import type { AttackerType, Difficulty } from '@/types/game';
+
+/**
+ * Poll CDP /json endpoint until a page target is available.
+ * Browser-Use may return URLs before the browser is fully ready.
+ */
+async function waitForCdpReady(cdpUrl: string, maxAttempts = 10, intervalMs = 1000): Promise<boolean> {
+  for (let i = 0; i < maxAttempts; i++) {
+    const wsUrl = await getPageTargetWsUrl(cdpUrl).catch(() => null);
+    if (wsUrl) {
+      console.log(`[start] CDP ready after ${i + 1} attempt(s)`);
+      return true;
+    }
+    if (i < maxAttempts - 1) {
+      await new Promise(r => setTimeout(r, intervalMs));
+    }
+  }
+  console.error(`[start] CDP not ready after ${maxAttempts} attempts`);
+  return false;
+}
+
+async function cleanupRemoteSession(attackerType: AttackerType, browserSessionId: string): Promise<void> {
+  if (!browserSessionId) return;
+  try {
+    if (attackerType === 'browser-use') {
+      await stopSession(browserSessionId);
+    } else {
+      await stopBrowser(browserSessionId);
+    }
+  } catch {
+    // cleanup is best-effort
+  }
+}
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
@@ -103,7 +136,21 @@ export async function POST(req: NextRequest) {
     modelUrl,
   });
 
-  // 2b. Persist to Convex for training data collection
+  // 2b. Verify CDP is accepting connections before starting agents
+  const requiresReadyCdp = attackerType !== 'browser-use' || !noDefender;
+  if (requiresReadyCdp) {
+    const cdpReady = await waitForCdpReady(cdpUrl);
+    if (!cdpReady) {
+      console.error('[start] CDP endpoint never became ready — aborting game');
+      deleteSession(gameId);
+      await cleanupRemoteSession(attackerType, browserSessionId);
+      return NextResponse.json({ error: 'Browser started but CDP connection failed' }, { status: 500 });
+    }
+  } else {
+    console.log('[start] CDP readiness gate skipped (browser-use attacker with no defender)');
+  }
+
+  // 2c. Persist to Convex for training data collection
   createGameRecord({
     gameId,
     taskId: task.id,

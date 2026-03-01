@@ -1,5 +1,6 @@
 import WebSocket from 'ws';
 import { uploadScreenshot } from './data-collector';
+import { getPageTargetWsUrl } from './cdp';
 import { log, logError } from './log';
 
 interface ScreencastFrame {
@@ -24,21 +25,11 @@ export async function startScreencast(gameId: string, cdpUrl: string): Promise<v
   if (!cdpUrl || activeSessions.has(gameId)) return;
 
   try {
-    // Resolve page target WebSocket URL
-    const httpBase = cdpUrl
-      .replace('wss://', 'https://')
-      .replace('ws://', 'http://');
-    const baseUrl = new URL(httpBase);
-    const targetsUrl = `${baseUrl.protocol}//${baseUrl.host}/json`;
+    // Resolve page target WebSocket URL (shared cache with cdp.ts)
+    const wsUrl = await getPageTargetWsUrl(cdpUrl);
+    if (!wsUrl) return;
 
-    const targetsRes = await fetch(targetsUrl);
-    if (!targetsRes.ok) return;
-
-    const targets = await targetsRes.json();
-    const page = targets.find((t: { type: string; webSocketDebuggerUrl?: string }) => t.type === 'page');
-    if (!page?.webSocketDebuggerUrl) return;
-
-    const ws = new WebSocket(page.webSocketDebuggerUrl);
+    const ws = new WebSocket(wsUrl);
     const session: ScreencastSession = {
       frames: [],
       ws,

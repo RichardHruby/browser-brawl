@@ -6,7 +6,14 @@ import { injectJS, snapshotDOM } from './cdp';
 import { emitEvent } from './sse-emitter';
 import { nanoid } from 'nanoid';
 import { getAnthropicApiKey } from './env';
-import { recordDefenderAction, finalizeGame, recordHealthChange, captureAndUploadScreenshot, setSessionRecording } from './data-collector';
+import {
+  recordDefenderAction,
+  finalizeGame,
+  recordHealthChange,
+  captureAndUploadScreenshot,
+  setSessionRecording,
+  setDefenderActionScreenshots,
+} from './data-collector';
 import { stopScreencast } from './screencast';
 import { log, logError, logWarn } from './log';
 import type { DisruptionEvent } from '@/types/game';
@@ -380,7 +387,7 @@ async function runDefenderTurn(gameId: string): Promise<void> {
     payload = disruption.generatePayload();
   }
 
-  // Start pre-injection screenshot + DOM snapshot now, then await before persistence.
+  // Fire screenshot uploads without blocking gameplay. IDs are patched in later.
   const beforeScreenshotPromise = captureAndUploadScreenshot(session.cdpUrl).catch(() => null);
   const domSnapPromise = snapshotDOM(session.cdpUrl).catch(() => null);
 
@@ -401,21 +408,18 @@ async function runDefenderTurn(gameId: string): Promise<void> {
     });
   }
 
-  // Collect artifacts for persistence.
+  // DOM snapshot is fast (~500ms) — safe to await.
   const domSnap = await domSnapPromise;
-  const beforeScreenshotId = await beforeScreenshotPromise;
 
-  // Capture a post-injection screenshot (after a short delay so DOM changes render).
-  const afterScreenshotPromise = success
-    ? new Promise<string | null>((resolve) => {
+  const afterScreenshotPromise: Promise<string | null> = success
+    ? new Promise((resolve) => {
       setTimeout(() => {
         captureAndUploadScreenshot(session.cdpUrl)
           .then(resolve)
           .catch(() => resolve(null));
       }, 500);
     })
-    : Promise.resolve<string | null>(null);
-  const afterScreenshotId = await afterScreenshotPromise;
+    : Promise.resolve(null);
 
   session.defenderCooldowns.set(disruption.id, session.mode === 'turnbased' ? session.turnNumber : Date.now());
 
@@ -430,11 +434,12 @@ async function runDefenderTurn(gameId: string): Promise<void> {
     reasoning,
   };
   session.defenderDisruptions.push(event);
+  const actionNumber = session.defenderDisruptions.length;
 
   // Persist defender action to Convex
   recordDefenderAction({
     gameId,
-    actionNumber: session.defenderDisruptions.length,
+    actionNumber,
     disruptionId: disruption.id,
     disruptionName: disruption.name,
     description: disruption.description,
@@ -445,9 +450,25 @@ async function runDefenderTurn(gameId: string): Promise<void> {
     injectionPayload: payload.slice(0, 5000),
     attackerStepAtTime: session.attackerSteps.length,
     domSnapshot: domSnap ?? undefined,
-    screenshotBeforeId: beforeScreenshotId ?? undefined,
-    screenshotAfterId: afterScreenshotId ?? undefined,
   });
+
+  beforeScreenshotPromise.then((storageId) => {
+    if (!storageId) return;
+    setDefenderActionScreenshots({
+      gameId,
+      actionNumber,
+      screenshotBeforeId: storageId,
+    });
+  }).catch(() => {});
+
+  afterScreenshotPromise.then((storageId) => {
+    if (!storageId) return;
+    setDefenderActionScreenshots({
+      gameId,
+      actionNumber,
+      screenshotAfterId: storageId,
+    });
+  }).catch(() => {});
 
   // Always emit disruption card (success or failure)
   emitEvent<DefenderDisruptionPayload>(gameId, 'defender_disruption', {

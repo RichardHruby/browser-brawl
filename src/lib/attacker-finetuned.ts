@@ -200,8 +200,8 @@ export async function runAttackerLoop(gameId: string, signal: AbortSignal): Prom
   });
 
   const mcpClient = new Client({ name: 'browser-brawl-finetuned', version: '1.0.0' });
-  await mcpClient.connect(transport);
 
+  // Register abort handler BEFORE connect so a hanging connection can be cleaned up
   const onAbort = () => {
     mcpClient.close().catch(() => {});
     transport.close().catch(() => {});
@@ -209,6 +209,8 @@ export async function runAttackerLoop(gameId: string, signal: AbortSignal): Prom
   signal.addEventListener('abort', onAbort, { once: true });
 
   try {
+    await mcpClient.connect(transport);
+
     // Discover tools from Playwright MCP
     const { tools: mcpToolList } = await mcpClient.listTools();
     const tools: ToolDef[] = mcpToolList.map(t => ({
