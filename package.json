@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "vitest run"
+    "test": "vitest run",
+    "eval:miniwob": "tsx scripts/eval-miniwob.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
@@ -31,6 +32,7 @@
     "@types/ws": "^8.18.1",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
+    "playwright-core": "^1.59.0-alpha-1771104257000",
     "tailwindcss": "^4",
     "tsx": "^4.21.0",
     "typescript": "^5",

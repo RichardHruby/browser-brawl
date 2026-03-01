@@ -288,6 +288,38 @@ gpt     → Final "TASK COMPLETE" message
 4. **Evaluation** — In-distribution (Browser Brawl held-out set) + out-of-distribution (MiniWob++)
 5. **Adversarial specialization** — DPO with successful vs failed trajectories, disruption-annotated data
 
+### MiniWob++ Benchmark Evaluation — `scripts/eval-miniwob.ts`
+
+Out-of-distribution eval harness that tests the fine-tuned Qwen2.5-3B against standardized browser tasks. Compares fine-tuned vs vanilla Qwen (and optionally Claude Sonnet via Anthropic API).
+
+**Key design:** Uses the same Playwright MCP tool-calling interface the model was trained on (NOT BrowserGym — different action space). The model outputs `<tool_call>` XML, tools execute via MCP, results return as `<tool_response>` XML.
+
+**Architecture:**
+- Serves MiniWob++ HTML files via local static HTTP server
+- Launches local Chromium with `--remote-debugging-port` (no cloud browser needed)
+- Per episode: navigates to task → `core.startEpisodeReal()` → reads utterance → spawns Playwright MCP via CDP → runs agent loop → checks `WOB_RAW_REWARD_GLOBAL` for pass/fail
+- System prompt reuses `buildSystemPrompt()` from `src/lib/training-converter.ts` (exact format used in training)
+- Supports `--record` for per-episode `.webm` video recording via Playwright
+
+**25 curated tasks** (`scripts/miniwob-tasks.ts`) across 5 categories: click (9), type (6), form (4), multi-step (3), navigation (2) — selected for relevance to Browser Brawl training data.
+
+**Usage:**
+```bash
+# Prerequisites
+git clone https://github.com/Farama-Foundation/miniwob-plusplus.git (outside this repo)
+npx playwright install chromium
+
+# Single model, single task
+npx tsx scripts/eval-miniwob.ts --finetuned-url <URL> --miniwob-dir ../miniwob-plusplus/miniwob/html --tasks click-button --episodes 1
+
+# Full comparison with recording
+npx tsx scripts/eval-miniwob.ts --finetuned-url <FT_URL> --vanilla-url <VN_URL> --miniwob-dir ../miniwob-plusplus/miniwob/html --episodes 3 --record --output data/miniwob_results.json
+```
+
+**CLI flags:** `--finetuned-url`, `--vanilla-url`, `--miniwob-dir`, `--tasks`, `--episodes`, `--max-steps`, `--port`, `--cdp-port`, `--headless`, `--record`, `--record-dir`, `--output`, `--finetuned-only`, `--vanilla-only`
+
+**Output:** Per-task pass rate comparison table, breakdowns by category and difficulty, JSON results file. See `docs/miniwob-eval.md` for full status and next steps.
+
 ## Current Status
 
 The game is fully playable end-to-end:
