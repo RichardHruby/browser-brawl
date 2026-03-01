@@ -116,7 +116,7 @@ IMPORTANT:
       // Call Claude immediately
       log(`[attacker] Step ${logger.currentStep + 1} — calling Claude (loop start +${Date.now() - loopT0}ms)...`);
       const response = await anthropic.messages.create({
-        model: 'claude-sonnet-4-20250514',
+        model: 'claude-sonnet-4-6',
         max_tokens: 4096,
         tools,
         messages,
