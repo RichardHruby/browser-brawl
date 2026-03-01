@@ -31,7 +31,7 @@ import json
 import re
 import time
 import sys
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 try:
@@ -127,6 +127,28 @@ def format_compliance(attacker_steps: list[dict]) -> float:
 
 # ── Metrics ───────────────────────────────────────────────────────────────────
 
+def parse_duration_s(started_at: str | None, ended_at: str | None) -> float | None:
+    """Return wall-clock seconds between ISO timestamps, or None if unavailable."""
+    if not started_at or not ended_at:
+        return None
+    try:
+        fmt = "%Y-%m-%dT%H:%M:%S.%fZ"
+        def _parse(s: str):
+            s = s.rstrip("Z").split("+")[0]  # normalise
+            for f in ("%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%S"):
+                try:
+                    return datetime.strptime(s, f)
+                except ValueError:
+                    pass
+            return None
+        t0, t1 = _parse(started_at), _parse(ended_at)
+        if t0 and t1:
+            return round((t1 - t0).total_seconds(), 1)
+    except Exception:
+        pass
+    return None
+
+
 def compute_metrics(results: list[dict]) -> dict:
     n = len(results)
     if n == 0:
@@ -134,26 +156,42 @@ def compute_metrics(results: list[dict]) -> dict:
 
     wins       = [r for r in results if r.get("winner") == "attacker"]
     losses     = [r for r in results if r.get("winner") != "attacker"]
+
     avg_steps  = sum(r.get("steps", 0) for r in results) / n
     avg_steps_on_wins = (
         sum(r.get("steps", 0) for r in wins) / len(wins) if wins else None
     )
+
+    durations     = [r["duration_s"] for r in results if r.get("duration_s") is not None]
+    avg_duration  = round(sum(durations) / len(durations), 1) if durations else None
+    win_durations = [r["duration_s"] for r in wins if r.get("duration_s") is not None]
+    avg_duration_on_wins = round(sum(win_durations) / len(win_durations), 1) if win_durations else None
+
     timeouts   = sum(1 for r in results if r.get("win_reason") == "timeout")
     health_dep = sum(1 for r in results if r.get("win_reason") == "health_depleted")
     fmt_scores = [r["format_compliance"] for r in results if "format_compliance" in r]
     avg_fmt    = round(sum(fmt_scores) / len(fmt_scores), 3) if fmt_scores else None
 
     return {
-        "n":                   n,
-        "win_rate":            round(len(wins) / n, 3),
-        "wins":                len(wins),
-        "losses":              len(losses),
-        "avg_steps":           round(avg_steps, 1),
-        "avg_steps_on_wins":   round(avg_steps_on_wins, 1) if avg_steps_on_wins else None,
-        "timeouts":            timeouts,
-        "health_depleted":     health_dep,
-        "format_compliance":   avg_fmt,
+        "n":                     n,
+        "win_rate":              round(len(wins) / n, 3),
+        "wins":                  len(wins),
+        "losses":                len(losses),
+        "avg_steps":             round(avg_steps, 1),
+        "avg_steps_on_wins":     round(avg_steps_on_wins, 1) if avg_steps_on_wins else None,
+        "avg_duration_s":        avg_duration,
+        "avg_duration_on_wins":  avg_duration_on_wins,
+        "timeouts":              timeouts,
+        "health_depleted":       health_dep,
+        "format_compliance":     avg_fmt,
     }
+
+
+def fmt_duration(s: float | None) -> str:
+    if s is None:
+        return "n/a"
+    m, sec = divmod(int(s), 60)
+    return f"{m}m{sec:02d}s"
 
 
 def print_metrics(label: str, metrics: dict) -> None:
@@ -168,6 +206,9 @@ def print_metrics(label: str, metrics: dict) -> None:
     print(f"  Avg steps (all):    {metrics['avg_steps']}")
     if metrics["avg_steps_on_wins"] is not None:
         print(f"  Avg steps (wins):   {metrics['avg_steps_on_wins']}")
+    print(f"  Avg time (all):     {fmt_duration(metrics['avg_duration_s'])}")
+    if metrics["avg_duration_on_wins"] is not None:
+        print(f"  Avg time (wins):    {fmt_duration(metrics['avg_duration_on_wins'])}")
     print(f"  Health depleted:    {metrics['health_depleted']}")
     print(f"  Timeouts:           {metrics['timeouts']}")
     if metrics["format_compliance"] is not None:
@@ -241,6 +282,7 @@ def main():
             win_reason = status.get("winReason") or status.get("phase")
             steps_list = status.get("attackerSteps", [])
             steps      = len(steps_list)
+            duration   = parse_duration_s(status.get("startedAt"), status.get("endedAt"))
             fmt        = format_compliance(steps_list) if attacker_type == "finetuned" else None
 
             result = {
@@ -253,6 +295,7 @@ def main():
                 "winner":            winner,
                 "win_reason":        win_reason,
                 "steps":             steps,
+                "duration_s":        duration,
                 "timestamp":         datetime.utcnow().isoformat(),
             }
             if fmt is not None:
@@ -261,8 +304,9 @@ def main():
             results.append(result)
 
             icon = "✓" if winner == "attacker" else "✗"
-            fmt_str = f"  fmt={fmt:.0%}" if fmt is not None else ""
-            print(f"  {icon} {winner or 'none'} — {win_reason} — {steps} steps{fmt_str}")
+            time_str = f"  {fmt_duration(duration)}" if duration else ""
+            fmt_str  = f"  fmt={fmt:.0%}" if fmt is not None else ""
+            print(f"  {icon} {winner or 'none'} — {win_reason} — {steps} steps{time_str}{fmt_str}")
 
             if game_num < args.games:
                 time.sleep(10)  # cooldown between browser sessions
@@ -284,10 +328,13 @@ def main():
             print(f"\n{'─' * 52}")
             print("  HEAD-TO-HEAD")
             print(f"{'─' * 52}")
-            wr_d    = fm["win_rate"]    - bm["win_rate"]
-            step_d  = fm["avg_steps"]  - bm["avg_steps"]
+            wr_d   = fm["win_rate"]  - bm["win_rate"]
+            step_d = fm["avg_steps"] - bm["avg_steps"]
             print(f"  Win rate Δ:     {wr_d:+.1%}  (Qwen vs Claude)")
             print(f"  Avg steps Δ:    {step_d:+.1f}  (Qwen vs Claude)")
+            if bm["avg_duration_s"] and fm["avg_duration_s"]:
+                time_d = fm["avg_duration_s"] - bm["avg_duration_s"]
+                print(f"  Avg time Δ:     {time_d:+.0f}s  (Qwen vs Claude)")
 
     if args.output:
         out = Path(args.output)
