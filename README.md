@@ -61,10 +61,9 @@ flowchart LR
 ```
 
 1. **Lobby** — Pick a task (Amazon shopping, Google Flights, Hacker News, etc.) and difficulty level
-2. **Loading** (~8s) — A cloud browser spins up via Browser-Use API
-3. **Arena** — Both agents run concurrently. The attacker navigates the real website with Playwright. The defender injects JavaScript disruptions via CDP. Health drains over time and on each hit.
-4. **Game Over** — Attacker wins by completing the task. Defender wins by depleting health to zero.
-5. **Data** — Every match records full Claude conversations, tool calls, DOM snapshots, screenshots, and video to Convex for training data extraction.
+2. **Arena** — Both agents run concurrently. The attacker navigates the real website with Playwright. The defender injects JavaScript disruptions via CDP. Health drains over time and on each hit.
+3. **Game Over** — Attacker wins by completing the task. Defender wins by depleting health to zero.
+4. **Data** — Every match records full Claude conversations, tool calls, DOM snapshots, screenshots, and video to Convex for training data extraction.
 
 ---
 
