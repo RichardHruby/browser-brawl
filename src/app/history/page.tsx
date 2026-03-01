@@ -3,6 +3,7 @@
 import { useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { useCallback, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { DIFFICULTY_COLORS, WINNER_SHORT } from '@/lib/constants';
 import { formatDuration, formatDate, formatWinReason, formatModel } from '@/lib/format';
@@ -14,6 +15,8 @@ export default function HistoryPage() {
   const [diffFilter, setDiffFilter] = useState<Difficulty | ''>('');
   const [winnerFilter, setWinnerFilter] = useState<Winner | ''>('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [isKickingOff, setIsKickingOff] = useState(false);
+  const router = useRouter();
 
   const sessions = useQuery(api.sessions.list, {
     difficulty: diffFilter || undefined,
@@ -47,12 +50,14 @@ export default function HistoryPage() {
     sessions.some((s) => selected.has(s.gameId)) &&
     !allVisibleSelected;
 
+  const gameIdsParam = Array.from(selected).join(',');
+
   return (
     <div
       className="boxy-ui min-h-screen flex flex-col"
       style={{ background: 'var(--color-bg-deep)' }}
     >
-      {/* Compact header */}
+      {/* Compact sticky header */}
       <div
         className="sticky top-0 z-30 px-6 py-3"
         style={{
@@ -60,7 +65,8 @@ export default function HistoryPage() {
           borderBottom: '2px solid var(--color-border)',
         }}
       >
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          {/* Left: nav + title */}
           <div className="flex items-center gap-4">
             <Link
               href="/"
@@ -83,7 +89,8 @@ export default function HistoryPage() {
             )}
           </div>
 
-          <div className="flex items-center gap-3">
+          {/* Right: filters + action buttons */}
+          <div className="flex items-center gap-3 flex-wrap">
             <select
               value={diffFilter}
               onChange={(e) => {
@@ -127,6 +134,116 @@ export default function HistoryPage() {
                 {selected.size} selected
               </span>
             )}
+
+            {/* Download Traces — exports selected sessions as ShareGPT JSONL */}
+            <div className="relative group/dl">
+              <button
+                onClick={() => {
+                  if (selected.size === 0) return;
+                  window.location.href = `/api/export/training?gameIds=${gameIdsParam}`;
+                }}
+                disabled={selected.size === 0}
+                className="font-display text-xs font-bold tracking-widest uppercase px-4 py-2 rounded transition-all duration-200 hover:scale-105 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
+                style={{
+                  background: 'var(--color-bg-card)',
+                  color: 'var(--color-attacker)',
+                  border: selected.size > 0 ? '2px solid var(--color-attacker)' : '2px solid var(--color-border)',
+                }}
+              >
+                Download Traces{selected.size > 0 ? ` (${selected.size})` : ''}
+              </button>
+              <div
+                className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 rounded text-xs font-mono whitespace-nowrap opacity-0 group-hover/dl:opacity-100 transition-opacity duration-200 pointer-events-none z-50"
+                style={{
+                  background: 'var(--color-bg-card)',
+                  color: 'var(--color-attacker)',
+                  border: '1px solid var(--color-attacker)',
+                  boxShadow: '0 0 10px rgba(0, 255, 255, 0.15)',
+                }}
+              >
+                {selected.size === 0
+                  ? 'Select sessions to download'
+                  : `Download ${selected.size} session${selected.size !== 1 ? 's' : ''} as ShareGPT JSONL`}
+                <div
+                  className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0"
+                  style={{
+                    borderLeft: '6px solid transparent',
+                    borderRight: '6px solid transparent',
+                    borderTop: '6px solid var(--color-attacker)',
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Kickoff Finetune button with tooltip */}
+            <div className="relative group/tooltip">
+              <button
+                onClick={async () => {
+                  if (selected.size === 0 || isKickingOff) return;
+                  setIsKickingOff(true);
+                  try {
+                    const res = await fetch('/api/training/start', {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ gameIds: Array.from(selected), textOnly: true }),
+                    });
+                    const data = await res.json();
+                    if (res.ok) {
+                      router.push('/training');
+                    } else {
+                      alert(`Failed to start training: ${data.error || 'Unknown error'}`);
+                    }
+                  } catch (err) {
+                    alert(`Network error: ${err}`);
+                  } finally {
+                    setIsKickingOff(false);
+                  }
+                }}
+                disabled={selected.size === 0 || isKickingOff}
+                className="font-display text-xs font-bold tracking-widest uppercase px-4 py-2 rounded transition-all duration-200 hover:scale-105 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
+                style={{
+                  background: selected.size > 0 ? 'linear-gradient(135deg, #131325, #1a1a35)' : 'var(--color-bg-card)',
+                  color: '#cc44ff',
+                  border: selected.size > 0 ? '2px solid #cc44ff' : '2px solid var(--color-border)',
+                  boxShadow: selected.size > 0 ? '0 0 12px rgba(204, 68, 255, 0.3)' : 'none',
+                }}
+              >
+                {isKickingOff ? 'Starting...' : 'Kickoff Finetune'}
+              </button>
+              <div
+                className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 rounded text-xs font-mono whitespace-nowrap opacity-0 group-hover/tooltip:opacity-100 transition-opacity duration-200 pointer-events-none z-50"
+                style={{
+                  background: 'var(--color-bg-card)',
+                  color: '#cc44ff',
+                  border: '1px solid #cc44ff',
+                  boxShadow: '0 0 10px rgba(204, 68, 255, 0.25)',
+                }}
+              >
+                {selected.size === 0
+                  ? 'Select sessions to kick off a finetune'
+                  : `Kick off a finetune pipeline with Qwen2.5 — ${selected.size} session${selected.size !== 1 ? 's' : ''} as ShareGPT JSONL`}
+                <div
+                  className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0"
+                  style={{
+                    borderLeft: '6px solid transparent',
+                    borderRight: '6px solid transparent',
+                    borderTop: '6px solid #cc44ff',
+                  }}
+                />
+              </div>
+            </div>
+
+            <Link
+              href="/training"
+              className="font-display text-xs font-bold tracking-widest uppercase px-4 py-2 rounded transition-all duration-200 hover:scale-105"
+              style={{
+                background: 'var(--color-bg-card)',
+                color: '#cc44ff',
+                border: '2px solid #cc44ff',
+              }}
+            >
+              Fine Tuning Runs
+            </Link>
           </div>
         </div>
       </div>

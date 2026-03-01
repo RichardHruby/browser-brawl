@@ -280,13 +280,174 @@ gpt     → Final "TASK COMPLETE" message
 
 **Tests:** `scripts/__tests__/convert-to-sharegpt.test.ts` — 16 tests covering tool def conversion, system prompt generation, assistant message formatting, tool response formatting, role mapping, metadata population, and quality filters.
 
+### Post-Processing — `scripts/prepare_training_data.py`
+
+Converts ShareGPT JSONL → OpenAI Messages JSONL required by Unsloth `FastVisionModel`:
+- Maps roles: `system`→`system`, `human`→`user`, `gpt`→`assistant`, `tool`→`tool`
+- Wraps string values in typed content arrays: `[{"type": "text", "text": "..."}]`
+- Downloads screenshots from Convex URLs → `data/images/{gameId}/{step}.png`
+- Attaches images to tool response messages as `{"type": "image", "image": "file:///abs/path.png"}`
+- Usage: `python scripts/prepare_training_data.py -i data/sharegpt.jsonl -o data/openai_messages.jsonl [--download-images --raw-jsonl data/raw.jsonl]`
+
+**Critical:** Both Unsloth `FastVisionModel` and Axolotl multimodal require OpenAI Messages format — NOT ShareGPT `from`/`value` format. The ShareGPT converter output is intermediate only.
+
+### Shared Training Converter — `src/lib/training-converter.ts`
+
+Shared module used by both CLI scripts and API routes. Contains all conversion logic:
+- `convertTrajectory(raw, minToolCalls)` — Anthropic native messages → ShareGPT format
+- `toOpenAIMessages(sharegpt)` — ShareGPT → OpenAI Messages format (ported from Python `prepare_training_data.py`)
+- `buildSystemPrompt()`, `convertAssistantMessage()`, `convertToolResultMessage()`
+- Types: `RawTrajectory`, `ShareGPTTrainingExample`, `OpenAITrainingExample`, `AnthropicToolDef`
+
+**Important:** Only processes Anthropic native format (`tool_use` content blocks). Games played with the fine-tuned model store `<tool_call>` XML strings instead — the converter correctly skips these (0 tool calls detected).
+
+**Tests:** `src/lib/__tests__/training-converter.test.ts` — 11 tests covering role mapping, content wrapping, end-to-end pipeline, and Unsloth format validation.
+
+### One-Click Training — `/history` → "Kickoff Finetune"
+
+Select games on the history page and click "Kickoff Finetune" to trigger the full pipeline automatically:
+
+1. **`POST /api/training/start`** (`src/app/api/training/start/route.ts`) — Orchestration endpoint
+   - Creates `trainingJobs` record in Convex (status: `preparing`)
+   - Fetches conversation data for each gameId from Convex
+   - Converts: Anthropic native → ShareGPT → OpenAI Messages (all in TypeScript, no Python)
+   - Uploads JSONL to Convex file storage → gets download URL
+   - Calls Modal `/kickoff` endpoint (fire-and-forget)
+   - Returns `{ experimentName, gameCount, status }`
+
+2. **Modal `kickoff`** (`scripts/modal_train_pipeline.py`) — Web endpoint
+   - Receives `{ data_url, experiment_name, text_only, convex_site_url }`
+   - Spawns async GPU `train()` function via `Function.from_name().spawn()` (150s web endpoint timeout workaround)
+   - Returns immediately with `{ call_id }`
+
+3. **Modal `train`** — GPU function (A10G, 6h timeout)
+   - Downloads JSONL from Convex storage URL
+   - Runs Unsloth QLoRA fine-tune (Qwen2.5-3B-Instruct)
+   - Merges LoRA weights into base model
+   - Calls Convex HTTP endpoint at each phase for real-time status updates
+
+4. **`/training` page** (`src/app/training/page.tsx`) — Real-time dashboard
+   - Uses `useQuery(api.training.list)` for live updates (no polling needed)
+   - Shows: experiment name, status badge, progress bar, step/loss metrics, errors
+   - When `ready`: shows serve URL, deploy command, and model volume path
+
+**Env vars required:**
+- `MODAL_TRAIN_ENDPOINT` — deployed Modal kickoff URL (`https://mehulkalia--browser-brawl-train-pipeline-kickoff.modal.run`)
+- `NEXT_PUBLIC_CONVEX_SITE_URL` — Convex HTTP endpoint URL for Modal callbacks
+
+**Deploy Modal pipeline:**
+```bash
+modal deploy scripts/modal_train_pipeline.py
+```
+
+### Convex Training Tables & HTTP Endpoint
+
+**Table: `trainingJobs`** (`convex/schema.ts`) — Tracks training experiments:
+- Status: `preparing` → `uploading` → `training` → `merging` → `ready` | `failed`
+- Real-time metrics: `currentStep`, `totalSteps`, `currentLoss`
+- Indexed by `experimentName`
+
+**Mutations/queries:** `convex/training.ts` — `create`, `updateStatus`, `setTrainingData`, `list`, `get`, `getTrainingDataUrl`
+
+**HTTP endpoint:** `convex/http.ts` — `POST /api/training-status` — unauthenticated endpoint that Modal calls to push status updates back to Convex.
+
+### Training Pipeline Output
+
+When training completes (`status: ready`), the pipeline produces:
+
+1. **Merged model** on Modal volume, ready for vLLM serving
+2. **Serve URL** stored in Convex `trainingJobs.serveUrl` and displayed on `/training` page
+3. **Deploy command** shown on `/training` page
+
+**Model files** on Modal `browser-brawl-checkpoints` volume:
+```
+/checkpoints/experiments/{experiment_name}/
+├── checkpoint-*/          ← SFTTrainer epoch checkpoints
+├── final_model/           ← LoRA adapter (adapter_config.json, adapter_model.bin, tokenizer)
+└── merged_model/          ← Full merged model for vLLM serving (~6GB, bfloat16 safetensors)
+```
+
+**Serve URL pattern** (workspace: `mehulkalia`):
+```
+https://mehulkalia--{experiment_name}-model-chat.modal.run?experiment_name={experiment_name}
+```
+
+**Modal volumes:**
+- `browser-brawl-model-cache` — HuggingFace model cache (mounted at `/model_cache`)
+- `browser-brawl-training-data` — Training data input (mounted at `/data`)
+- `browser-brawl-checkpoints` — Outputs: LoRA adapters + merged models (mounted at `/checkpoints`)
+
+**Serving** — deploy once, works for all experiments automatically:
+```bash
+modal deploy scripts/modal_serve.py   # one-time setup
+# URL pattern: https://mehulkalia--browser-brawl-serve-model-chat.modal.run?experiment_name=<name>
+# Each ?experiment_name= value gets its own auto-scaling container pool (modal.parameter)
+# First request for a new experiment cold-starts (~2min to load model into vLLM)
+# Set in .env.local: FINETUNED_MODEL_URL=https://mehulkalia--browser-brawl-serve-model-chat.modal.run?experiment_name=<name>
+```
+
+**To download locally:**
+```bash
+MSYS_NO_PATHCONV=1 modal volume get browser-brawl-checkpoints /experiments/<name>/merged_model ./local_model/
+```
+
+### CLI Fine-Tuning — `scripts/modal_finetune.py`
+
+Manual CLI alternative to the one-click pipeline. Runs QLoRA fine-tuning on Modal A10G (24GB VRAM):
+- **Text-only** (`--text-only`): `Qwen2.5-3B-Instruct` + `FastLanguageModel`
+- **Multimodal** (default): `Qwen2.5-VL-3B-Instruct` + `FastVisionModel`
+
+```bash
+# Upload data manually
+MSYS_NO_PATHCONV=1 modal volume put browser-brawl-training-data data/openai_messages.jsonl /train.jsonl
+
+# Train
+modal run scripts/modal_finetune.py --text-only
+```
+
+### Merge (one-off) — `scripts/modal_merge.py`
+
+Merges LoRA adapter into base model for checkpoints trained before auto-merge was added. Pins `trl==0.19.1` to match `unsloth_zoo` requirements.
+
+### Fine-Tuned Attacker — `src/lib/attacker-finetuned.ts`
+
+Drop-in replacement for `attacker-playwright.ts` that calls `FINETUNED_MODEL_URL` instead of Claude:
+- Same Playwright MCP browser tools
+- Parses `<tool_call>` XML responses (matching training data format from `convert-to-sharegpt.ts`)
+- Formats tool results as `<tool_response>` XML
+- Activated via `attackerType: 'finetuned'` in game start payload
+
+### Eval — `scripts/eval_browser_brawl.py`
+
+Runs N games via Browser Brawl API comparing fine-tuned Qwen vs Claude Sonnet baseline. Defender disabled by default (`noDefender=true`) to isolate model capability from health-drain noise.
+
+Metrics: task success rate, avg steps to completion, avg time to completion, format compliance (finetuned only).
+
+```bash
+python scripts/eval_browser_brawl.py --games 5 --task hackernews-upvote
+python scripts/eval_browser_brawl.py --finetuned-only --game-timeout 600   # skip baseline, longer timeout for cold starts
+```
+
+The `noDefender=true` flag is also accepted by `/api/game/start` directly.
+
+**Smoke test results** (2026-03-01, experiment `text-20260228-2221`, 1 training example):
+- 2/2 games won (hackernews-upvote, easy, no defender)
+- 7 steps per game, 18s warm / 3m22s cold
+- 100% format compliance (`<tool_call>` XML parsed correctly)
+
 ### Pipeline Phases
 
-1. **Data extraction + conversion** — `scripts/extract-training-data.ts` + `scripts/convert-to-sharegpt.ts` (done, verified end-to-end)
-2. **Data farming** — Headless game runner to generate 500+ successful trajectories
-3. **Fine-tuning** — Axolotl + Unsloth on Modal A100, QLoRA on Qwen2.5-VL-3B-Instruct
-4. **Evaluation** — In-distribution (Browser Brawl held-out set) + out-of-distribution (MiniWob++)
-5. **Adversarial specialization** — DPO with successful vs failed trajectories, disruption-annotated data
+1. **Data extraction** — `scripts/extract-training-data.ts` ✅
+2. **ShareGPT conversion** — `scripts/convert-to-sharegpt.ts` ✅
+3. **OpenAI Messages post-processing** — `scripts/prepare_training_data.py` ✅ (also ported to TS in `src/lib/training-converter.ts`)
+4. **Fine-tuning on Modal** — `scripts/modal_finetune.py` ✅ (CLI) / `scripts/modal_train_pipeline.py` ✅ (one-click)
+5. **Model serving** — `scripts/modal_serve.py` ✅ (deployed, vLLM on A10G, 32K context)
+6. **LoRA merge** — `scripts/modal_merge.py` ✅ (one-off for pre-merge checkpoints)
+7. **Fine-tuned attacker** — `src/lib/attacker-finetuned.ts` ✅
+8. **Eval harness** — `scripts/eval_browser_brawl.py` ✅ (smoke test passed: 2/2 wins on hackernews-upvote)
+9. **One-click pipeline** — `/history` → Kickoff Finetune → `/training` dashboard ✅ (verified end-to-end)
+10. **Data farming** — Need ~50-150 successful attacker games before meaningful results
+11. **Adversarial specialization** — DPO with successful vs failed trajectories (post-PoC)
 
 ### MiniWob++ Benchmark Evaluation — `scripts/eval-miniwob.ts`
 
@@ -330,10 +491,15 @@ The game is fully playable end-to-end:
 - SSE streaming, live browser view, and game over detection all functional
 - Full training data pipeline: Laminar traces LLM calls, Convex stores structured game data, full Claude conversations, screenshots, DOM snapshots, network requests, and screencast recordings
 - Full conversation persistence to Convex `conversations` table — complete messages array with reasoning, tool calls, and untruncated tool results persisted after each Claude turn
-- History/replay UI with session list, filters, step-by-step replay, video playback, and CSV export
+- History/replay UI with session list, multi-select, step-by-step replay, video playback, and CSV export
+- Full fine-tuning pipeline built, deployed, and smoke-tested end-to-end: extract → convert → post-process → Modal train → merge → vLLM serve → fine-tuned attacker → eval (2/2 wins with 1 training example)
+- **One-click training pipeline:** Select games on `/history` → click "Kickoff Finetune" → data conversion + upload + Modal GPU training + LoRA merge all automated → real-time status on `/training` page via Convex subscriptions. Verified end-to-end: `preparing → uploading → training → merging → ready` in ~2 minutes.
 
 ### Known Issues
 - Attacker can still complete tasks on easy/medium difficulty before health runs out
+- Fine-tuning pipeline verified with 1 training example only — need 50-150 games for meaningful eval
+- Modal cold start takes ~2 min for vLLM model loading; warm up endpoint before running eval
+- Only Claude Sonnet games produce valid training data (Anthropic native `tool_use` format). Fine-tuned model games store `<tool_call>` XML and are correctly skipped by the converter.
 
 ## Future Directions
 

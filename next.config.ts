@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
   serverExternalPackages: [
@@ -17,6 +18,9 @@ const nextConfig: NextConfig = {
       "./node_modules/@playwright/mcp/node_modules/playwright/**/*",
       "./node_modules/@playwright/mcp/node_modules/playwright-core/**/*",
     ],
+  },
+  turbopack: {
+    root: path.resolve(__dirname),
   },
 };
 

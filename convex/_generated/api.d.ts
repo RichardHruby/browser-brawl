@@ -11,10 +11,12 @@
 import type * as conversations from "../conversations.js";
 import type * as events from "../events.js";
 import type * as health from "../health.js";
+import type * as http from "../http.js";
 import type * as network from "../network.js";
 import type * as screenshots from "../screenshots.js";
 import type * as sessions from "../sessions.js";
 import type * as steps from "../steps.js";
+import type * as training from "../training.js";
 
 import type {
   ApiFromModules,
@@ -26,10 +28,12 @@ declare const fullApi: ApiFromModules<{
   conversations: typeof conversations;
   events: typeof events;
   health: typeof health;
+  http: typeof http;
   network: typeof network;
   screenshots: typeof screenshots;
   sessions: typeof sessions;
   steps: typeof steps;
+  training: typeof training;
 }>;
 
 /**
