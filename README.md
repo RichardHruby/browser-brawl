@@ -6,7 +6,7 @@ One AI agent (the attacker) tries to complete a task on a real webpage. Another 
 
 We've proven this works: traces from Browser Brawl fine-tune Qwen2.5-VL-3B into a capable browser agent.
 
-> Built at the [Browser Use Web Agents Hackathon](https://browser-use.com/hackathon) at [Y Combinator](https://events.ycombinator.com/browser-use-hackathon), San Francisco — Feb 28–Mar 1, 2026.
+> Built at the [Browser Use](https://browser-use.com) Web Agents Hackathon at Y Combinator, San Francisco — Feb 28–Mar 1, 2026.
 
 ---
 
@@ -252,7 +252,7 @@ defender/                         # Standalone defender CLI (legacy prototype)
 
 ## Acknowledgments
 
-Built at the [Browser Use Web Agents Hackathon](https://browser-use.com/hackathon) at Y Combinator, San Francisco.
+Built at the [Browser Use](https://browser-use.com) Web Agents Hackathon at Y Combinator, San Francisco.
 
 Sponsored by Anthropic, OpenAI, Vercel, Convex, and Browser Use.
 
