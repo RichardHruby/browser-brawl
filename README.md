@@ -134,7 +134,7 @@ The attacker agent is framework-agnostic — pick the one you prefer:
 
 | Framework | How it works |
 |-----------|-------------|
-| [**Playwright MCP**](https://github.com/anthropics/mcp) (default) | Spawns a Playwright MCP server connected to the cloud browser via CDP. Full tool suite (click, type, navigate, snapshot, etc.) |
+| [**Playwright MCP**](https://github.com/anthropics/mcp) | Spawns a Playwright MCP server connected to the cloud browser via CDP. Full tool suite (click, type, navigate, snapshot, etc.) |
 | [**Browser-Use SDK**](https://browser-use.com) | Uses Browser-Use's built-in agent API for browser control |
 | [**Stagehand**](https://github.com/browserbase/stagehand) | Browserbase's AI-native browser automation framework |
 
