@@ -247,7 +247,7 @@ defender/                         # Standalone defender CLI (legacy prototype)
 ## Collaborators
 
 - **Richard Hruby** — [GitHub](https://github.com/RichardHruby)
-- **Mehul Gupta** — [GitHub](https://github.com/mehulgupta29)
+- **Mehul Kalia** — [GitHub](http://github.com/mehulkalia/)
 
 ---
 
