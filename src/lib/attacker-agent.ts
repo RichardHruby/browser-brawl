@@ -1,6 +1,7 @@
 import { getSession } from './game-session-store';
 import { runAttackerLoop as runPlaywright } from './attacker-playwright';
 import { runAttackerLoop as runStagehand } from './attacker-stagehand';
+import { runAttackerLoop as runFinetuned } from './attacker-finetuned';
 
 /**
  * Run the local attacker loop based on the selected attacker type.
@@ -12,6 +13,10 @@ export async function runAttackerLoop(gameId: string, signal: AbortSignal): Prom
 
   if (session.attackerType === 'stagehand') {
     return runStagehand(gameId, signal);
+  }
+
+  if (session.attackerType === 'finetuned') {
+    return runFinetuned(gameId, signal);
   }
 
   return runPlaywright(gameId, signal);

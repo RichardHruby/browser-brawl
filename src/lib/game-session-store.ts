@@ -9,6 +9,7 @@ export interface ServerGameSession {
   task: Task;
   difficulty: Difficulty;
   attackerType: AttackerType;
+  modelUrl?: string;
   phase: GamePhase;
   health: number;
   startedAt: string;
@@ -70,6 +71,7 @@ export function createSession(params: {
   difficulty: Difficulty;
   mode: GameMode;
   attackerType: AttackerType;
+  modelUrl?: string;
 }): ServerGameSession {
   const session: ServerGameSession = {
     ...params,

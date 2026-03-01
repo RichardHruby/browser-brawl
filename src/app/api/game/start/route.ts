@@ -14,12 +14,13 @@ import type { AttackerType, Difficulty } from '@/types/game';
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { taskId, difficulty = 'easy', customTask, mode = 'realtime', attackerType = 'playwright-mcp' } = body as {
+  const { taskId, difficulty = 'easy', customTask, mode = 'realtime', attackerType = 'playwright-mcp', modelUrl } = body as {
     taskId?: string;
     difficulty?: Difficulty;
     customTask?: string;
     mode?: string;
     attackerType?: AttackerType;
+    modelUrl?: string;
   };
   const gameMode = mode === 'turnbased' ? 'turnbased' : 'realtime' as const;
 
@@ -79,6 +80,7 @@ export async function POST(req: NextRequest) {
     difficulty,
     mode: gameMode,
     attackerType,
+    modelUrl,
   });
 
   // 2b. Persist to Convex for training data collection
@@ -90,7 +92,7 @@ export async function POST(req: NextRequest) {
     taskStartUrl: task.startUrl,
     difficulty,
     mode: gameMode,
-    attackerModel: 'claude-sonnet-4-20250514',
+    attackerModel: attackerType === 'finetuned' ? 'finetuned-qwen' : 'claude-sonnet-4-20250514',
     defenderModel: 'claude-haiku-4-5-20251001',
   });
 
