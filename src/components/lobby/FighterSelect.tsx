@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect } from 'react';
 import Image from 'next/image';
 import type { AttackerType } from '@/types/game';
 
@@ -81,6 +82,20 @@ interface Props {
 
 export function FighterSelect({ value, onChange }: Props) {
   const selected = FIGHTERS.find(f => f.value === value) ?? FIGHTERS[0];
+
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      e.preventDefault();
+      const idx = FIGHTERS.findIndex(f => f.value === value);
+      const next = e.key === 'ArrowLeft'
+        ? (idx - 1 + FIGHTERS.length) % FIGHTERS.length
+        : (idx + 1) % FIGHTERS.length;
+      onChange(FIGHTERS[next].value);
+    }
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [value, onChange]);
 
   return (
     <div className="flex flex-col items-center gap-6 w-full">
