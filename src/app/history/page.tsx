@@ -2,7 +2,7 @@
 
 import { useQuery } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import Link from 'next/link';
 import { DIFFICULTY_COLORS, WINNER_SHORT } from '@/lib/constants';
 import { formatDuration, formatDate, formatWinReason } from '@/lib/format';
@@ -13,12 +13,41 @@ type Winner = 'attacker' | 'defender';
 export default function HistoryPage() {
   const [diffFilter, setDiffFilter] = useState<Difficulty | ''>('');
   const [winnerFilter, setWinnerFilter] = useState<Winner | ''>('');
+  const [selected, setSelected] = useState<Set<string>>(new Set());
 
   const sessions = useQuery(api.sessions.list, {
     difficulty: diffFilter || undefined,
     winner: winnerFilter || undefined,
     limit: 50,
   });
+
+  const toggleOne = useCallback((gameId: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(gameId)) next.delete(gameId);
+      else next.add(gameId);
+      return next;
+    });
+  }, []);
+
+  const toggleAll = useCallback(() => {
+    if (!sessions) return;
+    const allIds = sessions.map((s) => s.gameId);
+    const allSelected = allIds.length > 0 && allIds.every((id) => selected.has(id));
+    setSelected(allSelected ? new Set() : new Set(allIds));
+  }, [sessions, selected]);
+
+  const allVisibleSelected =
+    sessions != null &&
+    sessions.length > 0 &&
+    sessions.every((s) => selected.has(s.gameId));
+
+  const someVisibleSelected =
+    sessions != null &&
+    sessions.some((s) => selected.has(s.gameId)) &&
+    !allVisibleSelected;
+
+  const gameIdsParam = Array.from(selected).join(',');
 
   return (
     <div
@@ -36,37 +65,105 @@ export default function HistoryPage() {
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
           <div>
             <h1 className="font-display text-3xl font-black tracking-widest neon-cyan">
-              GAME HISTORY
+              PRIOR TRACES
             </h1>
             <p className="font-game text-sm mt-1" style={{ color: 'var(--color-text-secondary)' }}>
               Past sessions &middot; Training data
             </p>
           </div>
-          <div className="flex gap-3 flex-wrap">
-            <a
-              href="/api/export/sessions"
-              download
-              className="font-display text-xs font-bold tracking-widest uppercase px-4 py-2 rounded transition-all duration-200 hover:scale-105"
-              style={{
-                background: 'var(--color-bg-card)',
-                color: 'var(--color-attacker)',
-                border: '2px solid var(--color-border)',
-              }}
-            >
-              Export Sessions
-            </a>
-            <a
-              href="/api/export/disruptions"
-              download
-              className="font-display text-xs font-bold tracking-widest uppercase px-4 py-2 rounded transition-all duration-200 hover:scale-105"
-              style={{
-                background: 'var(--color-bg-card)',
-                color: 'var(--color-defender)',
-                border: '2px solid var(--color-border)',
-              }}
-            >
-              Export Disruptions
-            </a>
+          <div className="flex gap-3 flex-wrap items-center">
+            {/* Download Traces — exports selected sessions as ShareGPT JSONL */}
+            <div className="relative group/dl">
+              <button
+                onClick={() => {
+                  if (selected.size === 0) return;
+                  window.location.href = `/api/export/training?gameIds=${gameIdsParam}`;
+                }}
+                disabled={selected.size === 0}
+                className="font-display text-xs font-bold tracking-widest uppercase px-4 py-2 rounded transition-all duration-200 hover:scale-105 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
+                style={{
+                  background: 'var(--color-bg-card)',
+                  color: 'var(--color-attacker)',
+                  border:
+                    selected.size > 0
+                      ? '2px solid var(--color-attacker)'
+                      : '2px solid var(--color-border)',
+                }}
+              >
+                Download Traces{selected.size > 0 ? ` (${selected.size})` : ''}
+              </button>
+              <div
+                className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 rounded text-xs font-mono whitespace-nowrap opacity-0 group-hover/dl:opacity-100 transition-opacity duration-200 pointer-events-none z-50"
+                style={{
+                  background: 'var(--color-bg-card)',
+                  color: 'var(--color-attacker)',
+                  border: '1px solid var(--color-attacker)',
+                  boxShadow: '0 0 10px rgba(0, 255, 255, 0.15)',
+                }}
+              >
+                {selected.size === 0
+                  ? 'Select sessions to download'
+                  : `Download ${selected.size} session${selected.size !== 1 ? 's' : ''} as ShareGPT JSONL`}
+                <div
+                  className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0"
+                  style={{
+                    borderLeft: '6px solid transparent',
+                    borderRight: '6px solid transparent',
+                    borderTop: '6px solid var(--color-attacker)',
+                  }}
+                />
+              </div>
+            </div>
+            {/* Kickoff Finetune button with tooltip */}
+            <div className="relative group/tooltip">
+              <button
+                onClick={() => {
+                  if (selected.size === 0) return;
+                  // TODO: wire to actual finetune pipeline trigger
+                  window.location.href = `/api/export/training?gameIds=${gameIdsParam}`;
+                }}
+                disabled={selected.size === 0}
+                className="font-display text-xs font-bold tracking-widest uppercase px-4 py-2 rounded transition-all duration-200 hover:scale-105 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
+                style={{
+                  background:
+                    selected.size > 0
+                      ? 'linear-gradient(135deg, #131325, #1a1a35)'
+                      : 'var(--color-bg-card)',
+                  color: '#cc44ff',
+                  border:
+                    selected.size > 0
+                      ? '2px solid #cc44ff'
+                      : '2px solid var(--color-border)',
+                  boxShadow:
+                    selected.size > 0
+                      ? '0 0 12px rgba(204, 68, 255, 0.3)'
+                      : 'none',
+                }}
+              >
+                Kickoff Finetune
+              </button>
+              <div
+                className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-2 rounded text-xs font-mono whitespace-nowrap opacity-0 group-hover/tooltip:opacity-100 transition-opacity duration-200 pointer-events-none z-50"
+                style={{
+                  background: 'var(--color-bg-card)',
+                  color: '#cc44ff',
+                  border: '1px solid #cc44ff',
+                  boxShadow: '0 0 10px rgba(204, 68, 255, 0.25)',
+                }}
+              >
+                {selected.size === 0
+                  ? 'Select sessions to kick off a finetune'
+                  : `Kick off a finetune pipeline with Qwen2.5 — ${selected.size} session${selected.size !== 1 ? 's' : ''} as ShareGPT JSONL`}
+                <div
+                  className="absolute top-full left-1/2 -translate-x-1/2 w-0 h-0"
+                  style={{
+                    borderLeft: '6px solid transparent',
+                    borderRight: '6px solid transparent',
+                    borderTop: '6px solid #cc44ff',
+                  }}
+                />
+              </div>
+            </div>
             <Link
               href="/"
               className="font-display text-xs font-bold tracking-widest uppercase px-4 py-2 rounded transition-all duration-200 hover:scale-105"
@@ -85,7 +182,10 @@ export default function HistoryPage() {
         <div className="flex gap-4 mt-4 flex-wrap">
           <select
             value={diffFilter}
-            onChange={(e) => setDiffFilter(e.target.value as Difficulty | '')}
+            onChange={(e) => {
+              setDiffFilter(e.target.value as Difficulty | '');
+              setSelected(new Set());
+            }}
             className="font-mono text-xs px-3 py-2 rounded appearance-none cursor-pointer"
             style={{
               background: 'var(--color-bg-card)',
@@ -102,7 +202,10 @@ export default function HistoryPage() {
 
           <select
             value={winnerFilter}
-            onChange={(e) => setWinnerFilter(e.target.value as Winner | '')}
+            onChange={(e) => {
+              setWinnerFilter(e.target.value as Winner | '');
+              setSelected(new Set());
+            }}
             className="font-mono text-xs px-3 py-2 rounded appearance-none cursor-pointer"
             style={{
               background: 'var(--color-bg-card)',
@@ -120,6 +223,11 @@ export default function HistoryPage() {
               {sessions.length} session{sessions.length !== 1 ? 's' : ''}
             </span>
           )}
+          {selected.size > 0 && (
+            <span className="font-mono text-xs self-center neon-cyan">
+              {selected.size} selected
+            </span>
+          )}
         </div>
       </div>
 
@@ -134,6 +242,17 @@ export default function HistoryPage() {
         <table className="w-full font-game text-sm">
           <thead>
             <tr style={{ borderBottom: '1px solid var(--color-border)' }}>
+              <th className="w-10 px-3 py-3">
+                <input
+                  type="checkbox"
+                  checked={allVisibleSelected}
+                  ref={(el) => {
+                    if (el) el.indeterminate = someVisibleSelected;
+                  }}
+                  onChange={toggleAll}
+                  className="accent-[var(--color-attacker)] w-4 h-4 cursor-pointer"
+                />
+              </th>
               <th className="text-left px-4 py-3 font-mono text-xs uppercase tracking-wider" style={{ color: 'var(--color-text-secondary)' }}>Date</th>
               <th className="text-left px-4 py-3 font-mono text-xs uppercase tracking-wider" style={{ color: 'var(--color-text-secondary)' }}>Task</th>
               <th className="text-left px-4 py-3 font-mono text-xs uppercase tracking-wider" style={{ color: 'var(--color-text-secondary)' }}>Mode</th>
@@ -148,13 +267,13 @@ export default function HistoryPage() {
           <tbody>
             {sessions === undefined ? (
               <tr>
-                <td colSpan={9} className="text-center py-12 font-mono" style={{ color: 'var(--color-text-secondary)' }}>
+                <td colSpan={10} className="text-center py-12 font-mono" style={{ color: 'var(--color-text-secondary)' }}>
                   Loading...
                 </td>
               </tr>
             ) : sessions.length === 0 ? (
               <tr>
-                <td colSpan={9} className="text-center py-12 font-mono" style={{ color: 'var(--color-text-secondary)' }}>
+                <td colSpan={10} className="text-center py-12 font-mono" style={{ color: 'var(--color-text-secondary)' }}>
                   No sessions found
                 </td>
               </tr>
@@ -163,8 +282,19 @@ export default function HistoryPage() {
                 <tr
                   key={s._id}
                   className="transition-colors hover:bg-white/5"
-                  style={{ borderBottom: '1px solid var(--color-border)' }}
+                  style={{
+                    borderBottom: '1px solid var(--color-border)',
+                    background: selected.has(s.gameId) ? 'rgba(0, 255, 255, 0.04)' : 'transparent',
+                  }}
                 >
+                  <td className="px-3 py-3">
+                    <input
+                      type="checkbox"
+                      checked={selected.has(s.gameId)}
+                      onChange={() => toggleOne(s.gameId)}
+                      className="accent-[var(--color-attacker)] w-4 h-4 cursor-pointer"
+                    />
+                  </td>
                   <td className="px-4 py-3 font-mono text-xs" style={{ color: 'var(--color-text-secondary)' }}>
                     {formatDate(s.startedAt)}
                   </td>

@@ -1,14 +1,24 @@
 import { ConvexHttpClient } from 'convex/browser';
 import { api } from '../../../../../convex/_generated/api';
 
-export async function GET() {
+export async function GET(request: Request) {
   const url = process.env.NEXT_PUBLIC_CONVEX_URL;
   if (!url) {
     return new Response('NEXT_PUBLIC_CONVEX_URL not configured', { status: 500 });
   }
 
+  const { searchParams } = new URL(request.url);
+  const gameIdsParam = searchParams.get('gameIds');
+  const gameIdFilter = gameIdsParam
+    ? new Set(gameIdsParam.split(',').filter(Boolean))
+    : null;
+
   const client = new ConvexHttpClient(url);
-  const actions = await client.query(api.steps.listAllActions, { limit: 5000 });
+  let actions = await client.query(api.steps.listAllActions, { limit: 5000 });
+
+  if (gameIdFilter) {
+    actions = actions.filter((a: any) => gameIdFilter.has(a.gameId));
+  }
 
   const headers = [
     'gameId', 'actionNumber', 'disruptionId', 'disruptionName',
