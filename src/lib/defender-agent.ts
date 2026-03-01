@@ -2,11 +2,11 @@ import Anthropic from '@anthropic-ai/sdk';
 import { observe, Laminar } from '@lmnr-ai/lmnr';
 import { getSession, createGate, type ServerGameSession } from './game-session-store';
 import { getDisruptionsForDifficulty, getDisruptionById } from './disruptions';
-import { injectJS, snapshotDOM } from './cdp';
+import { injectJS, snapshotDOM, captureScreenshot } from './cdp';
 import { emitEvent } from './sse-emitter';
 import { nanoid } from 'nanoid';
 import { getAnthropicApiKey } from './env';
-import { recordDefenderAction, finalizeGame, recordHealthChange, captureAndUploadScreenshot, setSessionRecording } from './data-collector';
+import { recordDefenderAction, finalizeGame, recordHealthChange, uploadScreenshot, setSessionRecording } from './data-collector';
 import { stopScreencast } from './screencast';
 import { log, logError, logWarn } from './log';
 import type { DisruptionEvent } from '@/types/game';
@@ -380,19 +380,35 @@ async function runDefenderTurn(gameId: string): Promise<void> {
     payload = disruption.generatePayload();
   }
 
-  // Start pre-injection screenshot + DOM snapshot now, then await before persistence.
-  const beforeScreenshotPromise = captureAndUploadScreenshot(session.cdpUrl).catch(() => null);
-  const domSnapPromise = snapshotDOM(session.cdpUrl).catch(() => null);
+  // Capture before-screenshot PNG and DOM snapshot concurrently.
+  // IMPORTANT: Await the CDP capture BEFORE injecting so the "before" image
+  // reflects pre-injection state.  The Convex upload runs in the background.
+  const t0 = Date.now();
+  log('[defender-screenshot] capturing BEFORE screenshot + DOM snapshot...');
+  const [beforePng, domSnap] = await Promise.all([
+    captureScreenshot(session.cdpUrl).catch((err) => { log('[defender-screenshot] before capture error:', err); return null; }),
+    snapshotDOM(session.cdpUrl).catch((err) => { log('[defender-screenshot] domSnap error:', err); return null; }),
+  ]);
+  const t1 = Date.now();
+  log(`[defender-screenshot] BEFORE capture done in ${t1 - t0}ms — png=${beforePng ? `${beforePng.length} bytes` : 'null'}, domSnap=${domSnap ? `${domSnap.length} chars` : 'null'}`);
+
+  // Start uploading the before screenshot in the background.
+  const beforeUploadPromise = beforePng
+    ? uploadScreenshot(beforePng).catch((err) => { log('[defender-screenshot] before upload error:', err); return null; })
+    : Promise.resolve<string | null>(null);
+  log('[defender-screenshot] before upload started (background)');
 
   emitEvent<DefenderActivityPayload>(gameId, 'defender_activity', {
     message: `Injecting ${disruption.name}...`,
     kind: 'tool_call',
   });
 
-  // Inject immediately — this is the critical path
-  log('[defender] injecting disruption:', disruption.name, 'via cdpUrl:', session.cdpUrl || '(EMPTY)');
+  // Inject — this is the critical path.
+  const tInject0 = Date.now();
+  log('[defender-screenshot] injecting disruption:', disruption.name, 'via cdpUrl:', session.cdpUrl || '(EMPTY)');
   const success = await injectJS(session.cdpUrl, payload);
-  log('[defender] injection result:', success ? 'SUCCESS' : 'FAILED');
+  const tInject1 = Date.now();
+  log(`[defender-screenshot] injection done in ${tInject1 - tInject0}ms — success=${success}`);
 
   if (!success) {
     emitEvent<DefenderActivityPayload>(gameId, 'defender_activity', {
@@ -401,21 +417,29 @@ async function runDefenderTurn(gameId: string): Promise<void> {
     });
   }
 
-  // Collect artifacts for persistence.
-  const domSnap = await domSnapPromise;
-  const beforeScreenshotId = await beforeScreenshotPromise;
+  // Capture after-screenshot: wait for DOM changes to render, then capture + upload.
+  let afterScreenshotId: string | null = null;
+  if (success) {
+    log('[defender-screenshot] waiting 800ms for DOM changes to render...');
+    await new Promise(resolve => setTimeout(resolve, 800));
+    const tAfter0 = Date.now();
+    log('[defender-screenshot] capturing AFTER screenshot...');
+    const afterPng = await captureScreenshot(session.cdpUrl).catch((err) => { log('[defender-screenshot] after capture error:', err); return null; });
+    const tAfter1 = Date.now();
+    log(`[defender-screenshot] AFTER capture done in ${tAfter1 - tAfter0}ms — png=${afterPng ? `${afterPng.length} bytes` : 'null'}`);
+    if (afterPng) {
+      const tUpload0 = Date.now();
+      afterScreenshotId = await uploadScreenshot(afterPng).catch((err) => { log('[defender-screenshot] after upload error:', err); return null; });
+      log(`[defender-screenshot] AFTER upload done in ${Date.now() - tUpload0}ms — storageId=${afterScreenshotId ?? 'null'}`);
+    }
+  } else {
+    log('[defender-screenshot] injection failed, skipping AFTER screenshot');
+  }
 
-  // Capture a post-injection screenshot (after a short delay so DOM changes render).
-  const afterScreenshotPromise = success
-    ? new Promise<string | null>((resolve) => {
-      setTimeout(() => {
-        captureAndUploadScreenshot(session.cdpUrl)
-          .then(resolve)
-          .catch(() => resolve(null));
-      }, 500);
-    })
-    : Promise.resolve<string | null>(null);
-  const afterScreenshotId = await afterScreenshotPromise;
+  // Collect the before-screenshot upload result (should be done by now).
+  const beforeScreenshotId = await beforeUploadPromise;
+  log(`[defender-screenshot] BEFORE upload resolved — storageId=${beforeScreenshotId ?? 'null'}`);
+  log(`[defender-screenshot] TOTAL screenshot flow: ${Date.now() - t0}ms — before=${beforeScreenshotId ?? 'null'}, after=${afterScreenshotId ?? 'null'}`);
 
   session.defenderCooldowns.set(disruption.id, session.mode === 'turnbased' ? session.turnNumber : Date.now());
 
