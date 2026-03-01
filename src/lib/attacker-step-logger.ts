@@ -38,6 +38,7 @@ export class AttackerStepLogger {
     const description = opts.description.slice(0, 300);
     const timestamp = new Date().toISOString();
 
+
     this.pushToSession(step, description, 'thinking', timestamp);
     this.emitStep(step, description, 'thinking', false);
     this.emitStatus('thinking');
@@ -68,6 +69,7 @@ export class AttackerStepLogger {
     const step = ++this.stepNumber;
     const description = opts.description.slice(0, 300);
     const timestamp = new Date().toISOString();
+
 
     this.pushToSession(step, description, 'acting', timestamp);
 
@@ -108,6 +110,7 @@ export class AttackerStepLogger {
     const description = opts.description.slice(0, 200);
     const agentStatus: AttackerStatus = opts.success ? 'complete' : 'failed';
     const timestamp = new Date().toISOString();
+
 
     this.pushToSession(step, description, agentStatus, timestamp);
     this.emitStep(step, description, agentStatus, opts.success);
