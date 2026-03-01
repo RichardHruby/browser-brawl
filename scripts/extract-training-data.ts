@@ -122,12 +122,12 @@ async function main() {
     // Fetch screenshot URLs for steps that have them
     const stepsWithScreenshots = await Promise.all(
       steps.map(async (step: Record<string, unknown>) => {
-        let screenshotUrl: string | null = null;
+        let screenshotUrl: string | undefined;
         if (step.screenshotBeforeId) {
           try {
             screenshotUrl = await client.query(api.screenshots.getUrl, {
-              storageId: step.screenshotBeforeId as string,
-            });
+              storageId: step.screenshotBeforeId as any,
+            }) ?? undefined;
           } catch {
             // screenshot may have been deleted
           }

@@ -270,7 +270,7 @@ export function convertTrajectory(
       if (typeof msg.content === 'string') {
         // First user message — extract just the task from the system prompt
         // The original prompt includes instructions; we simplify for training
-        const taskMatch = msg.content.match(/TASK:\s*(.+?)(?:\n\nIMPORTANT:|$)/s);
+        const taskMatch = msg.content.match(/TASK:\s*([\s\S]+?)(?:\n\nIMPORTANT:|$)/);
         const taskText = taskMatch ? taskMatch[1].trim() : msg.content;
         conversations.push({ from: 'human', value: taskText });
       } else if (Array.isArray(msg.content)) {
