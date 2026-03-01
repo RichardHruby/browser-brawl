@@ -4,7 +4,7 @@
 
 One AI agent (the attacker) tries to complete a task on a real webpage. Another AI agent (the defender) tries to block it with JavaScript injections. They compete in real time inside a cloud browser. Every match produces rich, structured training data — tool calls, DOM snapshots, screenshots, full conversation traces — that you can use to fine-tune smaller browser models.
 
-We've proven this works: traces from Browser Brawl fine-tune Qwen2.5-VL-3B into a capable browser agent.
+We've proven this works: traces from Browser Brawl fine-tune Qwen2.5-3B into a capable browser agent. Two wins out of two games on Hacker News upvote with a single training example.
 
 > Built at the [Browser Use](https://browser-use.com) Web Agents Hackathon at [Y Combinator](https://events.ycombinator.com/browser-use-hackathon), San Francisco — Feb 28–Mar 1, 2026.
 
@@ -106,11 +106,71 @@ flowchart LR
 - Session video via CDP screencast (~1fps JPEG frames)
 - Laminar auto-traces on all LLM calls
 
-### Training Pipeline
+### One-Click Training Pipeline
+
+Select games on the history page, click **Kickoff Finetune**, and the full pipeline runs automatically — no Python environment or CLI needed.
+
+```mermaid
+flowchart TD
+  subgraph UI["Browser UI"]
+    H["/history\nselect games → Kickoff Finetune"]
+    T["/training\nlive status dashboard"]
+    L["Lobby\nBYOM toggle + endpoint URL"]
+  end
+
+  subgraph API["Next.js API Route"]
+    S["POST /api/training/start\nfetch conversations from Convex\nconvert: Anthropic → ShareGPT → OpenAI Messages"]
+  end
+
+  subgraph Convex["Convex"]
+    DB["conversations table\nfull Claude messages + tool calls"]
+    FS["file storage\nJSONL training blob"]
+    JT["trainingJobs table\nstatus + step/loss metrics"]
+  end
+
+  subgraph Modal["Modal — GPU Cloud"]
+    K["kickoff endpoint\nweb fn, spawns GPU job"]
+    TR["train\nUnsloth QLoRA on A10G\nQwen2.5-3B-Instruct"]
+    MG["merge\nLoRA adapter → base model"]
+    SV["serve\nvLLM endpoint, OpenAI-compatible"]
+  end
+
+  H --> S
+  S -->|query| DB
+  S -->|upload JSONL| FS
+  FS -->|download URL| S
+  S -->|fire-and-forget POST| K
+  K -->|spawn async| TR
+  TR -->|status callbacks| JT
+  TR --> MG
+  MG --> SV
+  JT -->|useQuery live updates| T
+  SV -->|serve URL| T
+  T -->|paste URL| L
+  L -->|fight with fine-tuned model| L
+```
+
+Status transitions streamed live to `/training` via Convex subscriptions: `preparing → uploading → training → merging → ready`.
+
+### Bring Your Own Model (BYOM)
+
+Once you have a fine-tuned model, close the loop — fight with it directly in the game.
+
+1. In the lobby, enable **Bring Your Own Model**
+2. Paste your vLLM endpoint URL (OpenAI-compatible — e.g. the serve URL from `/training`)
+3. Hit **FIGHT** — the fine-tuned model controls the attacker using the same Playwright MCP tool interface it was trained on
+
+The model outputs `<tool_call>` XML matching the training data format. Results return as `<tool_response>` XML. Cold start handling built in: a warm-up ping fires during browser creation to overlap the ~2min Modal cold start with the ~8s browser spin-up.
+
+This closes the self-improvement loop: **play games → collect traces → train model → fight with that model → generate harder traces → repeat.**
+
+### Training Pipeline (CLI)
 - `extract-training-data.ts` — Pull successful game trajectories from Convex as raw JSONL
 - `convert-to-sharegpt.ts` — Convert Anthropic tool format to Qwen2.5-compatible ShareGPT format
+- `eval_browser_brawl.py` — Compare fine-tuned Qwen vs Claude Sonnet baseline across N games
+- `eval-miniwob.ts` — Out-of-distribution eval on MiniWob++ benchmark tasks
 - Quality filters (minimum tool call count, success-only)
-- Proven end-to-end: Convex → JSONL → ShareGPT → Qwen2.5-VL-3B fine-tuning (QLoRA via Axolotl)
+- Proven end-to-end: Convex → JSONL → ShareGPT → Qwen2.5-3B fine-tuning (QLoRA via Unsloth)
 
 ---
 
@@ -125,7 +185,8 @@ flowchart LR
 | **Database & Storage** | [Convex](https://convex.dev) (real-time DB + file storage) |
 | **LLM Observability** | [Laminar](https://www.lmnr.ai) (auto-traces all Anthropic calls) |
 | **Protocol** | [Model Context Protocol (MCP)](https://modelcontextprotocol.io) |
-| **Fine-tuning Target** | Qwen2.5-VL-3B-Instruct (QLoRA via Axolotl + Unsloth) |
+| **Fine-tuning** | Unsloth QLoRA on Modal A10G — Qwen2.5-3B-Instruct |
+| **Serving** | vLLM on Modal, OpenAI-compatible API |
 | **Testing** | Vitest |
 
 ### Supported Browser Agent Frameworks
@@ -137,6 +198,7 @@ The attacker agent is framework-agnostic — pick the one you prefer:
 | [**Playwright MCP**](https://github.com/anthropics/mcp) | Spawns a Playwright MCP server connected to the cloud browser via CDP. Full tool suite (click, type, navigate, snapshot, etc.) |
 | [**Browser-Use SDK**](https://browser-use.com) | Uses Browser-Use's built-in agent API for browser control |
 | [**Stagehand**](https://github.com/browserbase/stagehand) | Browserbase's AI-native browser automation framework |
+| [**Fine-tuned Qwen**](scripts/modal_train_pipeline.py) | Your own Qwen2.5-3B fine-tuned on Browser Brawl traces, served via vLLM. Enable via the BYOM toggle in the lobby. |
 
 ---
 
@@ -173,16 +235,45 @@ ANTHROPIC_API_KEY=sk-ant-...
 BROWSER_USE_API_KEY=bu_...
 LMNR_PROJECT_API_KEY=...
 NEXT_PUBLIC_CONVEX_URL=https://...convex.cloud
+NEXT_PUBLIC_CONVEX_SITE_URL=https://...convex.site
+
+# Required for one-click training pipeline
+MODAL_TRAIN_ENDPOINT=https://your-workspace--browser-brawl-train-pipeline-kickoff.modal.run
 ```
 
-### Extract Training Data
+### Training Pipeline
 
+**One-click (recommended):**
+1. Play games and collect successful traces
+2. Go to `/history`, select winning sessions, click **Kickoff Finetune**
+3. Watch live progress on `/training` (`preparing → uploading → training → merging → ready`)
+4. Copy the serve URL from `/training` → paste into the lobby BYOM field → **FIGHT**
+
+**Deploy Modal endpoints first (one-time setup):**
+```bash
+modal deploy scripts/modal_train_pipeline.py   # training + kickoff endpoint
+modal deploy scripts/modal_serve.py            # vLLM inference endpoint (all experiments)
+```
+
+**Manual CLI:**
 ```bash
 # Pull successful game trajectories from Convex
-npx tsx scripts/extract-training-data.ts --game <gameId> -o data/raw.jsonl
+npx tsx scripts/extract-training-data.ts -o data/raw.jsonl
 
-# Convert to ShareGPT format for Qwen2.5-VL fine-tuning
+# Convert to ShareGPT format
 npx tsx scripts/convert-to-sharegpt.ts -i data/raw.jsonl -o data/train.jsonl
+
+# Run fine-tuning directly
+modal run scripts/modal_finetune.py --text-only
+```
+
+**Evaluate:**
+```bash
+# In-distribution: fine-tuned Qwen vs Claude Sonnet baseline
+python scripts/eval_browser_brawl.py --games 10 --task hackernews-upvote
+
+# Out-of-distribution: MiniWob++ benchmark
+npx tsx scripts/eval-miniwob.ts --finetuned-url <URL> --miniwob-dir ../miniwob-plusplus/miniwob/html
 ```
 
 ## API Routes
@@ -194,8 +285,10 @@ npx tsx scripts/convert-to-sharegpt.ts -i data/raw.jsonl -o data/train.jsonl
 | `/api/game/[sessionId]/events` | GET | SSE event stream (replays history on reconnect) |
 | `/api/game/[sessionId]/status` | GET | Current game state snapshot |
 | `/api/game/[sessionId]/abort` | POST | Stop game, clean up resources |
+| `/api/training/start` | POST | Kick off full training pipeline (convert → upload → Modal GPU train) |
 | `/api/export/sessions` | GET | CSV download of all sessions |
 | `/api/export/disruptions` | GET | CSV download of all defender actions |
+| `/api/export/training` | GET | Download selected sessions as ShareGPT JSONL |
 
 ---
 
@@ -216,29 +309,40 @@ npx tsx scripts/convert-to-sharegpt.ts -i data/raw.jsonl -o data/train.jsonl
 src/
 ├── app/                          # Next.js pages + API routes
 │   ├── api/game/                 # Game lifecycle endpoints
-│   ├── api/export/               # CSV export endpoints
+│   ├── api/training/             # One-click training pipeline endpoint
+│   ├── api/export/               # CSV + JSONL export endpoints
 │   ├── history/                  # Replay UI (session list + detail viewer)
+│   ├── training/                 # Live training dashboard
 │   └── page.tsx                  # Main game page (lobby → arena → game over)
 ├── components/
-│   ├── lobby/                    # Task selector, difficulty picker, fighter select
+│   ├── lobby/                    # Task selector, difficulty picker, fighter select, BYOM toggle
 │   ├── arena/                    # Health bar, browser frame, agent panels
 │   ├── end/                      # Winner banner
 │   └── shared/                   # Glitch text, neon borders, loading screen
 ├── hooks/                        # useGameState, useGameSSE, useArenaTimer, useHealthBar
 ├── lib/
 │   ├── attacker-playwright.ts    # Attacker: Playwright MCP + Claude Sonnet loop
+│   ├── attacker-finetuned.ts     # Attacker: fine-tuned Qwen via vLLM (BYOM)
 │   ├── attacker-stagehand.ts     # Attacker: Stagehand alternative
 │   ├── browser-use-attacker.ts   # Attacker: Browser-Use SDK alternative
 │   ├── defender-agent.ts         # Defender: Haiku + JS injection loop
 │   ├── disruptions.ts            # 9 prebuilt disruptions + cooldown system
 │   ├── cdp.ts                    # CDP WebSocket: injectJS, snapshotDOM
 │   ├── data-collector.ts         # Fire-and-forget Convex mutations
+│   ├── training-converter.ts     # Anthropic native → ShareGPT → OpenAI Messages
 │   ├── screencast.ts             # CDP screencast frame capture
 │   ├── sse-emitter.ts            # SSE broadcast to connected clients
 │   └── game-session-store.ts     # In-memory session state
 ├── types/                        # TypeScript interfaces
-convex/                           # Convex schema, mutations, queries
-scripts/                          # Training data extraction + conversion
+convex/                           # Convex schema, mutations, queries, HTTP endpoint
+scripts/
+├── extract-training-data.ts      # Pull trajectories from Convex as JSONL
+├── convert-to-sharegpt.ts        # Anthropic tool format → ShareGPT
+├── modal_train_pipeline.py       # Modal: kickoff web endpoint + GPU training function
+├── modal_serve.py                # Modal: vLLM inference endpoint (all experiments)
+├── modal_finetune.py             # Modal: manual CLI fine-tuning alternative
+├── eval_browser_brawl.py         # Eval: fine-tuned vs baseline across Browser Brawl tasks
+└── eval-miniwob.ts               # Eval: MiniWob++ out-of-distribution benchmark
 defender/                         # Standalone defender CLI (legacy prototype)
 ```
 
