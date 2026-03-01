@@ -1,6 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { observe } from '@lmnr-ai/lmnr';
 import { getSession, createGate } from './game-session-store';
 import { emitEvent } from './sse-emitter';
 import { endGame } from './defender-agent';
@@ -89,6 +90,15 @@ IMPORTANT:
       const s = getSession(gameId);
       if (!s || s.phase !== 'arena') break;
 
+      const loopStepNum = logger.currentStep + 1;
+      const loopResult = await observe(
+        {
+          name: `attacker-step-${loopStepNum}`,
+          sessionId: gameId,
+          metadata: { gameId, difficulty: session.difficulty, task: session.task.label, attackerType: 'playwright-mcp' },
+          tags: ['attacker', `step-${loopStepNum}`],
+        },
+        async () => {
       s.attackerStatus = 'thinking';
       emitEvent(gameId, 'status_update', {
         attackerStatus: 'thinking',
@@ -164,7 +174,7 @@ IMPORTANT:
             domSnapshot: domSnap,
           });
         }
-        break;
+        return { action: 'break', hadToolUses: false } as const;
       }
 
       // Execute each tool call via MCP
@@ -235,8 +245,14 @@ IMPORTANT:
         toolDefinitions: toolDefsJson,
       });
 
+      return { action: 'continue', hadToolUses: true } as const;
+        },
+      ); // end observe()
+
+      if (loopResult.action === 'break') break;
+
       // Turn-based: check if attacker's turn is exhausted
-      if (s.mode === 'turnbased' && toolUses.length > 0) {
+      if (s.mode === 'turnbased' && loopResult.hadToolUses) {
         s.attackerStepsThisTurn++;
 
         if (s.attackerStepsThisTurn >= s.attackerStepsPerTurn) {

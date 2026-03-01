@@ -1,4 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk';
+import { observe, Laminar } from '@lmnr-ai/lmnr';
 import { getSession, createGate, type ServerGameSession } from './game-session-store';
 import { getDisruptionsForDifficulty, getDisruptionById } from './disruptions';
 import { injectJS, snapshotDOM } from './browserbase';
@@ -274,6 +275,16 @@ async function runDefenderTurn(gameId: string): Promise<void> {
   const session = getSession(gameId);
   if (!session || session.phase !== 'arena') return;
 
+  const turnNum = session.defenderDisruptions.length + 1;
+
+  await observe(
+    {
+      name: `defender-turn-${turnNum}`,
+      sessionId: gameId,
+      metadata: { gameId, difficulty: session.difficulty, task: session.task.label, health: session.health },
+      tags: ['defender', `turn-${turnNum}`],
+    },
+    async () => {
   emitEvent(gameId, 'status_update', {
     attackerStatus: session.attackerStatus,
     defenderStatus: 'plotting',
@@ -414,6 +425,8 @@ async function runDefenderTurn(gameId: string): Promise<void> {
     attackerStatus: session.attackerStatus,
     defenderStatus: 'cooling_down',
   });
+    },
+  ); // end observe()
 }
 
 export function endGame(
@@ -469,4 +482,7 @@ export function endGame(
   stopScreencast(gameId).then(storageId => {
     if (storageId) setSessionRecording(gameId, storageId);
   }).catch(() => {});
+
+  // Flush Laminar traces so they're sent before potential cleanup
+  Laminar.flush().catch(() => {});
 }
