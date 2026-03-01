@@ -9,6 +9,7 @@ export interface ServerGameSession {
   task: Task;
   difficulty: Difficulty;
   attackerType: AttackerType;
+  modelUrl?: string;
   phase: GamePhase;
   health: number;
   startedAt: string;
@@ -27,6 +28,8 @@ export interface ServerGameSession {
   attackerStepsPerTurn: number;
   attackerGate: { promise: Promise<void>; resolve: () => void } | null;
   defenderSignal: { promise: Promise<void>; resolve: () => void } | null;
+  // Finetuned: resolved after first real attacker step so defender waits
+  finetunedReadyGate: { promise: Promise<void>; resolve: () => void } | null;
   // Runtime-only fields
   sseClients: Set<ReadableStreamDefaultController>;
   defenderLoopHandle: ReturnType<typeof setTimeout> | null;
@@ -70,6 +73,7 @@ export function createSession(params: {
   difficulty: Difficulty;
   mode: GameMode;
   attackerType: AttackerType;
+  modelUrl?: string;
 }): ServerGameSession {
   const session: ServerGameSession = {
     ...params,
@@ -90,6 +94,7 @@ export function createSession(params: {
     attackerStepsPerTurn: STEPS_PER_TURN[params.difficulty] ?? 3,
     attackerGate: null,
     defenderSignal: null,
+    finetunedReadyGate: params.attackerType === 'finetuned' ? createGate() : null,
     // Runtime fields
     sseClients: new Set(),
     defenderLoopHandle: null,

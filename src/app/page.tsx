@@ -16,7 +16,7 @@ export default function Home() {
     handleSSEEvent
   );
 
-  async function handleStart(difficulty: Difficulty, task: Task, mode: GameMode, attackerType: AttackerType) {
+  async function handleStart(difficulty: Difficulty, task: Task, mode: GameMode, attackerType: AttackerType, modelUrl?: string) {
     startGame(difficulty, task, mode, attackerType);
     try {
       const res = await fetch('/api/game/start', {
@@ -27,6 +27,7 @@ export default function Home() {
           difficulty,
           mode,
           attackerType,
+          modelUrl,
           customTask: task.id === 'custom' ? task.description : undefined,
         }),
       });
