@@ -6,7 +6,7 @@ One AI agent (the attacker) tries to complete a task on a real webpage. Another 
 
 We've proven this works: traces from Browser Brawl fine-tune Qwen2.5-VL-3B into a capable browser agent.
 
-> Built at the [Browser Use](https://browser-use.com) Web Agents Hackathon at Y Combinator, San Francisco — Feb 28–Mar 1, 2026.
+> Built at the [Browser Use](https://browser-use.com) Web Agents Hackathon at [Y Combinator](https://events.ycombinator.com/browser-use-hackathon), San Francisco — Feb 28–Mar 1, 2026.
 
 ---
 
@@ -43,16 +43,16 @@ flowchart LR
   end
 
   subgraph Arena
-    A1[Attacker\nPlaywright MCP / Browser-Use / Stagehand]
+    A1[Attacker<br/>Playwright MCP / Browser-Use / Stagehand]
     A2[Cloud browser live view]
-    A3[Defender\nHaiku + CDP injection]
+    A3[Defender<br/>Haiku + CDP injection]
     A1 --> A2
     A3 --> A2
     A2 -. SSE stream .-> C1
   end
 
   subgraph TrainingPipeline["Training Pipeline"]
-    C1[Convex DB\nconversations, steps/screenshots,\ndisruptions/DOM, health timeline]
+    C1[Convex DB<br/>conversations, steps/screenshots,<br/>disruptions/DOM, health timeline]
     C2[extract -> convert -> ShareGPT JSONL]
     C1 --> C2
   end
@@ -145,13 +145,13 @@ The attacker agent is framework-agnostic — pick the one you prefer:
 ### Prerequisites
 
 - Node.js 20+
-- Yarn
+- npm
 
 ### Setup
 
 ```bash
 # Install dependencies
-yarn install
+npm install
 
 # Set up environment variables
 cp .env.local.example .env.local
@@ -161,7 +161,7 @@ cp .env.local.example .env.local
 npx convex dev
 
 # Start the app
-yarn dev
+npm run dev
 ```
 
 ### Environment Variables
@@ -186,14 +186,6 @@ npx tsx scripts/extract-training-data.ts --game <gameId> -o data/raw.jsonl
 # Convert to ShareGPT format for Qwen2.5-VL fine-tuning
 npx tsx scripts/convert-to-sharegpt.ts -i data/raw.jsonl -o data/train.jsonl
 ```
-
-### Run Tests
-
-```bash
-npx vitest run
-```
-
----
 
 ## API Routes
 
@@ -263,7 +255,7 @@ defender/                         # Standalone defender CLI (legacy prototype)
 
 ## Acknowledgments
 
-Built at the [Browser Use](https://browser-use.com) Web Agents Hackathon at Y Combinator, San Francisco.
+Built at the [Browser Use](https://browser-use.com) Web Agents Hackathon at [Y Combinator](https://events.ycombinator.com/browser-use-hackathon), San Francisco.
 
 Sponsored by Anthropic, OpenAI, Vercel, Convex, and Browser Use.
 
