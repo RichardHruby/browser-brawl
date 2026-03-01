@@ -2,7 +2,7 @@
 
 import { useQuery } from 'convex/react';
 import { api } from '../../../../convex/_generated/api';
-import { use, useState } from 'react';
+import { use, useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import type { Id } from '../../../../convex/_generated/dataModel';
 
@@ -20,6 +20,139 @@ function ScreenshotViewer({ storageId }: { storageId: Id<'_storage'> | undefined
       className="w-full rounded-lg"
       style={{ border: '1px solid var(--color-border)' }}
     />
+  );
+}
+
+interface RecordingData {
+  fps: number;
+  duration: number;
+  frameCount: number;
+  frames: { t: number; d: string }[];
+}
+
+function ScreencastPlayer({ storageId }: { storageId: Id<'_storage'> }) {
+  const url = useQuery(api.screenshots.getUrl, { storageId });
+  const [recording, setRecording] = useState<RecordingData | null>(null);
+  const [frameIndex, setFrameIndex] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  const [speed, setSpeed] = useState(1);
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Fetch and parse recording data
+  useEffect(() => {
+    if (!url) return;
+    fetch(url)
+      .then(r => r.json())
+      .then(data => setRecording(data as RecordingData))
+      .catch(() => {});
+  }, [url]);
+
+  const advanceFrame = useCallback(() => {
+    if (!recording) return;
+    setFrameIndex(prev => {
+      const next = prev + 1;
+      if (next >= recording.frames.length) {
+        setPlaying(false);
+        return prev;
+      }
+      return next;
+    });
+  }, [recording]);
+
+  // Playback timer
+  useEffect(() => {
+    if (!playing || !recording || frameIndex >= recording.frames.length - 1) {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      return;
+    }
+
+    const currentFrame = recording.frames[frameIndex];
+    const nextFrame = recording.frames[frameIndex + 1];
+    const delay = (nextFrame.t - currentFrame.t) / speed;
+
+    timerRef.current = setTimeout(advanceFrame, Math.max(delay, 16));
+    return () => { if (timerRef.current) clearTimeout(timerRef.current); };
+  }, [playing, frameIndex, recording, speed, advanceFrame]);
+
+  if (!recording) {
+    return (
+      <div className="flex items-center justify-center py-8 font-mono text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+        Loading recording...
+      </div>
+    );
+  }
+
+  const frame = recording.frames[frameIndex];
+  const elapsed = frame ? (frame.t / 1000).toFixed(1) : '0.0';
+  const total = (recording.duration / 1000).toFixed(1);
+
+  return (
+    <div className="space-y-3">
+      <div className="rounded-lg overflow-hidden" style={{ border: '1px solid var(--color-border)' }}>
+        {frame && (
+          <img
+            src={`data:image/jpeg;base64,${frame.d}`}
+            alt={`Frame ${frameIndex + 1}`}
+            className="w-full"
+          />
+        )}
+      </div>
+
+      {/* Controls */}
+      <div className="flex items-center gap-3">
+        <button
+          onClick={() => setPlaying(!playing)}
+          className="font-mono text-xs px-3 py-1.5 rounded"
+          style={{ background: 'var(--color-bg-card)', color: 'var(--color-attacker)', border: '1px solid var(--color-attacker)' }}
+        >
+          {playing ? 'Pause' : 'Play'}
+        </button>
+        <button
+          onClick={() => { setFrameIndex(Math.max(0, frameIndex - 1)); setPlaying(false); }}
+          className="font-mono text-xs px-2 py-1.5 rounded"
+          style={{ background: 'var(--color-bg-card)', color: 'var(--color-text-primary)', border: '1px solid var(--color-border)' }}
+        >
+          Prev
+        </button>
+        <button
+          onClick={() => { setFrameIndex(Math.min(recording.frames.length - 1, frameIndex + 1)); setPlaying(false); }}
+          className="font-mono text-xs px-2 py-1.5 rounded"
+          style={{ background: 'var(--color-bg-card)', color: 'var(--color-text-primary)', border: '1px solid var(--color-border)' }}
+        >
+          Next
+        </button>
+
+        {/* Speed selector */}
+        {[1, 2, 4].map(s => (
+          <button
+            key={s}
+            onClick={() => setSpeed(s)}
+            className="font-mono text-[10px] px-2 py-1 rounded"
+            style={{
+              background: speed === s ? 'var(--color-attacker)' : 'var(--color-bg-card)',
+              color: speed === s ? '#000' : 'var(--color-text-secondary)',
+              border: '1px solid var(--color-border)',
+            }}
+          >
+            {s}x
+          </button>
+        ))}
+
+        {/* Scrubber */}
+        <input
+          type="range"
+          min={0}
+          max={recording.frames.length - 1}
+          value={frameIndex}
+          onChange={(e) => { setFrameIndex(Number(e.target.value)); setPlaying(false); }}
+          className="flex-1"
+        />
+
+        <span className="font-mono text-[10px]" style={{ color: 'var(--color-text-secondary)' }}>
+          {elapsed}s / {total}s ({frameIndex + 1}/{recording.frameCount})
+        </span>
+      </div>
+    </div>
   );
 }
 
@@ -317,6 +450,11 @@ export default function ReplayPage({ params }: { params: Promise<{ gameId: strin
                   </pre>
                 </div>
               )}
+            </div>
+          ) : session.recordingStorageId ? (
+            <div className="space-y-4">
+              <h2 className="font-display text-lg font-bold neon-cyan">Session Recording</h2>
+              <ScreencastPlayer storageId={session.recordingStorageId} />
             </div>
           ) : (
             <div className="flex items-center justify-center h-full font-mono text-sm" style={{ color: 'var(--color-text-secondary)' }}>

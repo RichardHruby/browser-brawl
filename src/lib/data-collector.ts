@@ -63,6 +63,14 @@ export function finalizeGame(params: {
   fire(c.mutation(api.sessions.finalize, params));
 }
 
+export function setSessionRecording(gameId: string, recordingStorageId: string): void {
+  const c = getClient();
+  if (!c) return;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  fire(c.mutation(api.sessions.setRecording, { gameId, recordingStorageId: recordingStorageId as any }));
+}
+
 // ── Attacker steps ─────────────────────────────────────────────────
 
 export function recordAttackerStep(params: {

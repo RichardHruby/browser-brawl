@@ -87,6 +87,24 @@ export const list = query({
   },
 });
 
+export const setRecording = mutation({
+  args: {
+    gameId: v.string(),
+    recordingStorageId: v.id('_storage'),
+  },
+  handler: async (ctx, args) => {
+    const session = await ctx.db
+      .query('sessions')
+      .withIndex('by_gameId', (q) => q.eq('gameId', args.gameId))
+      .unique();
+    if (!session) return;
+
+    await ctx.db.patch(session._id, {
+      recordingStorageId: args.recordingStorageId,
+    });
+  },
+});
+
 export const get = query({
   args: { gameId: v.string() },
   handler: async (ctx, args) => {

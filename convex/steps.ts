@@ -61,3 +61,11 @@ export const getActionsForSession = query({
       .collect();
   },
 });
+
+export const listAllActions = query({
+  args: { limit: v.optional(v.number()) },
+  handler: async (ctx, args) => {
+    const results = await ctx.db.query('defenderActions').order('desc').collect();
+    return results.slice(0, args.limit ?? 5000);
+  },
+});

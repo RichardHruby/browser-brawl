@@ -52,17 +52,43 @@ export default function HistoryPage() {
             Past sessions &middot; Training data
           </p>
         </div>
-        <Link
-          href="/"
-          className="font-mono text-sm px-4 py-2 rounded-lg transition-colors"
-          style={{
-            background: 'var(--color-bg-card)',
-            color: 'var(--color-text-secondary)',
-            border: '1px solid var(--color-border)',
-          }}
-        >
-          Back to Lobby
-        </Link>
+        <div className="flex gap-3">
+          <a
+            href="/api/export/sessions"
+            download
+            className="font-mono text-xs px-3 py-2 rounded-lg transition-colors"
+            style={{
+              background: 'var(--color-bg-card)',
+              color: 'var(--color-attacker)',
+              border: '1px solid var(--color-border)',
+            }}
+          >
+            Export Sessions CSV
+          </a>
+          <a
+            href="/api/export/disruptions"
+            download
+            className="font-mono text-xs px-3 py-2 rounded-lg transition-colors"
+            style={{
+              background: 'var(--color-bg-card)',
+              color: 'var(--color-defender)',
+              border: '1px solid var(--color-border)',
+            }}
+          >
+            Export Disruptions CSV
+          </a>
+          <Link
+            href="/"
+            className="font-mono text-sm px-4 py-2 rounded-lg transition-colors"
+            style={{
+              background: 'var(--color-bg-card)',
+              color: 'var(--color-text-secondary)',
+              border: '1px solid var(--color-border)',
+            }}
+          >
+            Back to Lobby
+          </Link>
+        </div>
       </div>
 
       {/* Filters */}

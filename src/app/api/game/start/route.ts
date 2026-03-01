@@ -8,6 +8,7 @@ import { TASKS } from '@/lib/tasks';
 import { runAttackerLoop } from '@/lib/attacker-agent';
 import { createGameRecord, recordNetworkRequest } from '@/lib/data-collector';
 import { startNetworkCapture } from '@/lib/browserbase';
+import { startScreencast } from '@/lib/screencast';
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
@@ -82,6 +83,9 @@ export async function POST(req: NextRequest) {
   }).then(stopFn => {
     if (stopFn) session.stopNetworkCapture = stopFn;
   }).catch(() => {});
+
+  // 2d. Start screencast recording via CDP
+  startScreencast(gameId, cdpUrl).catch(() => {});
 
   // 3. Transition to arena
   session.phase = 'arena';

@@ -6,7 +6,8 @@ import { emitEvent } from './sse-emitter';
 import { nanoid } from 'nanoid';
 import { getAnthropicApiKey } from './env';
 import { initLaminar } from './laminar';
-import { recordDefenderAction, finalizeGame, recordHealthChange, captureAndUploadScreenshot } from './data-collector';
+import { recordDefenderAction, finalizeGame, recordHealthChange, captureAndUploadScreenshot, setSessionRecording } from './data-collector';
+import { stopScreencast } from './screencast';
 import type { DisruptionEvent } from '@/types/game';
 import type { DefenderDisruptionPayload, HealthUpdatePayload, TurnChangePayload } from '@/types/events';
 
@@ -461,4 +462,9 @@ export function endGame(
     healthFinal: session.health,
     durationSeconds: elapsed,
   });
+
+  // Stop screencast and upload recording (async, non-blocking)
+  stopScreencast(gameId).then(storageId => {
+    if (storageId) setSessionRecording(gameId, storageId);
+  }).catch(() => {});
 }
