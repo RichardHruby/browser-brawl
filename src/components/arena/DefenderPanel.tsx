@@ -21,11 +21,11 @@ export function DefenderPanel({ disruptions, status }: Props) {
 
   return (
     <div className="flex flex-col h-full w-72 shrink-0 rounded overflow-hidden"
-      style={{ border: '1px solid var(--color-defender-border)', background: 'var(--color-bg-panel)' }}>
+      style={{ border: '2px solid var(--color-defender-border)', background: 'var(--color-bg-panel)' }}>
 
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 shrink-0"
-        style={{ borderBottom: '1px solid var(--color-defender-dim)' }}>
+        style={{ borderBottom: '2px solid var(--color-defender-dim)' }}>
         <span className="font-display text-sm font-bold tracking-widest neon-red">
           DEFENDER
         </span>

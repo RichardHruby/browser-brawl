@@ -22,8 +22,8 @@ export function TurnIndicator({ currentTurn, turnNumber, stepsRemaining, stepsPe
       className="flex items-center justify-center gap-3 py-1.5 px-4 font-display text-xs font-bold tracking-widest"
       style={{
         background: bgColor,
-        borderTop: `1px solid ${borderColor}`,
-        borderBottom: `1px solid ${borderColor}`,
+        borderTop: `2px solid ${borderColor}`,
+        borderBottom: `2px solid ${borderColor}`,
         color,
       }}
     >

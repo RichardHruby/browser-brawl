@@ -1,4 +1,4 @@
-import type { Difficulty, AttackerStatus, DefenderStatus } from '@/types/game';
+import type { Difficulty, AttackerStatus, DefenderStatus, AttackerType } from '@/types/game';
 
 // ── Difficulty colors (canonical neon palette) ──
 
@@ -43,6 +43,20 @@ export const DEFENDER_STATUS_COLORS: Record<DefenderStatus, string> = {
   plotting:     '#cc44ff',
   striking:     '#ff003c',
   cooling_down: '#ffaa00',
+};
+
+// ── Attacker type labels & colors (must match lobby fighter cards) ──
+
+export const ATTACKER_TYPE_LABELS: Record<AttackerType, string> = {
+  'playwright-mcp': 'Playwright MCP',
+  'stagehand':      'Stagehand',
+  'browser-use':    'Browser-Use',
+};
+
+export const ATTACKER_TYPE_COLORS: Record<AttackerType, string> = {
+  'playwright-mcp': '#cc2244',
+  'browser-use':    '#dd8800',
+  'stagehand':      '#ccaa00',
 };
 
 // ── Win reason labels ──
