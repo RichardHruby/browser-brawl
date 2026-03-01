@@ -6,12 +6,12 @@ const OPTIONS: { value: AttackerType; label: string; desc: string }[] = [
   {
     value: 'playwright-mcp',
     label: 'PLAYWRIGHT MCP',
-    desc: 'Local agent via Claude + Playwright',
+    desc: 'Anthropic Claude agent via Playwright',
   },
   {
     value: 'stagehand',
     label: 'STAGEHAND',
-    desc: 'Local agent via Stagehand runtime',
+    desc: 'Browserbase Stagehand with managed cloud browsers',
   },
   {
     value: 'browser-use',

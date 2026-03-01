@@ -50,3 +50,14 @@ export function formatWinReason(reason: string | null | undefined): string {
   if (!reason) return '—';
   return REASON_LABELS[reason] ?? reason.replace(/_/g, ' ');
 }
+
+const MODEL_DISPLAY: Record<string, string> = {
+  'claude-sonnet-4-20250514': 'Sonnet 4',
+  'claude-haiku-4-5-20251001': 'Haiku 4.5',
+  'claude-opus-4-20250514': 'Opus 4',
+};
+
+export function formatModel(model: string | undefined): string {
+  if (!model) return '—';
+  return MODEL_DISPLAY[model] ?? model;
+}

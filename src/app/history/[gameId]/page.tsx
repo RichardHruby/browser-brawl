@@ -6,8 +6,8 @@ import { use, useState, useEffect, useRef, useCallback } from 'react';
 import Link from 'next/link';
 import type { Id } from '../../../../convex/_generated/dataModel';
 import type { Difficulty } from '@/types/game';
-import { DIFFICULTY_COLORS, WINNER_SHORT } from '@/lib/constants';
-import { formatTime, formatDuration, formatWinReason } from '@/lib/format';
+import { DIFFICULTY_COLORS, WINNER_SHORT, ATTACKER_TYPE_COLORS } from '@/lib/constants';
+import { formatDuration, formatModel, formatWinReason } from '@/lib/format';
 import { HealthBar } from '@/components/arena/HealthBar';
 
 function ScreenshotViewer({ storageId }: { storageId: Id<'_storage'> | undefined }) {
@@ -30,6 +30,64 @@ interface RecordingData {
   frames: { t: number; d: string }[];
 }
 
+function toDisplayString(value: unknown): string {
+  if (value == null) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') {
+    return String(value);
+  }
+  try {
+    return JSON.stringify(value, null, 2);
+  } catch {
+    return String(value);
+  }
+}
+
+function formatJsonInput(value: unknown): string {
+  if (typeof value !== 'string') return toDisplayString(value);
+  try {
+    return JSON.stringify(JSON.parse(value), null, 2);
+  } catch {
+    return value;
+  }
+}
+
+type DomElement = {
+  tag: string;
+  text: string;
+  id?: string;
+  pos: { x: number; y: number; w: number; h: number };
+};
+
+function parseDomElements(snapshot: unknown): DomElement[] {
+  if (typeof snapshot !== 'string') return [];
+
+  try {
+    const parsed = JSON.parse(snapshot);
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed.map((entry) => {
+      const node = (entry && typeof entry === 'object' ? entry : {}) as Record<string, unknown>;
+      const posRaw = (node.pos && typeof node.pos === 'object' ? node.pos : {}) as Record<string, unknown>;
+      const toNum = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? v : Number(v) || 0);
+
+      return {
+        tag: toDisplayString(node.tag) || 'node',
+        text: toDisplayString(node.text),
+        id: node.id == null ? undefined : toDisplayString(node.id),
+        pos: {
+          x: toNum(posRaw.x),
+          y: toNum(posRaw.y),
+          w: toNum(posRaw.w),
+          h: toNum(posRaw.h),
+        },
+      };
+    });
+  } catch {
+    return [];
+  }
+}
+
 function ScreencastPlayer({ storageId }: { storageId: Id<'_storage'> }) {
   const url = useQuery(api.screenshots.getUrl, { storageId });
   const [recording, setRecording] = useState<RecordingData | null>(null);
@@ -38,7 +96,6 @@ function ScreencastPlayer({ storageId }: { storageId: Id<'_storage'> }) {
   const [speed, setSpeed] = useState(1);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Fetch and parse recording data
   useEffect(() => {
     if (!url) return;
     fetch(url)
@@ -59,7 +116,6 @@ function ScreencastPlayer({ storageId }: { storageId: Id<'_storage'> }) {
     });
   }, [recording]);
 
-  // Playback timer
   useEffect(() => {
     if (!playing || !recording || frameIndex >= recording.frames.length - 1) {
       if (timerRef.current) clearTimeout(timerRef.current);
@@ -87,47 +143,46 @@ function ScreencastPlayer({ storageId }: { storageId: Id<'_storage'> }) {
   const total = (recording.duration / 1000).toFixed(1);
 
   return (
-    <div className="space-y-3">
-      <div className="rounded overflow-hidden" style={{ border: '2px solid var(--color-border)' }}>
+    <div className="flex flex-col flex-1 min-h-0">
+      <div className="flex-1 min-h-0 rounded overflow-hidden" style={{ border: '2px solid var(--color-border)' }}>
         {frame && (
           <img
             src={`data:image/jpeg;base64,${frame.d}`}
             alt={`Frame ${frameIndex + 1}`}
-            className="w-full"
+            className="w-full h-full object-contain"
           />
         )}
       </div>
 
       {/* Controls */}
-      <div className="flex items-center gap-3">
+      <div className="flex items-center gap-3 pt-3 shrink-0">
         <button
           onClick={() => setPlaying(!playing)}
-          className="font-display text-xs font-bold tracking-widest uppercase px-3 py-1.5 rounded transition-all duration-200 hover:scale-105"
+          className="font-display text-xs font-bold tracking-widest uppercase px-3 py-1.5 transition-all duration-200 hover:scale-105"
           style={{ background: 'var(--color-bg-card)', color: 'var(--color-attacker)', border: '2px solid var(--color-attacker)' }}
         >
           {playing ? 'Pause' : 'Play'}
         </button>
         <button
           onClick={() => { setFrameIndex(Math.max(0, frameIndex - 1)); setPlaying(false); }}
-          className="font-mono text-xs px-2 py-1.5 rounded transition-colors"
+          className="font-mono text-xs px-2 py-1.5 transition-colors"
           style={{ background: 'var(--color-bg-card)', color: 'var(--color-text-primary)', border: '2px solid var(--color-border)' }}
         >
           Prev
         </button>
         <button
           onClick={() => { setFrameIndex(Math.min(recording.frames.length - 1, frameIndex + 1)); setPlaying(false); }}
-          className="font-mono text-xs px-2 py-1.5 rounded transition-colors"
+          className="font-mono text-xs px-2 py-1.5 transition-colors"
           style={{ background: 'var(--color-bg-card)', color: 'var(--color-text-primary)', border: '2px solid var(--color-border)' }}
         >
           Next
         </button>
 
-        {/* Speed selector */}
         {[1, 2, 4].map(s => (
           <button
             key={s}
             onClick={() => setSpeed(s)}
-            className="font-mono text-[10px] px-2 py-1 rounded transition-colors"
+            className="font-mono text-[10px] px-2 py-1 transition-colors"
             style={{
               background: speed === s ? 'var(--color-attacker)' : 'var(--color-bg-card)',
               color: speed === s ? '#000' : 'var(--color-text-secondary)',
@@ -138,7 +193,6 @@ function ScreencastPlayer({ storageId }: { storageId: Id<'_storage'> }) {
           </button>
         ))}
 
-        {/* Scrubber */}
         <input
           type="range"
           min={0}
@@ -178,7 +232,7 @@ export default function ReplayPage({ params }: { params: Promise<{ gameId: strin
     return (
       <div className="boxy-ui min-h-screen flex flex-col items-center justify-center gap-6 px-6" style={{ background: 'var(--color-bg-deep)' }}>
         <span className="font-mono text-lg" style={{ color: 'var(--color-text-secondary)' }}>Session not found</span>
-        <Link href="/history" className="font-display text-xs font-bold tracking-widest uppercase px-4 py-2 rounded transition-all duration-200 hover:scale-105 neon-cyan"
+        <Link href="/history" className="font-display text-xs font-bold tracking-widest uppercase px-4 py-2 transition-all duration-200 hover:scale-105 neon-cyan"
           style={{ background: 'var(--color-bg-card)', border: '2px solid var(--color-border)' }}>
           Back to History
         </Link>
@@ -187,54 +241,75 @@ export default function ReplayPage({ params }: { params: Promise<{ gameId: strin
   }
 
   const diffColor = DIFFICULTY_COLORS[session.difficulty as Difficulty];
+  const attackerColor = ATTACKER_TYPE_COLORS['playwright-mcp'];
   const selectedStepData = selectedStep != null ? steps?.find(s => s.stepNumber === selectedStep) : null;
   const selectedActionData = selectedAction != null ? actions?.find(a => a.actionNumber === selectedAction) : null;
+  const selectedDomElements = selectedStepData ? parseDomElements(selectedStepData.domSnapshot) : [];
 
   return (
-    <div className="boxy-ui min-h-screen flex flex-col" style={{ background: 'var(--color-bg-deep)' }}>
-      {/* Header — matches arena header style */}
-      <div className="px-4 py-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between shrink-0 sticky top-0 z-30"
+    <div className="boxy-ui flex flex-col h-screen" style={{ background: 'var(--color-bg-deep)' }}>
+      {/* Header — mirrors ArenaHeader layout */}
+      <div className="flex flex-col gap-1 shrink-0 px-4 py-2"
         style={{ borderBottom: '2px solid var(--color-border)', background: 'var(--color-bg-panel)' }}>
-        <div className="flex items-center gap-4 flex-wrap">
-          <Link href="/history"
-            className="font-display text-xs font-bold tracking-widest uppercase px-3 py-1.5 rounded transition-all duration-200 hover:scale-105"
-            style={{ background: 'var(--color-bg-card)', color: 'var(--color-text-secondary)', border: '2px solid var(--color-border)' }}>
-            &larr; HISTORY
-          </Link>
-          <h1 className="font-display text-lg font-black tracking-wider neon-cyan">
-            {session.taskLabel}
-          </h1>
-        </div>
 
-        <div className="flex items-center gap-3 flex-wrap font-mono text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-          <span>{session.mode}</span>
-          <span className="px-1.5 py-0.5 rounded uppercase text-[10px]"
-            style={{ color: diffColor, background: `${diffColor}18` }}>
-            {session.difficulty}
-          </span>
-          {session.winner && (
-            <span>
-              Winner: <span className={session.winner === 'attacker' ? 'neon-cyan' : 'neon-red'}>
-                {WINNER_SHORT[session.winner as 'attacker' | 'defender']}
-              </span>
+        {/* Top row: attacker | center info | defender */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Link href="/history"
+              className="font-display text-xs font-bold tracking-widest uppercase px-3 py-1.5 transition-all duration-200 hover:scale-105"
+              style={{ background: 'var(--color-bg-card)', color: 'var(--color-text-secondary)', border: '2px solid var(--color-border)' }}>
+              &larr;
+            </Link>
+            <span className="font-display text-xs font-bold tracking-widest neon-cyan">
+              ⚔ ATTACKER
             </span>
-          )}
-          <span>{formatWinReason(session.winReason)}</span>
-          {session.durationSeconds != null && <span>{formatDuration(session.durationSeconds)}</span>}
-        </div>
-      </div>
+            <span className="text-[10px] font-mono px-1.5 py-0.5 border"
+              style={{ color: attackerColor, background: `${attackerColor}1f`, borderColor: `${attackerColor}88` }}>
+              {formatModel(session.attackerModel)}
+            </span>
+          </div>
 
-      {/* Health bar */}
-      <div className="px-4 py-2 shrink-0" style={{ borderBottom: '2px solid var(--color-border)', background: 'var(--color-bg-panel)' }}>
-        <div className="flex items-center gap-3">
-          <span className="font-mono text-xs" style={{ color: 'var(--color-text-secondary)' }}>HP</span>
-          <HealthBar health={session.healthFinal ?? 100} variant="static" />
+          <div className="flex items-center gap-4">
+            <span className="text-xs font-mono truncate max-w-xs"
+              style={{ color: 'var(--color-text-secondary)' }}>
+              {session.taskLabel}
+            </span>
+            {session.durationSeconds != null && (
+              <span className="font-display text-sm font-bold tabular-nums"
+                style={{ color: 'var(--color-text-primary)' }}>
+                {formatDuration(session.durationSeconds)}
+              </span>
+            )}
+            {session.winner && (
+              <span className={`font-mono text-xs px-2 py-0.5 border ${session.winner === 'attacker' ? 'neon-cyan' : 'neon-red'}`}
+                style={{
+                  borderColor: session.winner === 'attacker' ? 'var(--color-attacker)' : 'var(--color-defender)',
+                  background: session.winner === 'attacker' ? 'rgba(0, 212, 255, 0.1)' : 'rgba(255, 0, 60, 0.1)',
+                }}>
+                {WINNER_SHORT[session.winner as 'attacker' | 'defender']} — {formatWinReason(session.winReason)}
+              </span>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="font-display text-xs font-bold tracking-widest neon-red">
+              DEFENDER 🛡
+            </span>
+            <span className="text-[10px] font-mono px-1.5 py-0.5 border uppercase"
+              style={{ color: diffColor, background: `${diffColor}18`, borderColor: `${diffColor}66` }}>
+              {session.difficulty}
+            </span>
+          </div>
         </div>
+
+        {/* Health bar row */}
+        <HealthBar health={session.healthFinal ?? 100} variant="static" />
+
         {/* Health timeline markers */}
         {healthTimeline && healthTimeline.length > 0 && (
-          <div className="flex gap-2 mt-1.5 flex-wrap">
+          <div className="flex gap-1.5 flex-wrap px-4">
             {healthTimeline.map((h, i) => (
-              <span key={i} className="font-mono text-[10px] px-1.5 py-0.5 rounded" style={{
+              <span key={i} className="font-mono text-[9px] px-1 py-0.5" style={{
                 background: 'var(--color-bg-card)',
                 color: h.delta < 0 ? 'var(--color-health-low)' : 'var(--color-health-high)',
               }}>
@@ -245,250 +320,299 @@ export default function ReplayPage({ params }: { params: Promise<{ gameId: strin
         )}
       </div>
 
-      {/* Three-column layout */}
-      <div className="flex-1 flex overflow-hidden">
-        {/* Left: Attacker Steps */}
-        <div className="w-80 flex-shrink-0 overflow-y-auto feed-scroll"
-          style={{ borderRight: '2px solid var(--color-border)', background: 'var(--color-bg-panel)' }}>
-          <div className="px-4 py-3 font-display text-xs font-bold tracking-widest sticky top-0 shrink-0"
-            style={{
-              background: 'var(--color-bg-panel)',
-              borderBottom: '2px solid var(--color-attacker-border)',
-            }}>
-            <span className="neon-cyan">⚔ ATTACKER STEPS</span>
-            <span className="font-mono text-[10px] ml-2" style={{ color: 'var(--color-text-secondary)' }}>
-              ({steps?.length ?? 0})
+      {/* Three-column layout — matches ArenaScreen's flex flex-1 gap-2 p-2 */}
+      <main className="flex flex-1 gap-2 p-2 overflow-hidden min-h-0">
+        {/* Left: Attacker Steps — matches AttackerPanel chrome */}
+        <div className="flex flex-col h-full w-72 shrink-0 rounded overflow-hidden"
+          style={{ border: `2px solid ${attackerColor}66`, background: 'var(--color-bg-panel)' }}>
+
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 py-3 shrink-0"
+            style={{ borderBottom: `2px solid ${attackerColor}33` }}>
+            <span className="font-display text-sm font-bold tracking-widest"
+              style={{ color: attackerColor, textShadow: `0 0 8px ${attackerColor}` }}>
+              ATTACKER
             </span>
           </div>
-          {steps?.map((step) => (
-            <button
-              key={step._id}
-              onClick={() => { setSelectedStep(step.stepNumber); setSelectedAction(null); }}
-              className="w-full text-left px-4 py-3 transition-colors"
-              style={{
-                borderBottom: '1px solid var(--color-border)',
-                background: selectedStep === step.stepNumber ? 'var(--color-attacker-dim)' : 'transparent',
-              }}
-            >
-              <div className="flex items-center gap-2">
-                <span className="font-mono text-xs neon-cyan">#{step.stepNumber}</span>
-                <span className="font-mono text-[10px]" style={{ color: 'var(--color-text-secondary)' }}>
-                  {formatTime(step.timestamp)}
-                </span>
-              </div>
-              <div className="font-game text-sm mt-1 truncate" style={{ color: 'var(--color-text-primary)' }}>
-                {step.description}
-              </div>
-              {step.toolName && (
-                <span className="font-mono text-[10px] px-1.5 py-0.5 rounded mt-1 inline-block" style={{
-                  background: 'var(--color-attacker-dim)',
-                  color: 'var(--color-attacker)',
-                }}>
-                  {step.toolName}
-                </span>
-              )}
-            </button>
-          ))}
+
+          {/* Feed */}
+          <div className="flex-1 overflow-y-auto px-3 py-2 feed-scroll">
+            {steps?.map((step) => (
+              <button
+                key={step._id}
+                onClick={() => { setSelectedStep(step.stepNumber); setSelectedAction(null); }}
+                className="w-full text-left mb-2 transition-colors"
+                style={{
+                  background: selectedStep === step.stepNumber ? `${attackerColor}18` : 'transparent',
+                }}
+              >
+                <div className="flex items-start gap-2">
+                  <span className="text-xs font-mono shrink-0 mt-0.5"
+                    style={{ color: attackerColor, opacity: 0.6 }}>
+                    {String(step.stepNumber).padStart(2, '0')}
+                  </span>
+                  <div className="flex-1 min-w-0">
+                    <span className="text-xs font-mono leading-relaxed block truncate"
+                      style={{ color: 'var(--color-text-mono)' }}>
+                      {toDisplayString(step.description)}
+                    </span>
+                    {step.toolName && (
+                      <span className="font-mono text-[10px] px-1.5 py-0.5 mt-0.5 inline-block" style={{
+                        background: `${attackerColor}18`,
+                        color: attackerColor,
+                      }}>
+                        {toDisplayString(step.toolName)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+
+          {/* Footer */}
+          <div className="px-4 py-2 shrink-0 text-xs font-mono"
+            style={{ borderTop: `1px solid ${attackerColor}33`, color: 'var(--color-text-secondary)' }}>
+            {steps?.length ?? 0} step{(steps?.length ?? 0) !== 1 ? 's' : ''}
+          </div>
         </div>
 
-        {/* Center: Detail viewer */}
-        <div className="flex-1 overflow-y-auto feed-scroll p-6">
-          {selectedStepData ? (
-            <div className="space-y-4">
-              <h2 className="font-display text-lg font-bold neon-cyan">
-                Step #{selectedStepData.stepNumber}: {selectedStepData.toolName ?? 'Text Response'}
-              </h2>
-              <div className="font-game text-sm" style={{ color: 'var(--color-text-primary)' }}>
-                {selectedStepData.description}
+        {/* Center: Detail viewer / Screencast — matches BrowserFrame chrome */}
+        <div className="relative flex-1 min-w-0 flex flex-col rounded overflow-hidden"
+          style={{ border: '2px solid var(--color-border)', background: '#111' }}>
+
+          {/* Browser chrome bar */}
+          <div className="flex items-center gap-2 px-3 py-2 shrink-0"
+            style={{ background: 'var(--color-bg-panel)', borderBottom: '2px solid var(--color-border)' }}>
+            <div className="flex gap-1.5">
+              <div className="w-3 h-3 rounded-full" style={{ background: '#ff5f57' }} />
+              <div className="w-3 h-3 rounded-full" style={{ background: '#febc2e' }} />
+              <div className="w-3 h-3 rounded-full" style={{ background: '#28c840' }} />
+            </div>
+            <div className="flex-1 rounded px-3 py-0.5"
+              style={{ background: 'var(--color-bg-card)' }}>
+              {selectedStepData ? (
+                <span className="font-mono text-[10px]" style={{ color: 'var(--color-text-secondary)' }}>
+                  Step #{selectedStepData.stepNumber}: {toDisplayString(selectedStepData.toolName) || 'Text Response'}
+                </span>
+              ) : selectedActionData ? (
+                <span className="font-mono text-[10px]" style={{ color: 'var(--color-text-secondary)' }}>
+                  Disruption #{selectedActionData.actionNumber}: {toDisplayString(selectedActionData.disruptionName)}
+                </span>
+              ) : (
+                <span className="font-mono text-[10px]" style={{ color: 'var(--color-text-secondary)' }}>
+                  Session Recording
+                </span>
+              )}
+            </div>
+            <div className="text-xs font-mono" style={{ color: 'var(--color-text-secondary)', opacity: 0.7 }}>
+              ● REPLAY
+            </div>
+          </div>
+
+          {/* Content area */}
+          <div className="flex-1 overflow-y-auto feed-scroll p-4" style={{ background: 'var(--color-bg-deep)' }}>
+            {selectedStepData ? (
+              <div className="space-y-4">
+                <h2 className="font-display text-lg font-bold neon-cyan">
+                  Step #{selectedStepData.stepNumber}: {toDisplayString(selectedStepData.toolName) || 'Text Response'}
+                </h2>
+                <div className="font-game text-sm" style={{ color: 'var(--color-text-primary)' }}>
+                  {toDisplayString(selectedStepData.description)}
+                </div>
+
+                {selectedStepData.screenshotBeforeId && (
+                  <div>
+                    <h3 className="font-mono text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--color-text-secondary)' }}>
+                      Page State (Before)
+                    </h3>
+                    <ScreenshotViewer storageId={selectedStepData.screenshotBeforeId} />
+                  </div>
+                )}
+
+                {selectedStepData.toolInput && (
+                  <div>
+                    <h3 className="font-mono text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--color-text-secondary)' }}>
+                      Tool Input
+                    </h3>
+                    <pre className="font-mono text-xs p-3 overflow-x-auto code-block">
+                      {formatJsonInput(selectedStepData.toolInput)}
+                    </pre>
+                  </div>
+                )}
+
+                {selectedStepData.toolResultSummary && (
+                  <div>
+                    <h3 className="font-mono text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--color-text-secondary)' }}>
+                      Result
+                    </h3>
+                    <pre className="font-mono text-xs p-3 overflow-x-auto whitespace-pre-wrap code-block" style={{ maxHeight: '300px' }}>
+                      {toDisplayString(selectedStepData.toolResultSummary)}
+                    </pre>
+                  </div>
+                )}
+
+                {selectedStepData.domSnapshot && (
+                  <div>
+                    <h3 className="font-mono text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--color-text-secondary)' }}>
+                      DOM Snapshot ({selectedDomElements.length} elements)
+                    </h3>
+                    <div className="max-h-64 overflow-y-auto feed-scroll" style={{
+                      background: 'var(--color-bg-card)',
+                      border: '2px solid var(--color-border)',
+                    }}>
+                      {selectedDomElements.map((el, i) => (
+                        <div key={i} className="px-3 py-1.5 font-mono text-[11px] flex gap-3" style={{ borderBottom: '1px solid var(--color-border)' }}>
+                          <span style={{ color: 'var(--color-attacker)' }}>&lt;{el.tag}&gt;</span>
+                          {el.id && <span style={{ color: 'var(--color-status-thinking)' }}>#{el.id}</span>}
+                          <span className="truncate flex-1" style={{ color: 'var(--color-text-primary)' }}>{el.text || '(empty)'}</span>
+                          <span style={{ color: 'var(--color-text-secondary)' }}>{el.pos.x},{el.pos.y}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
-
-              {/* Screenshot */}
-              {selectedStepData.screenshotBeforeId && (
-                <div>
-                  <h3 className="font-mono text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--color-text-secondary)' }}>
-                    Page State (Before)
-                  </h3>
-                  <ScreenshotViewer storageId={selectedStepData.screenshotBeforeId} />
+            ) : selectedActionData ? (
+              <div className="space-y-4">
+                <h2 className="font-display text-lg font-bold neon-red">
+                  Disruption #{selectedActionData.actionNumber}: {toDisplayString(selectedActionData.disruptionName)}
+                </h2>
+                <div className="font-game text-sm" style={{ color: 'var(--color-text-primary)' }}>
+                  {toDisplayString(selectedActionData.description)}
                 </div>
-              )}
 
-              {/* Tool details */}
-              {selectedStepData.toolInput && (
-                <div>
-                  <h3 className="font-mono text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--color-text-secondary)' }}>
-                    Tool Input
-                  </h3>
-                  <pre className="font-mono text-xs p-3 rounded overflow-x-auto code-block">
-                    {(() => { try { return JSON.stringify(JSON.parse(selectedStepData.toolInput!), null, 2); } catch { return selectedStepData.toolInput; } })()}
-                  </pre>
+                <div className="flex gap-3">
+                  <span className="font-mono text-xs px-2 py-0.5" style={{
+                    background: selectedActionData.success ? 'var(--color-defender-dim)' : 'rgba(100, 100, 100, 0.15)',
+                    color: selectedActionData.success ? 'var(--color-defender)' : 'var(--color-text-secondary)',
+                  }}>
+                    {selectedActionData.success ? 'HIT' : 'MISS'}
+                  </span>
+                  <span className="font-mono text-xs" style={{ color: 'var(--color-health-low)' }}>
+                    -{selectedActionData.healthDamage} HP
+                  </span>
                 </div>
-              )}
 
-              {selectedStepData.toolResultSummary && (
                 <div>
                   <h3 className="font-mono text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--color-text-secondary)' }}>
-                    Result
+                    Reasoning
                   </h3>
-                  <pre className="font-mono text-xs p-3 rounded overflow-x-auto whitespace-pre-wrap code-block" style={{ maxHeight: '300px' }}>
-                    {selectedStepData.toolResultSummary}
-                  </pre>
-                </div>
-              )}
-
-              {/* DOM Snapshot */}
-              {selectedStepData.domSnapshot && (
-                <div>
-                  <h3 className="font-mono text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--color-text-secondary)' }}>
-                    DOM Snapshot ({JSON.parse(selectedStepData.domSnapshot).length} elements)
-                  </h3>
-                  <div className="max-h-64 overflow-y-auto feed-scroll rounded" style={{
+                  <p className="font-game text-sm p-3" style={{
                     background: 'var(--color-bg-card)',
+                    color: 'var(--color-text-primary)',
                     border: '2px solid var(--color-border)',
                   }}>
-                    {(JSON.parse(selectedStepData.domSnapshot) as Array<{ tag: string; text: string; id?: string; pos: { x: number; y: number; w: number; h: number } }>).map((el, i) => (
-                      <div key={i} className="px-3 py-1.5 font-mono text-[11px] flex gap-3" style={{ borderBottom: '1px solid var(--color-border)' }}>
-                        <span style={{ color: 'var(--color-attacker)' }}>&lt;{el.tag}&gt;</span>
-                        {el.id && <span style={{ color: 'var(--color-status-thinking)' }}>#{el.id}</span>}
-                        <span className="truncate flex-1" style={{ color: 'var(--color-text-primary)' }}>{el.text || '(empty)'}</span>
-                        <span style={{ color: 'var(--color-text-secondary)' }}>{el.pos.x},{el.pos.y}</span>
-                      </div>
-                    ))}
-                  </div>
+                    {toDisplayString(selectedActionData.reasoning)}
+                  </p>
                 </div>
-              )}
-            </div>
-          ) : selectedActionData ? (
-            <div className="space-y-4">
-              <h2 className="font-display text-lg font-bold neon-red">
-                Disruption #{selectedActionData.actionNumber}: {selectedActionData.disruptionName}
-              </h2>
-              <div className="font-game text-sm" style={{ color: 'var(--color-text-primary)' }}>
-                {selectedActionData.description}
-              </div>
 
-              <div className="flex gap-3">
-                <span className="font-mono text-xs px-2 py-0.5 rounded" style={{
-                  background: selectedActionData.success ? 'var(--color-defender-dim)' : 'rgba(100, 100, 100, 0.15)',
-                  color: selectedActionData.success ? 'var(--color-defender)' : 'var(--color-text-secondary)',
-                }}>
-                  {selectedActionData.success ? 'HIT' : 'MISS'}
-                </span>
-                <span className="font-mono text-xs" style={{ color: 'var(--color-health-low)' }}>
-                  -{selectedActionData.healthDamage} HP
-                </span>
-              </div>
+                <div className="grid grid-cols-2 gap-4">
+                  {selectedActionData.screenshotBeforeId && (
+                    <div>
+                      <h3 className="font-mono text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--color-text-secondary)' }}>Before</h3>
+                      <ScreenshotViewer storageId={selectedActionData.screenshotBeforeId} />
+                    </div>
+                  )}
+                  {selectedActionData.screenshotAfterId && (
+                    <div>
+                      <h3 className="font-mono text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--color-text-secondary)' }}>After</h3>
+                      <ScreenshotViewer storageId={selectedActionData.screenshotAfterId} />
+                    </div>
+                  )}
+                </div>
 
-              {/* Reasoning */}
-              <div>
-                <h3 className="font-mono text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--color-text-secondary)' }}>
-                  Reasoning
-                </h3>
-                <p className="font-game text-sm p-3 rounded" style={{
-                  background: 'var(--color-bg-card)',
-                  color: 'var(--color-text-primary)',
-                  border: '2px solid var(--color-border)',
-                }}>
-                  {selectedActionData.reasoning}
-                </p>
-              </div>
-
-              {/* Before/After Screenshots */}
-              <div className="grid grid-cols-2 gap-4">
-                {selectedActionData.screenshotBeforeId && (
+                {selectedActionData.injectionPayload && (
                   <div>
-                    <h3 className="font-mono text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--color-text-secondary)' }}>Before</h3>
-                    <ScreenshotViewer storageId={selectedActionData.screenshotBeforeId} />
+                    <h3 className="font-mono text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--color-text-secondary)' }}>
+                      Injection Payload
+                    </h3>
+                    <pre className="font-mono text-xs p-3 overflow-x-auto whitespace-pre-wrap code-block" style={{ maxHeight: '400px' }}>
+                      {toDisplayString(selectedActionData.injectionPayload)}
+                    </pre>
                   </div>
                 )}
-                {selectedActionData.screenshotAfterId && (
+
+                {selectedActionData.domSnapshot && (
                   <div>
-                    <h3 className="font-mono text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--color-text-secondary)' }}>After</h3>
-                    <ScreenshotViewer storageId={selectedActionData.screenshotAfterId} />
+                    <h3 className="font-mono text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--color-text-secondary)' }}>
+                      DOM Snapshot
+                    </h3>
+                    <pre className="font-mono text-xs p-3 overflow-x-auto whitespace-pre-wrap code-block" style={{ maxHeight: '300px' }}>
+                      {toDisplayString(selectedActionData.domSnapshot)}
+                    </pre>
                   </div>
                 )}
               </div>
-
-              {/* Injection Payload */}
-              {selectedActionData.injectionPayload && (
-                <div>
-                  <h3 className="font-mono text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--color-text-secondary)' }}>
-                    Injection Payload
-                  </h3>
-                  <pre className="font-mono text-xs p-3 rounded overflow-x-auto whitespace-pre-wrap code-block" style={{ maxHeight: '400px' }}>
-                    {selectedActionData.injectionPayload}
-                  </pre>
-                </div>
-              )}
-
-              {/* DOM Snapshot */}
-              {selectedActionData.domSnapshot && (
-                <div>
-                  <h3 className="font-mono text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--color-text-secondary)' }}>
-                    DOM Snapshot
-                  </h3>
-                  <pre className="font-mono text-xs p-3 rounded overflow-x-auto whitespace-pre-wrap code-block" style={{ maxHeight: '300px' }}>
-                    {selectedActionData.domSnapshot}
-                  </pre>
-                </div>
-              )}
-            </div>
-          ) : session.recordingStorageId ? (
-            <div className="space-y-4">
-              <h2 className="font-display text-lg font-bold neon-cyan">Session Recording</h2>
+            ) : session.recordingStorageId ? (
               <ScreencastPlayer storageId={session.recordingStorageId} />
-            </div>
-          ) : (
-            <div className="flex items-center justify-center h-full font-mono text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-              Select a step or action to view details
-            </div>
-          )}
+            ) : (
+              <div className="flex items-center justify-center h-full font-mono text-sm" style={{ color: 'var(--color-text-secondary)' }}>
+                Select a step or action to view details
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Right: Defender Actions */}
-        <div className="w-80 flex-shrink-0 overflow-y-auto feed-scroll"
-          style={{ borderLeft: '2px solid var(--color-border)', background: 'var(--color-bg-panel)' }}>
-          <div className="px-4 py-3 font-display text-xs font-bold tracking-widest sticky top-0 shrink-0"
-            style={{
-              background: 'var(--color-bg-panel)',
-              borderBottom: '2px solid var(--color-defender-border)',
-            }}>
-            <span className="neon-red">DEFENDER ACTIONS 🛡</span>
-            <span className="font-mono text-[10px] ml-2" style={{ color: 'var(--color-text-secondary)' }}>
-              ({actions?.length ?? 0})
+        {/* Right: Defender Actions — matches DefenderPanel chrome */}
+        <div className="flex flex-col h-full w-72 shrink-0 rounded overflow-hidden"
+          style={{ border: '2px solid var(--color-defender-border)', background: 'var(--color-bg-panel)' }}>
+
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 py-3 shrink-0"
+            style={{ borderBottom: '2px solid var(--color-defender-dim)' }}>
+            <span className="font-display text-sm font-bold tracking-widest neon-red">
+              DEFENDER
             </span>
           </div>
-          {actions?.map((action) => (
-            <button
-              key={action._id}
-              onClick={() => { setSelectedAction(action.actionNumber); setSelectedStep(null); }}
-              className="w-full text-left px-4 py-3 transition-colors"
-              style={{
-                borderBottom: '1px solid var(--color-border)',
-                background: selectedAction === action.actionNumber ? 'var(--color-defender-dim)' : 'transparent',
-              }}
-            >
-              <div className="flex items-center gap-2">
-                <span className="font-mono text-xs neon-red">#{action.actionNumber}</span>
-                <span className="font-mono text-[10px]" style={{ color: 'var(--color-text-secondary)' }}>
-                  {formatTime(action.timestamp)}
-                </span>
-                <span className="font-mono text-[10px] px-1 rounded" style={{
-                  color: action.success ? 'var(--color-defender)' : 'var(--color-text-secondary)',
-                  background: action.success ? 'var(--color-defender-dim)' : 'rgba(100, 100, 100, 0.1)',
-                }}>
-                  {action.success ? 'HIT' : 'MISS'}
-                </span>
-              </div>
-              <div className="font-game text-sm mt-1 truncate" style={{ color: 'var(--color-text-primary)' }}>
-                {action.disruptionName}
-              </div>
-              <div className="font-game text-xs mt-0.5 truncate" style={{ color: 'var(--color-text-secondary)' }}>
-                {action.reasoning}
-              </div>
-            </button>
-          ))}
+
+          {/* Feed */}
+          <div className="flex-1 overflow-y-auto px-3 py-2 feed-scroll">
+            {actions?.map((action) => (
+              <button
+                key={action._id}
+                onClick={() => { setSelectedAction(action.actionNumber); setSelectedStep(null); }}
+                className="w-full text-left mb-1.5 transition-colors"
+              >
+                <div
+                  className="flex items-center gap-1.5 px-2 py-1 rounded"
+                  style={{
+                    background: selectedAction === action.actionNumber
+                      ? 'rgba(255,0,60,0.15)'
+                      : action.success ? 'rgba(255,0,60,0.1)' : 'rgba(255,255,255,0.03)',
+                    borderLeft: action.success
+                      ? '2px solid var(--color-defender)'
+                      : '2px solid var(--color-border)',
+                  }}
+                >
+                  <span className="text-xs font-mono shrink-0 neon-red">#{action.actionNumber}</span>
+                  <span className="text-xs font-mono truncate flex-1"
+                    style={{ color: action.success ? 'var(--color-defender)' : 'var(--color-text-secondary)' }}>
+                    {toDisplayString(action.disruptionName)}
+                  </span>
+                  {action.success ? (
+                    <span className="shrink-0 text-[10px] font-mono font-bold"
+                      style={{ color: 'var(--color-health-low)' }}>
+                      -{action.healthDamage}
+                    </span>
+                  ) : (
+                    <span className="shrink-0 text-[10px] font-mono"
+                      style={{ color: 'var(--color-text-secondary)', opacity: 0.6 }}>
+                      BLOCKED
+                    </span>
+                  )}
+                </div>
+              </button>
+            ))}
+          </div>
+
+          {/* Footer */}
+          <div className="px-4 py-2 shrink-0 text-xs font-mono"
+            style={{ borderTop: '1px solid var(--color-defender-dim)', color: 'var(--color-text-secondary)' }}>
+            {actions?.filter(a => a.success).length ?? 0} disruptions landed
+          </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

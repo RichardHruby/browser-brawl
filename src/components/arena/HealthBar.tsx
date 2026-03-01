@@ -44,7 +44,7 @@ export function HealthBar({ health, variant = 'arena' }: Props) {
         </span>
       </div>
       <div
-        className={`relative h-5 rounded overflow-hidden ${shaking ? 'animate-bar-shake' : ''}`}
+        className="relative h-5 rounded overflow-hidden"
         style={{ background: 'var(--color-bg-card)', border: '1px solid var(--color-border)' }}
       >
         {/* Segment markers */}

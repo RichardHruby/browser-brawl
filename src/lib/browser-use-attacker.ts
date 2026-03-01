@@ -81,6 +81,19 @@ export async function runBrowserUseAttackerLoop(
 
       log('[browser-use attacker] step received:', JSON.stringify(step, null, 2));
 
+      // Do not block SSE/log emission on screenshot upload. Upload in the background.
+      // This keeps AttackerPanel logs responsive even when storage/upload is slow.
+      if (step.screenshotUrl) {
+        void downloadAndUploadScreenshot(step.screenshotUrl)
+          .then((storageId) => {
+            if (!storageId) return;
+            log('[browser-use attacker] screenshot uploaded (unlinked step):', storageId);
+          })
+          .catch((err) => {
+            logError('[browser-use attacker] screenshot upload failed:', err);
+          });
+      }
+
       // Phase 1: Emit reasoning as a "thinking" step
       const thinkingText = step.nextGoal || step.evaluationPreviousGoal || step.memory;
       if (thinkingText) {
@@ -101,11 +114,6 @@ export async function runBrowserUseAttackerLoop(
         screenshotUrl: step.screenshotUrl ?? undefined,
         domSnapshot: latestDomSnap,
       });
-
-      // Fire-and-forget: download screenshot from Browser-Use URL and upload to Convex
-      if (step.screenshotUrl) {
-        downloadAndUploadScreenshot(step.screenshotUrl).catch(() => {});
-      }
       // Refresh DOM snapshot for next step
       snapshotDOM(session.cdpUrl).then(dom => { latestDomSnap = dom; }).catch(() => {});
     }
