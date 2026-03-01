@@ -8,8 +8,10 @@
  *   - Formats tool results as <tool_response> XML
  */
 
+import Anthropic from '@anthropic-ai/sdk';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { getAnthropicApiKey } from './env';
 import { getSession, createGate } from './game-session-store';
 import { emitEvent } from './sse-emitter';
 import { endGame } from './defender-agent';
@@ -65,6 +67,7 @@ For each function call, return a json object with function name and arguments wi
 - Use browser_navigate to go to URLs.
 - Use browser_click to click elements (use the ref from snapshots).
 - Use browser_type to type text into fields.
+- For browser_run_code: the "code" argument MUST be an async arrow function with a single \`page\` parameter — CORRECT: \`async (page) => { await page.locator('input[name="q"]').fill('Sensodyne'); await page.keyboard.press('Enter'); }\`. WRONG (causes ReferenceError and breaks the game): \`(async () => { await browser.type(...) })()\` or any use of \`browser\` — \`browser\` does not exist. Never use a self-invoking IIFE. Always use \`async (page) => { ... }\`.
 - When done, respond with "TASK COMPLETE" and describe what you accomplished.
 - If you get stuck, try alternative approaches before giving up.
 - Be methodical: snapshot first, then act.`;
@@ -113,7 +116,7 @@ interface ParsedToolCall {
   arguments: Record<string, unknown>;
 }
 
-function parseToolCalls(text: string): ParsedToolCall[] {
+export function parseToolCalls(text: string): ParsedToolCall[] {
   const calls: ParsedToolCall[] = [];
   const pattern = /<tool_call>\s*([\s\S]*?)\s*<\/tool_call>/g;
   let match: RegExpExecArray | null;
@@ -141,6 +144,42 @@ function formatToolResponse(toolName: string, content: string): string {
 
 function stripToolCalls(text: string): string {
   return text.replace(/<tool_call>[\s\S]*?<\/tool_call>/g, '').trim();
+}
+
+// ── Haiku fixup layer ─────────────────────────────────────────────────────────
+
+export function needsFixup(text: string): boolean {
+  const pattern = /<tool_call>\s*([\s\S]*?)\s*<\/tool_call>/g;
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(text)) !== null) {
+    const inner = match[1];
+    try { JSON.parse(inner); } catch { return true; }
+    if (/\bbrowser\./.test(inner)) return true;
+    if (/\(async\s*\(\s*\)\s*=>/.test(inner) || /\(function\s*\(/.test(inner)) return true;
+  }
+  return false;
+}
+
+async function fixupToolCallSyntax(text: string, signal: AbortSignal): Promise<string> {
+  const anthropic = new Anthropic({ apiKey: getAnthropicApiKey() });
+  const msg = await anthropic.messages.create({
+    model: 'claude-haiku-4-5-20251001',
+    max_tokens: 1024,
+    system: `You are a JSON syntax fixer for browser automation tool calls.
+The user provides text containing <tool_call> XML blocks. Fix ONLY JSON syntax errors inside those blocks so each can be parsed by JSON.parse().
+
+Rules:
+- Fix escaping/quoting issues (e.g. unescaped double-quotes inside string values — use single quotes or escape them)
+- For the "code" argument: it MUST be \`async (page) => { ... }\` — fix any use of "browser" variable to "page", and fix IIFEs to arrow functions
+- Do NOT change tool names, argument keys, or argument values (only their formatting)
+- Return the COMPLETE original text with only the broken <tool_call> blocks corrected
+- Do NOT add explanation, markdown fences, or any other text`,
+    messages: [{ role: 'user', content: text }],
+  }, { signal });
+
+  const fixed = msg.content[0]?.type === 'text' ? msg.content[0].text : null;
+  if (!fixed || fixed.trim().length === 0) throw new Error('Empty fixup response');
+  return fixed;
 }
 
 // ── Attacker loop ─────────────────────────────────────────────────────────────
@@ -205,10 +244,10 @@ export async function runAttackerLoop(gameId: string, signal: AbortSignal): Prom
         snapshotDOM(session.cdpUrl).catch(() => null),
       ]);
 
-      // Call the fine-tuned model (with cold start detection)
+      // Call the fine-tuned model (with cold start detection on first call only)
       console.log(`[finetuned] Step ${stepNumber + 1} — calling model...`);
       let coldStartEmitted = false;
-      const coldStartTimer = setTimeout(() => {
+      const coldStartTimer = stepNumber === 0 ? setTimeout(() => {
         coldStartEmitted = true;
         console.log('[finetuned] Model call taking >10s — likely cold start');
         emitEvent<AttackerStepPayload>(gameId, 'attacker_step', {
@@ -217,11 +256,21 @@ export async function runAttackerLoop(gameId: string, signal: AbortSignal): Prom
           agentStatus: 'thinking',
           isComplete: false,
         });
-      }, 10_000);
+      }, 10_000) : null;
 
       const callStart = Date.now();
-      const responseText = await callFinetunedModel(messages, signal, modelUrl);
-      clearTimeout(coldStartTimer);
+      let responseText = await callFinetunedModel(messages, signal, modelUrl);
+      if (coldStartTimer) clearTimeout(coldStartTimer);
+
+      if (needsFixup(responseText)) {
+        console.log('[finetuned] Detected malformed tool_call — running Haiku fixup...');
+        try {
+          responseText = await fixupToolCallSyntax(responseText, signal);
+          console.log('[finetuned] Fixup applied.');
+        } catch (err) {
+          console.warn('[finetuned] Fixup failed, using raw response:', err);
+        }
+      }
 
       const callDuration = ((Date.now() - callStart) / 1000).toFixed(1);
       console.log(`[finetuned] Response (${callDuration}s): ${responseText.slice(0, 200)}`);
@@ -314,6 +363,11 @@ export async function runAttackerLoop(gameId: string, signal: AbortSignal): Prom
 
         toolStepCount++;
         stepNumber++;
+
+        // Signal defender to start on first real tool execution
+        if (toolStepCount === 1) {
+          session.finetunedReadyGate?.resolve();
+        }
 
         const description = `${toolCall.name}(${summarizeArgs(toolCall.arguments)})`;
         console.log(`[finetuned] Tool: ${description}`);

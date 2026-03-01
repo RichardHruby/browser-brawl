@@ -48,7 +48,16 @@ export function startDefenderLoop(gameId: string): void {
     tickHealthDecay(gameId);
   }, 1000);
 
-  scheduleNextAttack(gameId);
+  // Finetuned: wait for attacker's first real tool step before firing disruptions
+  if (session.finetunedReadyGate) {
+    session.finetunedReadyGate.promise.then(() => {
+      if (getSession(gameId)?.phase === 'arena') {
+        scheduleNextAttack(gameId);
+      }
+    });
+  } else {
+    scheduleNextAttack(gameId);
+  }
 }
 
 function scheduleNextAttack(gameId: string): void {
