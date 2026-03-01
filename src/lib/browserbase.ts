@@ -12,6 +12,8 @@ export async function injectJS(cdpUrl: string, script: string): Promise<boolean>
     return false;
   }
 
+  console.log('[injectJS] cdpUrl received:', cdpUrl);
+
   try {
     // Ensure we have an https:// base for the /json endpoint
     const httpBase = cdpUrl
@@ -20,19 +22,23 @@ export async function injectJS(cdpUrl: string, script: string): Promise<boolean>
     const baseUrl = new URL(httpBase);
     const targetsUrl = `${baseUrl.protocol}//${baseUrl.host}/json`;
 
+    console.log('[injectJS] fetching targets from:', targetsUrl);
     const targetsRes = await fetch(targetsUrl);
     if (!targetsRes.ok) {
-      console.error('[injectJS] Failed to list CDP targets:', targetsRes.status);
+      const body = await targetsRes.text();
+      console.error('[injectJS] Failed to list CDP targets:', targetsRes.status, body);
       return false;
     }
 
     const targets = await targetsRes.json();
+    console.log('[injectJS] targets found:', targets.length, 'types:', targets.map((t: { type: string }) => t.type));
     const page = targets.find((t: { type: string; webSocketDebuggerUrl?: string }) => t.type === 'page');
     if (!page?.webSocketDebuggerUrl) {
-      console.error('[injectJS] No page target found');
+      console.error('[injectJS] No page target found. All targets:', JSON.stringify(targets, null, 2));
       return false;
     }
 
+    console.log('[injectJS] connecting to page target:', page.webSocketDebuggerUrl);
     return await evaluateViaCDP(page.webSocketDebuggerUrl, script);
   } catch (err) {
     console.error('[injectJS] error:', err);

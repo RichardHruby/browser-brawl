@@ -12,6 +12,7 @@
     "@anthropic-ai/sdk": "^0.78.0",
     "@modelcontextprotocol/sdk": "^1.27.1",
     "@playwright/mcp": "^0.0.68",
+    "browser-use-sdk": "^3.1.0",
     "nanoid": "^5.1.6",
     "next": "16.1.6",
     "react": "19.2.3",

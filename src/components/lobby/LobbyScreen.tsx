@@ -2,18 +2,20 @@
 
 import { useState } from 'react';
 import { GlitchText } from '@/components/shared/GlitchText';
+import { AttackerTypeSelector } from './AttackerTypeSelector';
 import { DifficultySelector } from './DifficultySelector';
 import { TaskSelector } from './TaskSelector';
 import { StartButton } from './StartButton';
-import type { Difficulty, Task } from '@/types/game';
+import type { AttackerType, Difficulty, Task } from '@/types/game';
 
 interface Props {
-  onStart: (difficulty: Difficulty, task: Task) => void;
+  onStart: (difficulty: Difficulty, task: Task, attackerType: AttackerType) => void;
 }
 
 export function LobbyScreen({ onStart }: Props) {
   const [difficulty, setDifficulty] = useState<Difficulty>('easy');
   const [task, setTask] = useState<Task | null>(null);
+  const [attackerType, setAttackerType] = useState<AttackerType>('playwright-mcp');
 
   const canStart = !!task;
 
@@ -49,17 +51,18 @@ export function LobbyScreen({ onStart }: Props) {
         }}
       >
         <TaskSelector value={task} onChange={setTask} />
+        <AttackerTypeSelector value={attackerType} onChange={setAttackerType} />
         <DifficultySelector value={difficulty} onChange={setDifficulty} />
 
         {/* Info row */}
         <div className="flex gap-6 text-xs font-mono"
           style={{ color: 'var(--color-text-secondary)' }}>
-          <span>Attacker: <span className="neon-cyan">browser-use</span></span>
+          <span>Attacker: <span className="neon-cyan">{attackerType === 'browser-use' ? 'browser-use cloud' : 'Playwright MCP'}</span></span>
           <span>Defender: <span className="neon-red">Claude AI</span></span>
-          <span>Session: <span style={{ color: 'var(--color-text-primary)' }}>Browserbase</span></span>
+          <span>Session: <span style={{ color: 'var(--color-text-primary)' }}>browser-use</span></span>
         </div>
 
-        <StartButton onClick={() => task && onStart(difficulty, task)} disabled={!canStart} />
+        <StartButton onClick={() => task && onStart(difficulty, task, attackerType)} disabled={!canStart} />
       </div>
 
       {/* Footer */}

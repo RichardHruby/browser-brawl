@@ -28,6 +28,10 @@ export function startDefenderLoop(gameId: string): void {
   const session = getSession(gameId);
   if (!session) return;
 
+  console.log('[defender] starting loop for game:', gameId);
+  console.log('[defender] cdpUrl:', session.cdpUrl || '(EMPTY)');
+  console.log('[defender] difficulty:', session.difficulty);
+
   // Start passive health decay (every second)
   session.healthDecayHandle = setInterval(() => {
     tickHealthDecay(gameId);
@@ -274,8 +278,9 @@ async function runDefenderTurn(gameId: string): Promise<void> {
     payload = disruption.generatePayload();
   }
 
+  console.log('[defender] injecting disruption:', disruption.name, 'via cdpUrl:', session.cdpUrl || '(EMPTY)');
   const success = await injectJS(session.cdpUrl, payload);
-  console.log(`[defender] ${disruption.name} → ${success ? 'HIT' : 'MISS'} (${disruption.healthDamage} HP)`);
+  console.log('[defender] injection result:', success ? 'SUCCESS' : 'FAILED');
 
   session.defenderCooldowns.set(disruption.id, Date.now());
 
