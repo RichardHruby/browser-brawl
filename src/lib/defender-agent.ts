@@ -371,8 +371,8 @@ async function runDefenderTurn(gameId: string): Promise<void> {
     payload = disruption.generatePayload();
   }
 
-  // Fire screenshots in background (fire-and-forget — only for training data, never block game loop)
-  captureAndUploadScreenshot(session.cdpUrl).catch(() => null);
+  // Start pre-injection screenshot + DOM snapshot now, then await before persistence.
+  const beforeScreenshotPromise = captureAndUploadScreenshot(session.cdpUrl).catch(() => null);
   const domSnapPromise = snapshotDOM(session.cdpUrl).catch(() => null);
 
   emitEvent<DefenderActivityPayload>(gameId, 'defender_activity', {
@@ -392,15 +392,21 @@ async function runDefenderTurn(gameId: string): Promise<void> {
     });
   }
 
-  // Collect DOM snapshot (fast, ~500ms — likely done by now)
+  // Collect artifacts for persistence.
   const domSnap = await domSnapPromise;
-  const beforeScreenshotId = null;
+  const beforeScreenshotId = await beforeScreenshotPromise;
 
-  // Fire after-screenshot in background (don't block the turn)
-  if (success) {
-    setTimeout(() => captureAndUploadScreenshot(session.cdpUrl).catch(() => null), 500);
-  }
-  const afterScreenshotId = null;
+  // Capture a post-injection screenshot (after a short delay so DOM changes render).
+  const afterScreenshotPromise = success
+    ? new Promise<string | null>((resolve) => {
+      setTimeout(() => {
+        captureAndUploadScreenshot(session.cdpUrl)
+          .then(resolve)
+          .catch(() => resolve(null));
+      }, 500);
+    })
+    : Promise.resolve<string | null>(null);
+  const afterScreenshotId = await afterScreenshotPromise;
 
   session.defenderCooldowns.set(disruption.id, session.mode === 'turnbased' ? session.turnNumber : Date.now());
 

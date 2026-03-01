@@ -107,8 +107,8 @@ IMPORTANT:
         defenderStatus: s.defenderStatus,
       });
 
-      // Fire screenshot upload in background (fire-and-forget — only for training data, never block game loop)
-      captureAndUploadScreenshot(session.cdpUrl).catch(() => null);
+      // Start screenshot + DOM capture immediately so Claude call can run in parallel.
+      const preScreenshotPromise = captureAndUploadScreenshot(session.cdpUrl).catch(() => null);
 
       // Start DOM snapshot concurrently with Claude call (fast, ~500ms)
       const domSnapPromise = snapshotDOM(session.cdpUrl).catch(() => null);
@@ -122,9 +122,11 @@ IMPORTANT:
         messages,
       }, { signal });
 
-      // Collect DOM snapshot (likely already done since Claude call takes ~3s)
-      const preScreenshotId = null;
-      const domSnap = await domSnapPromise;
+      // Collect capture artifacts after Claude responds.
+      const [preScreenshotId, domSnap] = await Promise.all([
+        preScreenshotPromise,
+        domSnapPromise,
+      ]);
 
       // Process response content
       const assistantContent = response.content;

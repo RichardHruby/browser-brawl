@@ -22,6 +22,13 @@ export interface AgentEvent {
   agentStatus: AttackerStatus;
 }
 
+export interface DefenderStep {
+  id: string;
+  message: string;
+  kind: 'thinking' | 'tool_call';
+  timestamp: string;
+}
+
 export interface DisruptionEvent {
   id: string;
   disruptionId: string;
@@ -74,4 +81,6 @@ export interface ClientGameState {
   turnNumber: number;
   attackerStepsThisTurn: number;
   attackerStepsPerTurn: number;
+  defenderSteps: DefenderStep[];
+  defenderNextAttackIn: number | null;
 }

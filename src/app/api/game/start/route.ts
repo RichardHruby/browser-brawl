@@ -7,7 +7,7 @@ import { emitEvent } from '@/lib/sse-emitter';
 import { TASKS } from '@/lib/tasks';
 import { runAttackerLoop } from '@/lib/attacker-agent';
 import { createGameRecord, recordNetworkRequest } from '@/lib/data-collector';
-import { startNetworkCapture } from '@/lib/browserbase';
+import { startNetworkCapture } from '@/lib/cdp';
 import { startScreencast } from '@/lib/screencast';
 import { runBrowserUseAttackerLoop } from '@/lib/browser-use-attacker';
 import type { AttackerType, Difficulty } from '@/types/game';

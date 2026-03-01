@@ -81,11 +81,19 @@ export async function runBrowserUseAttackerLoop(
 
       log('[browser-use attacker] step received:', JSON.stringify(step, null, 2));
 
+      // Browser-Use gives us a screenshot URL; upload it first so step records
+      // can reference Convex storage IDs directly.
+      let screenshotId: string | null = null;
+      if (step.screenshotUrl) {
+        screenshotId = await downloadAndUploadScreenshot(step.screenshotUrl).catch(() => null);
+      }
+
       // Phase 1: Emit reasoning as a "thinking" step
       const thinkingText = step.nextGoal || step.evaluationPreviousGoal || step.memory;
       if (thinkingText) {
         logger.logThinking({
           description: thinkingText.slice(0, 300),
+          screenshotId,
           domSnapshot: latestDomSnap,
         });
       }
@@ -98,14 +106,10 @@ export async function runBrowserUseAttackerLoop(
       logger.logAction({
         description: actionDesc.slice(0, 300),
         toolName: step.actions?.[0],
+        screenshotId,
         screenshotUrl: step.screenshotUrl ?? undefined,
         domSnapshot: latestDomSnap,
       });
-
-      // Fire-and-forget: download screenshot from Browser-Use URL and upload to Convex
-      if (step.screenshotUrl) {
-        downloadAndUploadScreenshot(step.screenshotUrl).catch(() => {});
-      }
       // Refresh DOM snapshot for next step
       snapshotDOM(session.cdpUrl).then(dom => { latestDomSnap = dom; }).catch(() => {});
     }

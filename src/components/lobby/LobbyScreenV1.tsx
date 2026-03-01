@@ -29,24 +29,29 @@ export function LobbyScreenV1({ onStart }: Props) {
       {/* CRT scanlines */}
       <div className="crt-overlay" style={{ position: 'fixed' }} />
 
+      {/* GitHub badge — fixed top-right corner */}
+      <a
+        href="https://github.com/RichardHruby/browser-brawl"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="fixed top-4 right-4 z-20 flex items-center gap-2 font-display text-xs font-bold tracking-widest uppercase px-3 py-1.5 transition-all duration-200 hover:scale-105"
+        style={{
+          color: 'var(--color-attacker)',
+          background: 'var(--color-bg-panel)',
+          border: '2px solid var(--color-attacker)',
+          textShadow: '0 0 8px var(--color-attacker)',
+        }}
+      >
+        <svg height="14" viewBox="0 0 16 16" width="14" fill="currentColor">
+          <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
+        </svg>
+        GitHub
+      </a>
+
       {/* Main content */}
       <div className="flex-1 flex flex-col items-center justify-start lg:justify-center px-4 sm:px-6 lg:px-8 py-8 lg:py-10">
         {/* Title */}
-        <div className="text-center mb-6 lg:mb-10 relative">
-          {/* GitHub badge — top right of title block */}
-          <a
-            href="https://github.com/RichardHruby/browser-brawl"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="absolute right-0 top-0 flex items-center gap-1.5 font-mono text-[10px] tracking-wider transition-all duration-200 hover:opacity-100"
-            style={{ color: 'var(--color-text-secondary)', opacity: 0.55 }}
-          >
-            <svg height="14" viewBox="0 0 16 16" width="14" fill="currentColor">
-              <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z" />
-            </svg>
-            ★ Star on GitHub
-          </a>
-
+        <div className="text-center mb-6 lg:mb-10">
           <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-black tracking-[0.15em] sm:tracking-[0.2em] lg:tracking-widest mb-3 relative">
             <GlitchText text="BROWSER BRAWL" className="neon-cyan" />
           </h1>
@@ -171,8 +176,8 @@ export function LobbyScreenV1({ onStart }: Props) {
         <div className="w-full max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4 sm:gap-6 px-4">
           <Link
             href="/history"
-            className="order-2 sm:order-1 font-mono text-xs tracking-wider transition-all duration-200 hover:underline"
-            style={{ color: 'var(--color-text-secondary)', opacity: 0.7 }}
+            className="order-2 sm:order-1 font-mono text-sm tracking-widest font-bold transition-all duration-200 hover:underline"
+            style={{ color: 'var(--color-attacker)' }}
           >
             [ PRIOR TRACES ]
           </Link>

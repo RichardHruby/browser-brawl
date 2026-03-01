@@ -116,66 +116,77 @@ export function ArenaSelector({ value, onChange }: Props) {
         );
       })}
 
-      {/* Custom task row */}
-      <div className="relative group">
-        <button
-          onClick={handleCustomToggle}
-          className="w-full flex items-center gap-3 py-2 px-3 transition-all duration-150 cursor-pointer text-left"
-          style={{
-            background: isCustomSelected ? `${HIGHLIGHT_COLOR}12` : 'transparent',
-            borderLeft: isCustomSelected ? `2px solid ${HIGHLIGHT_COLOR}` : '2px solid transparent',
-          }}
-        >
-          <span
-            className="font-display text-xs w-3 flex-shrink-0"
-            style={{ color: isCustomSelected ? HIGHLIGHT_COLOR : 'transparent' }}
-          >
-            ▶
-          </span>
-          <span
-            className="font-display text-[11px] font-bold tracking-wider flex-1"
+      {/* Custom task row — transforms into inline input on click */}
+      <div className="relative group h-10">
+        {showCustom ? (
+          <div
+            className="h-full w-full flex items-center gap-2 px-3"
             style={{
-              color: isCustomSelected ? HIGHLIGHT_COLOR : 'var(--color-text-primary)',
-              textShadow: isCustomSelected ? `0 0 8px ${HIGHLIGHT_COLOR}` : 'none',
+              background: `${HIGHLIGHT_COLOR}12`,
+              borderLeft: `2px solid ${HIGHLIGHT_COLOR}`,
             }}
           >
-            CUSTOM TASK...
-          </span>
-        </button>
-        {/* Tooltip */}
-        <div
-          className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block z-50 w-56 px-2 py-1.5 font-mono text-[10px] leading-relaxed text-center"
-          style={{ background: 'var(--color-bg-deep)', border: '1px solid var(--color-attacker)', color: 'var(--color-text-secondary)' }}
-        >
-          Enter any task for the attacker agent to complete on any website.
-        </div>
-      </div>
-
-      {/* Custom arena input */}
-      {showCustom && (
-        <div className="flex gap-2 px-3 py-2 ml-6">
-          <input
-            type="text"
-            value={custom}
-            onChange={e => setCustom(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleCustomSubmit()}
-            placeholder="Describe the task..."
-            className="flex-1 px-3 py-1.5 text-xs font-mono outline-none"
-            style={{
-              background: 'var(--color-bg-deep)',
-              border: `1px solid var(--color-border)`,
-              color: 'var(--color-text-primary)',
-            }}
-          />
+            <span className="font-display text-xs w-3 flex-shrink-0" style={{ color: HIGHLIGHT_COLOR }}>▶</span>
+            <input
+              type="text"
+              value={custom}
+              onChange={e => setCustom(e.target.value)}
+              onKeyDown={e => {
+                if (e.key === 'Enter') handleCustomSubmit();
+                if (e.key === 'Escape') { setShowCustom(false); setCustom(''); }
+              }}
+              placeholder="Describe the task..."
+              autoFocus
+              className="flex-1 h-7 px-2 text-[11px] font-mono outline-none"
+              style={{
+                background: 'var(--color-bg-deep)',
+                border: `1px solid ${HIGHLIGHT_COLOR}44`,
+                color: 'var(--color-text-primary)',
+              }}
+            />
+            <button
+              onClick={handleCustomSubmit}
+              className="h-7 px-2 text-[10px] font-display font-bold tracking-wider flex-shrink-0"
+              style={{ background: HIGHLIGHT_COLOR, color: '#000' }}
+            >
+              SET
+            </button>
+          </div>
+        ) : (
           <button
-            onClick={handleCustomSubmit}
-            className="px-3 py-1.5 text-[10px] font-display font-bold tracking-wider"
-            style={{ background: HIGHLIGHT_COLOR, color: '#000' }}
+            onClick={handleCustomToggle}
+            className="h-full w-full flex items-center gap-3 px-3 transition-all duration-150 cursor-pointer text-left"
+            style={{
+              background: isCustomSelected ? `${HIGHLIGHT_COLOR}12` : 'transparent',
+              borderLeft: isCustomSelected ? `2px solid ${HIGHLIGHT_COLOR}` : '2px solid transparent',
+            }}
           >
-            SET
+            <span
+              className="font-display text-xs w-3 flex-shrink-0"
+              style={{ color: isCustomSelected ? HIGHLIGHT_COLOR : 'transparent' }}
+            >
+              ▶
+            </span>
+            <span
+              className="font-display text-[11px] font-bold tracking-wider flex-1 truncate"
+              style={{
+                color: isCustomSelected ? HIGHLIGHT_COLOR : 'var(--color-text-primary)',
+                textShadow: isCustomSelected ? `0 0 8px ${HIGHLIGHT_COLOR}` : 'none',
+              }}
+            >
+              {isCustomSelected ? `CUSTOM: ${value?.description}` : 'CUSTOM TASK...'}
+            </span>
           </button>
-        </div>
-      )}
+        )}
+        {!showCustom && (
+          <div
+            className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1 hidden group-hover:block z-50 w-56 px-2 py-1.5 font-mono text-[10px] leading-relaxed text-center"
+            style={{ background: 'var(--color-bg-deep)', border: '1px solid var(--color-attacker)', color: 'var(--color-text-secondary)' }}
+          >
+            Enter any task for the attacker agent to complete on any website.
+          </div>
+        )}
+      </div>
     </div>
   );
 }

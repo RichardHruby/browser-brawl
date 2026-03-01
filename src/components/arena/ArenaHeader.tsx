@@ -24,9 +24,6 @@ interface Props {
 export function ArenaHeader({ health, elapsed, task, attackerStatus, defenderStatus, onAbort, mode, currentTurn, turnNumber, attackerStepsThisTurn, attackerStepsPerTurn, difficulty, attackerType }: Props) {
   const diffColor = DIFFICULTY_COLORS[difficulty];
   const attackerTypeColor = ATTACKER_TYPE_COLORS[attackerType];
-  const attackerState = attackerStatus.replace(/_/g, ' ');
-  const defenderState = defenderStatus.replace(/_/g, ' ');
-
   return (
     <div className="flex flex-col gap-1 shrink-0 px-4 py-2"
       style={{ borderBottom: '2px solid var(--color-border)', background: 'var(--color-bg-panel)' }}>
@@ -34,16 +31,12 @@ export function ArenaHeader({ health, elapsed, task, attackerStatus, defenderSta
       {/* Top row: labels + timer + abort */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <span className="font-display text-xs font-bold tracking-widest" style={{ color: attackerTypeColor, textShadow: `0 0 8px ${attackerTypeColor}` }}>
+          <span className="font-display text-xs font-bold tracking-widest neon-cyan">
             ⚔ ATTACKER
           </span>
           <span className="text-[10px] font-mono px-1.5 py-0.5 border"
             style={{ color: attackerTypeColor, background: `${attackerTypeColor}1f`, borderColor: `${attackerTypeColor}88` }}>
             {ATTACKER_TYPE_LABELS[attackerType]}
-          </span>
-          <span className="text-[10px] font-mono px-1.5 py-0.5 border uppercase"
-            style={{ color: 'var(--color-text-secondary)', borderColor: 'var(--color-border)' }}>
-            {attackerState}
           </span>
         </div>
 
@@ -71,16 +64,12 @@ export function ArenaHeader({ health, elapsed, task, attackerStatus, defenderSta
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="text-[10px] font-mono px-1.5 py-0.5 border uppercase"
-            style={{ color: diffColor, background: `${diffColor}18`, borderColor: `${diffColor}66` }}>
-            {difficulty}
-          </span>
           <span className="font-display text-xs font-bold tracking-widest neon-red">
             DEFENDER 🛡
           </span>
           <span className="text-[10px] font-mono px-1.5 py-0.5 border uppercase"
-            style={{ color: 'var(--color-text-secondary)', borderColor: 'var(--color-border)' }}>
-            {defenderState}
+            style={{ color: diffColor, background: `${diffColor}18`, borderColor: `${diffColor}66` }}>
+            {difficulty}
           </span>
         </div>
       </div>
