@@ -282,13 +282,80 @@ gpt     → Final "TASK COMPLETE" message
 
 **Tests:** `scripts/__tests__/convert-to-sharegpt.test.ts` — 16 tests covering tool def conversion, system prompt generation, assistant message formatting, tool response formatting, role mapping, metadata population, and quality filters.
 
+### Post-Processing — `scripts/prepare_training_data.py`
+
+Converts ShareGPT JSONL → OpenAI Messages JSONL required by Unsloth `FastVisionModel`:
+- Maps roles: `system`→`system`, `human`→`user`, `gpt`→`assistant`, `tool`→`tool`
+- Wraps string values in typed content arrays: `[{"type": "text", "text": "..."}]`
+- Downloads screenshots from Convex URLs → `data/images/{gameId}/{step}.png`
+- Attaches images to tool response messages as `{"type": "image", "image": "file:///abs/path.png"}`
+- Usage: `python scripts/prepare_training_data.py -i data/sharegpt.jsonl -o data/openai_messages.jsonl [--download-images --raw-jsonl data/raw.jsonl]`
+
+**Critical:** Both Unsloth `FastVisionModel` and Axolotl multimodal require OpenAI Messages format — NOT ShareGPT `from`/`value` format. The ShareGPT converter output is intermediate only.
+
+### Fine-Tuning — `scripts/modal_finetune.py`
+
+Runs QLoRA fine-tuning on Modal A10G (24GB VRAM). Two modes:
+- **Text-only** (`--text-only`): `Qwen2.5-3B-Instruct` + `FastLanguageModel` — fastest validation path
+- **Multimodal** (default): `Qwen2.5-VL-3B-Instruct` + `FastVisionModel` — screenshots + DOM text
+
+After training, automatically merges LoRA weights into base model (`merged_model/`) — required for vLLM serving.
+
+Required training flags for VLM: `remove_unused_columns=False`, `dataset_text_field=""`, `dataset_kwargs={"skip_prepare_dataset": True}`
+
+Modal volumes: `browser-brawl-training-data`, `browser-brawl-model-cache`, `browser-brawl-checkpoints`
+
+Usage:
+```bash
+# Upload data (run locally first — MSYS_NO_PATHCONV=1 on Windows Git Bash)
+MSYS_NO_PATHCONV=1 modal volume put browser-brawl-training-data data/openai_messages.jsonl /train.jsonl
+
+# Train
+modal run scripts/modal_finetune.py --text-only
+modal run --detach scripts/modal_finetune.py --text-only   # background
+```
+
+### Serving — `scripts/modal_serve.py`
+
+Serves merged model via vLLM on Modal A10G with an OpenAI-compatible POST `/chat` endpoint.
+
+```bash
+modal deploy scripts/modal_serve.py --name <experiment-name>
+# Returns URL → set as FINETUNED_MODEL_URL in .env.local
+```
+
+### Fine-Tuned Attacker — `src/lib/attacker-finetuned.ts`
+
+Drop-in replacement for `attacker-playwright.ts` that calls `FINETUNED_MODEL_URL` instead of Claude:
+- Same Playwright MCP browser tools
+- Parses `<tool_call>` XML responses (matching training data format from `convert-to-sharegpt.ts`)
+- Formats tool results as `<tool_response>` XML
+- Activated via `attackerType: 'finetuned'` in game start payload
+
+### Eval — `scripts/eval_browser_brawl.py`
+
+Runs N games via Browser Brawl API comparing fine-tuned Qwen vs Claude Sonnet baseline. Defender disabled by default (`noDefender=true`) to isolate model capability from health-drain noise.
+
+Metrics: task success rate, avg steps to completion, avg time to completion, format compliance (finetuned only).
+
+```bash
+python scripts/eval_browser_brawl.py --games 5 --task hacker-news-upvote
+python scripts/eval_browser_brawl.py --finetuned-only   # skip baseline
+```
+
+The `noDefender=true` flag is also accepted by `/api/game/start` directly.
+
 ### Pipeline Phases
 
-1. **Data extraction + conversion** — `scripts/extract-training-data.ts` + `scripts/convert-to-sharegpt.ts` (done, verified end-to-end)
-2. **Data farming** — Headless game runner to generate 500+ successful trajectories
-3. **Fine-tuning** — Axolotl + Unsloth on Modal A100, QLoRA on Qwen2.5-VL-3B-Instruct
-4. **Evaluation** — In-distribution (Browser Brawl held-out set) + out-of-distribution (MiniWob++)
-5. **Adversarial specialization** — DPO with successful vs failed trajectories, disruption-annotated data
+1. **Data extraction** — `scripts/extract-training-data.ts` ✅
+2. **ShareGPT conversion** — `scripts/convert-to-sharegpt.ts` ✅
+3. **OpenAI Messages post-processing** — `scripts/prepare_training_data.py` ✅
+4. **Fine-tuning on Modal** — `scripts/modal_finetune.py` ✅ (verified: model loads, trains, merges)
+5. **Model serving** — `scripts/modal_serve.py` ✅ (built, not yet deployed with real data)
+6. **Fine-tuned attacker** — `src/lib/attacker-finetuned.ts` ✅
+7. **Eval harness** — `scripts/eval_browser_brawl.py` ✅ (built, not yet run end-to-end)
+8. **Data farming** — Need ~50-150 successful attacker games before meaningful results
+9. **Adversarial specialization** — DPO with successful vs failed trajectories (post-PoC)
 
 ## Current Status
 
@@ -301,9 +368,11 @@ The game is fully playable end-to-end:
 - Full training data pipeline: Laminar traces LLM calls, Convex stores structured game data, full Claude conversations, screenshots, DOM snapshots, network requests, and screencast recordings
 - Full conversation persistence to Convex `conversations` table — complete messages array with reasoning, tool calls, and untruncated tool results persisted after each Claude turn
 - History/replay UI with session list, filters, step-by-step replay, video playback, and CSV export
+- Full fine-tuning pipeline built and smoke-tested: extract → convert → post-process → Modal train (verified working on 1 example) → serve → fine-tuned attacker → eval harness
 
 ### Known Issues
 - Attacker can still complete tasks on easy/medium difficulty before health runs out
+- Fine-tuning pipeline not yet run end-to-end with real data volume (need 50-150 games)
 
 ## Future Directions
 
