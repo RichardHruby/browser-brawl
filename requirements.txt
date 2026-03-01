@@ -1,0 +1,20 @@
+# Training pipeline Python dependencies
+# Setup: python -m venv .venv && .venv/Scripts/pip install -r requirements.txt (Windows)
+#         python -m venv .venv && .venv/bin/pip install -r requirements.txt   (Mac/Linux)
+
+# Data preparation
+requests>=2.32.0
+Pillow>=10.0.0
+
+# Training (install separately on GPU machine or Colab — large packages)
+# unsloth[cu128-torch270]>=2025.7.8
+# unsloth_zoo>=2025.7.10
+# trl>=0.19.1
+# transformers>=4.54.0
+# peft>=0.16.0
+# datasets>=3.6.0
+# accelerate>=1.9.0
+# qwen-vl-utils[decord]>=0.0.8
+
+# Modal (for running training jobs)
+# modal>=0.73.0
