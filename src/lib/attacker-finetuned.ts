@@ -194,7 +194,7 @@ export async function runAttackerLoop(gameId: string, signal: AbortSignal): Prom
   const npxCommand = process.platform === 'win32' ? 'npx.cmd' : 'npx';
   const transport = new StdioClientTransport({
     command: npxCommand,
-    args: ['@playwright/mcp@latest', '--cdp-endpoint', session.cdpUrl],
+    args: ['@playwright/mcp', '--cdp-endpoint', session.cdpUrl],
   });
 
   const mcpClient = new Client({ name: 'browser-brawl-finetuned', version: '1.0.0' });

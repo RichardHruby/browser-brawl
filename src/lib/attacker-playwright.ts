@@ -30,7 +30,7 @@ export async function runAttackerLoop(gameId: string, signal: AbortSignal): Prom
   const transport = new StdioClientTransport({
     command: npxCommand,
     args: [
-      '@playwright/mcp@latest',
+      '@playwright/mcp',
       '--cdp-endpoint', session.cdpUrl,
     ],
   });
