@@ -18,7 +18,7 @@ function ScreenshotViewer({ storageId }: { storageId: Id<'_storage'> | undefined
       src={url}
       alt="Screenshot"
       className="w-full rounded"
-      style={{ border: '1px solid var(--color-border)' }}
+      style={{ border: '2px solid var(--color-border)' }}
     />
   );
 }
@@ -88,7 +88,7 @@ function ScreencastPlayer({ storageId }: { storageId: Id<'_storage'> }) {
 
   return (
     <div className="space-y-3">
-      <div className="rounded overflow-hidden" style={{ border: '1px solid var(--color-border)' }}>
+      <div className="rounded overflow-hidden" style={{ border: '2px solid var(--color-border)' }}>
         {frame && (
           <img
             src={`data:image/jpeg;base64,${frame.d}`}
@@ -103,21 +103,21 @@ function ScreencastPlayer({ storageId }: { storageId: Id<'_storage'> }) {
         <button
           onClick={() => setPlaying(!playing)}
           className="font-display text-xs font-bold tracking-widest uppercase px-3 py-1.5 rounded transition-all duration-200 hover:scale-105"
-          style={{ background: 'var(--color-bg-card)', color: 'var(--color-attacker)', border: '1px solid var(--color-attacker)' }}
+          style={{ background: 'var(--color-bg-card)', color: 'var(--color-attacker)', border: '2px solid var(--color-attacker)' }}
         >
           {playing ? 'Pause' : 'Play'}
         </button>
         <button
           onClick={() => { setFrameIndex(Math.max(0, frameIndex - 1)); setPlaying(false); }}
           className="font-mono text-xs px-2 py-1.5 rounded transition-colors"
-          style={{ background: 'var(--color-bg-card)', color: 'var(--color-text-primary)', border: '1px solid var(--color-border)' }}
+          style={{ background: 'var(--color-bg-card)', color: 'var(--color-text-primary)', border: '2px solid var(--color-border)' }}
         >
           Prev
         </button>
         <button
           onClick={() => { setFrameIndex(Math.min(recording.frames.length - 1, frameIndex + 1)); setPlaying(false); }}
           className="font-mono text-xs px-2 py-1.5 rounded transition-colors"
-          style={{ background: 'var(--color-bg-card)', color: 'var(--color-text-primary)', border: '1px solid var(--color-border)' }}
+          style={{ background: 'var(--color-bg-card)', color: 'var(--color-text-primary)', border: '2px solid var(--color-border)' }}
         >
           Next
         </button>
@@ -131,7 +131,7 @@ function ScreencastPlayer({ storageId }: { storageId: Id<'_storage'> }) {
             style={{
               background: speed === s ? 'var(--color-attacker)' : 'var(--color-bg-card)',
               color: speed === s ? '#000' : 'var(--color-text-secondary)',
-              border: '1px solid var(--color-border)',
+              border: '2px solid var(--color-border)',
             }}
           >
             {s}x
@@ -176,10 +176,10 @@ export default function ReplayPage({ params }: { params: Promise<{ gameId: strin
 
   if (session === null) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4" style={{ background: 'var(--color-bg-deep)' }}>
+      <div className="boxy-ui min-h-screen flex flex-col items-center justify-center gap-6 px-6" style={{ background: 'var(--color-bg-deep)' }}>
         <span className="font-mono text-lg" style={{ color: 'var(--color-text-secondary)' }}>Session not found</span>
         <Link href="/history" className="font-display text-xs font-bold tracking-widest uppercase px-4 py-2 rounded transition-all duration-200 hover:scale-105 neon-cyan"
-          style={{ background: 'var(--color-bg-card)', border: '1px solid var(--color-border)' }}>
+          style={{ background: 'var(--color-bg-card)', border: '2px solid var(--color-border)' }}>
           Back to History
         </Link>
       </div>
@@ -191,14 +191,14 @@ export default function ReplayPage({ params }: { params: Promise<{ gameId: strin
   const selectedActionData = selectedAction != null ? actions?.find(a => a.actionNumber === selectedAction) : null;
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: 'var(--color-bg-deep)' }}>
+    <div className="boxy-ui min-h-screen flex flex-col" style={{ background: 'var(--color-bg-deep)' }}>
       {/* Header — matches arena header style */}
-      <div className="px-4 py-3 flex items-center justify-between shrink-0"
-        style={{ borderBottom: '1px solid var(--color-border)', background: 'var(--color-bg-panel)' }}>
-        <div className="flex items-center gap-4">
+      <div className="px-4 py-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between shrink-0 sticky top-0 z-30"
+        style={{ borderBottom: '2px solid var(--color-border)', background: 'var(--color-bg-panel)' }}>
+        <div className="flex items-center gap-4 flex-wrap">
           <Link href="/history"
             className="font-display text-xs font-bold tracking-widest uppercase px-3 py-1.5 rounded transition-all duration-200 hover:scale-105"
-            style={{ background: 'var(--color-bg-card)', color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}>
+            style={{ background: 'var(--color-bg-card)', color: 'var(--color-text-secondary)', border: '2px solid var(--color-border)' }}>
             &larr; HISTORY
           </Link>
           <h1 className="font-display text-lg font-black tracking-wider neon-cyan">
@@ -206,7 +206,7 @@ export default function ReplayPage({ params }: { params: Promise<{ gameId: strin
           </h1>
         </div>
 
-        <div className="flex items-center gap-3 font-mono text-xs" style={{ color: 'var(--color-text-secondary)' }}>
+        <div className="flex items-center gap-3 flex-wrap font-mono text-xs" style={{ color: 'var(--color-text-secondary)' }}>
           <span>{session.mode}</span>
           <span className="px-1.5 py-0.5 rounded uppercase text-[10px]"
             style={{ color: diffColor, background: `${diffColor}18` }}>
@@ -220,18 +220,18 @@ export default function ReplayPage({ params }: { params: Promise<{ gameId: strin
             </span>
           )}
           <span>{formatWinReason(session.winReason)}</span>
-          {session.durationSeconds && <span>{formatDuration(session.durationSeconds)}</span>}
+          {session.durationSeconds != null && <span>{formatDuration(session.durationSeconds)}</span>}
         </div>
       </div>
 
       {/* Health bar */}
-      {healthTimeline && healthTimeline.length > 0 && (
-        <div className="px-4 py-2 shrink-0" style={{ borderBottom: '1px solid var(--color-border)', background: 'var(--color-bg-panel)' }}>
-          <div className="flex items-center gap-3">
-            <span className="font-mono text-xs" style={{ color: 'var(--color-text-secondary)' }}>HP</span>
-            <HealthBar health={session.healthFinal ?? 100} variant="static" />
-          </div>
-          {/* Health timeline markers */}
+      <div className="px-4 py-2 shrink-0" style={{ borderBottom: '2px solid var(--color-border)', background: 'var(--color-bg-panel)' }}>
+        <div className="flex items-center gap-3">
+          <span className="font-mono text-xs" style={{ color: 'var(--color-text-secondary)' }}>HP</span>
+          <HealthBar health={session.healthFinal ?? 100} variant="static" />
+        </div>
+        {/* Health timeline markers */}
+        {healthTimeline && healthTimeline.length > 0 && (
           <div className="flex gap-2 mt-1.5 flex-wrap">
             {healthTimeline.map((h, i) => (
               <span key={i} className="font-mono text-[10px] px-1.5 py-0.5 rounded" style={{
@@ -242,18 +242,18 @@ export default function ReplayPage({ params }: { params: Promise<{ gameId: strin
               </span>
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {/* Three-column layout */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left: Attacker Steps */}
         <div className="w-80 flex-shrink-0 overflow-y-auto feed-scroll"
-          style={{ borderRight: '1px solid var(--color-border)', background: 'var(--color-bg-panel)' }}>
+          style={{ borderRight: '2px solid var(--color-border)', background: 'var(--color-bg-panel)' }}>
           <div className="px-4 py-3 font-display text-xs font-bold tracking-widest sticky top-0 shrink-0"
             style={{
               background: 'var(--color-bg-panel)',
-              borderBottom: '1px solid var(--color-attacker-border)',
+              borderBottom: '2px solid var(--color-attacker-border)',
             }}>
             <span className="neon-cyan">⚔ ATTACKER STEPS</span>
             <span className="font-mono text-[10px] ml-2" style={{ color: 'var(--color-text-secondary)' }}>
@@ -343,7 +343,7 @@ export default function ReplayPage({ params }: { params: Promise<{ gameId: strin
                   </h3>
                   <div className="max-h-64 overflow-y-auto feed-scroll rounded" style={{
                     background: 'var(--color-bg-card)',
-                    border: '1px solid var(--color-border)',
+                    border: '2px solid var(--color-border)',
                   }}>
                     {(JSON.parse(selectedStepData.domSnapshot) as Array<{ tag: string; text: string; id?: string; pos: { x: number; y: number; w: number; h: number } }>).map((el, i) => (
                       <div key={i} className="px-3 py-1.5 font-mono text-[11px] flex gap-3" style={{ borderBottom: '1px solid var(--color-border)' }}>
@@ -386,7 +386,7 @@ export default function ReplayPage({ params }: { params: Promise<{ gameId: strin
                 <p className="font-game text-sm p-3 rounded" style={{
                   background: 'var(--color-bg-card)',
                   color: 'var(--color-text-primary)',
-                  border: '1px solid var(--color-border)',
+                  border: '2px solid var(--color-border)',
                 }}>
                   {selectedActionData.reasoning}
                 </p>
@@ -446,11 +446,11 @@ export default function ReplayPage({ params }: { params: Promise<{ gameId: strin
 
         {/* Right: Defender Actions */}
         <div className="w-80 flex-shrink-0 overflow-y-auto feed-scroll"
-          style={{ borderLeft: '1px solid var(--color-border)', background: 'var(--color-bg-panel)' }}>
+          style={{ borderLeft: '2px solid var(--color-border)', background: 'var(--color-bg-panel)' }}>
           <div className="px-4 py-3 font-display text-xs font-bold tracking-widest sticky top-0 shrink-0"
             style={{
               background: 'var(--color-bg-panel)',
-              borderBottom: '1px solid var(--color-defender-border)',
+              borderBottom: '2px solid var(--color-defender-border)',
             }}>
             <span className="neon-red">DEFENDER ACTIONS 🛡</span>
             <span className="font-mono text-[10px] ml-2" style={{ color: 'var(--color-text-secondary)' }}>
