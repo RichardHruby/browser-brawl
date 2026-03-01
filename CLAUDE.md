@@ -317,12 +317,18 @@ modal run --detach scripts/modal_finetune.py --text-only   # background
 
 ### Serving — `scripts/modal_serve.py`
 
-Serves merged model via vLLM on Modal A10G with an OpenAI-compatible POST `/chat` endpoint.
+Serves merged model via vLLM on Modal A10G with an OpenAI-compatible POST `/chat` endpoint. Context length set to 32K (Qwen2.5 native) — the system prompt with all 22 Playwright MCP tool definitions is ~9K tokens.
 
 ```bash
 modal deploy scripts/modal_serve.py --name <experiment-name>
 # Returns URL → set as FINETUNED_MODEL_URL in .env.local
+# IMPORTANT: must include ?experiment_name=<name> query param (modal.parameter is NOT set by --name)
+# FINETUNED_MODEL_URL=https://mehulkalia--<name>-model-chat.modal.run?experiment_name=<name>
 ```
+
+### Merge (one-off) — `scripts/modal_merge.py`
+
+Merges LoRA adapter into base model for checkpoints that were trained before the auto-merge step was added. Pins `trl==0.19.1` to match `unsloth_zoo` requirements.
 
 ### Fine-Tuned Attacker — `src/lib/attacker-finetuned.ts`
 
@@ -339,11 +345,16 @@ Runs N games via Browser Brawl API comparing fine-tuned Qwen vs Claude Sonnet ba
 Metrics: task success rate, avg steps to completion, avg time to completion, format compliance (finetuned only).
 
 ```bash
-python scripts/eval_browser_brawl.py --games 5 --task hacker-news-upvote
-python scripts/eval_browser_brawl.py --finetuned-only   # skip baseline
+python scripts/eval_browser_brawl.py --games 5 --task hackernews-upvote
+python scripts/eval_browser_brawl.py --finetuned-only --game-timeout 600   # skip baseline, longer timeout for cold starts
 ```
 
 The `noDefender=true` flag is also accepted by `/api/game/start` directly.
+
+**Smoke test results** (2026-03-01, experiment `text-20260228-2221`, 1 training example):
+- 2/2 games won (hackernews-upvote, easy, no defender)
+- 7 steps per game, 18s warm / 3m22s cold
+- 100% format compliance (`<tool_call>` XML parsed correctly)
 
 ### Pipeline Phases
 
@@ -351,11 +362,12 @@ The `noDefender=true` flag is also accepted by `/api/game/start` directly.
 2. **ShareGPT conversion** — `scripts/convert-to-sharegpt.ts` ✅
 3. **OpenAI Messages post-processing** — `scripts/prepare_training_data.py` ✅
 4. **Fine-tuning on Modal** — `scripts/modal_finetune.py` ✅ (verified: model loads, trains, merges)
-5. **Model serving** — `scripts/modal_serve.py` ✅ (built, not yet deployed with real data)
-6. **Fine-tuned attacker** — `src/lib/attacker-finetuned.ts` ✅
-7. **Eval harness** — `scripts/eval_browser_brawl.py` ✅ (built, not yet run end-to-end)
-8. **Data farming** — Need ~50-150 successful attacker games before meaningful results
-9. **Adversarial specialization** — DPO with successful vs failed trajectories (post-PoC)
+5. **Model serving** — `scripts/modal_serve.py` ✅ (deployed, vLLM on A10G, 32K context)
+6. **LoRA merge** — `scripts/modal_merge.py` ✅ (one-off for pre-merge checkpoints)
+7. **Fine-tuned attacker** — `src/lib/attacker-finetuned.ts` ✅
+8. **Eval harness** — `scripts/eval_browser_brawl.py` ✅ (smoke test passed: 2/2 wins on hackernews-upvote)
+9. **Data farming** — Need ~50-150 successful attacker games before meaningful results
+10. **Adversarial specialization** — DPO with successful vs failed trajectories (post-PoC)
 
 ## Current Status
 
@@ -368,11 +380,12 @@ The game is fully playable end-to-end:
 - Full training data pipeline: Laminar traces LLM calls, Convex stores structured game data, full Claude conversations, screenshots, DOM snapshots, network requests, and screencast recordings
 - Full conversation persistence to Convex `conversations` table — complete messages array with reasoning, tool calls, and untruncated tool results persisted after each Claude turn
 - History/replay UI with session list, filters, step-by-step replay, video playback, and CSV export
-- Full fine-tuning pipeline built and smoke-tested: extract → convert → post-process → Modal train (verified working on 1 example) → serve → fine-tuned attacker → eval harness
+- Full fine-tuning pipeline built, deployed, and smoke-tested end-to-end: extract → convert → post-process → Modal train → merge → vLLM serve → fine-tuned attacker → eval (2/2 wins with 1 training example)
 
 ### Known Issues
 - Attacker can still complete tasks on easy/medium difficulty before health runs out
-- Fine-tuning pipeline not yet run end-to-end with real data volume (need 50-150 games)
+- Fine-tuning pipeline verified with 1 training example only — need 50-150 games for meaningful eval
+- Modal cold start takes ~2 min for vLLM model loading; warm up endpoint before running eval
 
 ## Future Directions
 

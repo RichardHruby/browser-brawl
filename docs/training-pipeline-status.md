@@ -17,14 +17,16 @@ Verified end-to-end on game `dCM7YB1y8s` (Hacker News upvote, 9 messages, 3 scre
 | Script | What it does | Status |
 |--------|-------------|--------|
 | `scripts/modal_finetune.py` | QLoRA fine-tune on Modal A10G — text-only and VLM modes | Done, smoke-tested |
-| `scripts/modal_serve.py` | vLLM serving endpoint on Modal, OpenAI-compatible POST /chat | Done, not yet deployed |
+| `scripts/modal_serve.py` | vLLM serving endpoint on Modal, OpenAI-compatible POST /chat | Done, deployed |
+| `scripts/modal_merge.py` | One-off LoRA → merged model conversion | Done, verified |
 
-**Smoke test result** (experiment `text-20260228-2221`, 1 training example):
+**Training result** (experiment `text-20260228-2221`, 1 training example):
 - Model: `Qwen2.5-3B-Instruct` on A10G (22GB VRAM)
 - Unsloth patched 36 QKV/O/MLP layers, 29.9M trainable params (0.96%)
 - 3 epochs, 3 steps, 17 seconds total
 - Loss: 1.15 → 1.04
-- **Caveat:** this was run before the merge step was added. Checkpoint has `final_model/` (LoRA adapter) but not `merged_model/`. Need to re-run to get a deployable model.
+- LoRA merged into base weights via `modal_merge.py` → `merged_model/` (~6GB bfloat16)
+- Deployed via vLLM on Modal A10G, 32K context, OpenAI-compatible endpoint
 
 ### Phase 3: Inference + Eval ✅
 
@@ -58,7 +60,13 @@ The clearest eval of model capability is: run Qwen + Playwright MCP on real task
 Offline next-action prediction (give model a truncated conversation, check if it picks the right next tool) is a cheaper diagnostic but the live eval IS the right primary metric.
 
 ### Merge before serving
-vLLM doesn't support LoRA + VLM simultaneously. `save_pretrained_merged()` bakes `W + B·A` permanently into the base weights (bfloat16, ~6GB). The `modal_finetune.py` now does this automatically after training.
+vLLM doesn't support LoRA + VLM simultaneously. `save_pretrained_merged()` bakes `W + B·A` permanently into the base weights (bfloat16, ~6GB). The `modal_finetune.py` now does this automatically after training. For the initial checkpoint (which was trained before merge was added), `scripts/modal_merge.py` does a one-off merge.
+
+### Modal `modal.parameter` gotcha
+`modal deploy --name X` sets the **app deployment name**, NOT any `modal.parameter` fields. Parameters must be passed as URL query params: `?experiment_name=text-20260228-2221`. The `FINETUNED_MODEL_URL` in `.env.local` must include this query param.
+
+### vLLM context length
+`max_model_len` must be large enough to fit the system prompt with all 22 Playwright MCP tool definitions (~9K tokens as JSON). Set to 32768 (Qwen2.5's native context). The initial 4096 caused `ValueError: decoder prompt longer than max_model_len`.
 
 ### Data volume
 50-150 successful trajectories is enough for a PoC. Don't gate eval on 500+. Current state: 1 game (smoke test only). MiniWob++ and DPO are post-PoC.
@@ -70,37 +78,29 @@ vLLM doesn't support LoRA + VLM simultaneously. `save_pretrained_merged()` bakes
 
 ---
 
+## Smoke Test Results ✅
+
+**End-to-end pipeline verified** (2026-03-01). Qwen2.5-3B fine-tuned on 1 training example:
+
+| Run | Task | Steps | Time | Result |
+|-----|------|-------|------|--------|
+| 1 | hackernews-upvote | 7 | 3m22s | Win (cold start included) |
+| 2 | hackernews-upvote | 7 | 18s | Win (warm endpoint) |
+
+- Format compliance: 100% (all `<tool_call>` XML parsed correctly)
+- No defender (clean eval)
+
+---
+
 ## What's Remaining
 
-### Immediate (run the pipeline end-to-end as smoke test)
+### Next steps
 
-1. **Re-run training** — adds the merge step that was missing from `text-20260228-2221`:
-   ```bash
-   MSYS_NO_PATHCONV=1 .venv/Scripts/modal run --detach scripts/modal_finetune.py --text-only
-   ```
+1. **Farm data** — play ~50 Browser Brawl games (attacker wins). Extract + convert + post-process.
 
-2. **Deploy serve endpoint**:
-   ```bash
-   modal deploy scripts/modal_serve.py --name <new-experiment-name>
-   ```
+2. **Re-train** with full dataset, deploy new model, re-run eval with `--games 10`.
 
-3. **Set env var** in `.env.local`:
-   ```
-   FINETUNED_MODEL_URL=https://mehulkalia--browser-brawl-serve-model-chat.modal.run
-   ```
-
-4. **Run eval** (1 game each, just to verify plumbing works):
-   ```bash
-   python scripts/eval_browser_brawl.py --games 1 --finetuned-only
-   ```
-
-### After smoke test passes
-
-5. **Farm data** — play ~50 Browser Brawl games (attacker wins). Extract + convert + post-process.
-
-6. **Re-train** with full dataset, deploy new model, re-run eval with `--games 10`.
-
-7. **Compare** Qwen vs Claude baseline — success rate, steps, time.
+3. **Compare** Qwen vs Claude baseline — success rate, steps, time.
 
 ### Post-PoC (deferred)
 
@@ -124,16 +124,23 @@ npx tsx scripts/convert-to-sharegpt.ts -i data/raw.jsonl -o data/sharegpt.jsonl
 # 3. Post-process to OpenAI Messages
 python scripts/prepare_training_data.py -i data/sharegpt.jsonl -o data/openai_messages.jsonl
 
-# 4. Upload to Modal volume
-MSYS_NO_PATHCONV=1 .venv/Scripts/modal volume put browser-brawl-training-data data/openai_messages.jsonl /train.jsonl --force
+# 4. Upload to Modal volume (note: upload to volume root /, not /data/)
+MSYS_NO_PATHCONV=1 PYTHONIOENCODING=utf-8 .venv/Scripts/modal volume put browser-brawl-training-data data/openai_messages.jsonl /train.jsonl --force
 
 # 5. Train (text-only, ~5 min on 1 example, ~1-2hr on 100 examples)
-MSYS_NO_PATHCONV=1 .venv/Scripts/modal run --detach scripts/modal_finetune.py --text-only
+#    Includes automatic LoRA merge after training
+MSYS_NO_PATHCONV=1 PYTHONIOENCODING=utf-8 .venv/Scripts/modal run --detach scripts/modal_finetune.py --text-only
 
 # 6. Deploy serving endpoint
-modal deploy scripts/modal_serve.py --name <experiment-name>
-# Copy the URL → add to .env.local as FINETUNED_MODEL_URL=...
+#    --name sets deployment name AND becomes part of the URL
+PYTHONIOENCODING=utf-8 .venv/Scripts/modal deploy scripts/modal_serve.py --name <experiment-name>
 
-# 7. Eval (defender off, 5 games each)
-python scripts/eval_browser_brawl.py --games 5 --task hacker-news-upvote
+# 7. Set env var in .env.local (MUST include ?experiment_name= query param)
+#    FINETUNED_MODEL_URL=https://mehulkalia--<experiment-name>-model-chat.modal.run?experiment_name=<experiment-name>
+
+# 8. Warm up the endpoint (cold start takes ~2 min for model loading)
+curl -sL "https://mehulkalia--<experiment-name>-model-health.modal.run?experiment_name=<experiment-name>"
+
+# 9. Eval (defender off, 5 games each)
+python scripts/eval_browser_brawl.py --games 5 --task hackernews-upvote --game-timeout 600
 ```

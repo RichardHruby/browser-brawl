@@ -77,7 +77,7 @@ class Model:
 
         engine_args = AsyncEngineArgs(
             model=model_path,
-            max_model_len=4096,
+            max_model_len=32768,
             gpu_memory_utilization=0.90,
             dtype="bfloat16",
         )
