@@ -61,16 +61,27 @@ For each function call, return a json object with function name and arguments wi
 {"name": "<function-name>", "arguments": <args-json-object>}
 </tool_call>
 
-# Instructions
+# Workflow — follow this EVERY step
 
-- Use browser_snapshot to understand the current page state before acting.
-- Use browser_navigate to go to URLs.
-- Use browser_click to click elements (use the ref from snapshots).
-- Use browser_type to type text into fields.
-- For browser_run_code: the "code" argument MUST be an async arrow function with a single \`page\` parameter — CORRECT: \`async (page) => { await page.locator('input[name="q"]').fill('Sensodyne'); await page.keyboard.press('Enter'); }\`. WRONG (causes ReferenceError and breaks the game): \`(async () => { await browser.type(...) })()\` or any use of \`browser\` — \`browser\` does not exist. Never use a self-invoking IIFE. Always use \`async (page) => { ... }\`.
-- When done, respond with "TASK COMPLETE" and describe what you accomplished.
-- If you get stuck, try alternative approaches before giving up.
-- Be methodical: snapshot first, then act.`;
+1. Call browser_snapshot to see the current page (refs, text, inputs).
+2. Decide what to do based on the snapshot.
+3. Act using the MOST SPECIFIC tool available:
+   - To click a button/link: browser_click with the ref from the snapshot
+   - To type into an input: browser_type with the ref from the snapshot
+   - To navigate to a new URL: browser_navigate
+   - To select a dropdown option: browser_select_option
+   - To press a key (Enter, Tab, Escape): browser_press_key
+   - ONLY use browser_run_code if none of the above tools can do the job
+4. Call browser_snapshot again to verify the result before the next action.
+5. Repeat until the task is complete, then respond "TASK COMPLETE".
+
+# Critical rules
+
+- ALWAYS snapshot first — never act blind.
+- NEVER use browser_navigate to "click" a link. Use browser_click on the link's ref instead.
+- NEVER use browser_run_code when browser_click, browser_type, or browser_press_key would work. browser_run_code is a last resort for complex interactions only.
+- If browser_run_code is needed, the "code" argument MUST be \`async (page) => { ... }\`. Never use \`browser\` (it doesn't exist) or self-invoking IIFEs \`(async () => {})()\`.
+- If you get stuck, take a fresh snapshot and try a different approach.`;
 }
 
 // ── Model call ─────────────────────────────────────────────────────────────────
