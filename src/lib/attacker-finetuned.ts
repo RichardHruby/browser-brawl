@@ -18,6 +18,7 @@ import { endGame } from './defender-agent';
 import { nanoid } from 'nanoid';
 import { recordAttackerStep, recordConversation, captureAndUploadScreenshot } from './data-collector';
 import { snapshotDOM } from './cdp';
+import { buildPlaywrightMcpLaunchArgs } from './playwright-mcp-launcher';
 import type { AttackerStepPayload, TurnChangePayload } from '@/types/events';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -191,10 +192,11 @@ export async function runAttackerLoop(gameId: string, signal: AbortSignal): Prom
   const modelUrl = session.modelUrl;
 
   // Spawn Playwright MCP connected to the remote browser
-  const npxCommand = process.platform === 'win32' ? 'npx.cmd' : 'npx';
+  const mcpLaunch = buildPlaywrightMcpLaunchArgs(session.cdpUrl);
   const transport = new StdioClientTransport({
-    command: npxCommand,
-    args: ['@playwright/mcp', '--cdp-endpoint', session.cdpUrl],
+    command: mcpLaunch.command,
+    args: mcpLaunch.args,
+    env: mcpLaunch.env,
   });
 
   const mcpClient = new Client({ name: 'browser-brawl-finetuned', version: '1.0.0' });
