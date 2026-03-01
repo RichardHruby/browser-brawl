@@ -1,0 +1,417 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Browser Brawl — Tracing &amp; Fine-Tuning Pipeline</title>
+<style>
+:root{--cyan:#00d4ff;--red:#ff003c;--purple:#cc44ff;--green:#00ff88;--yellow:#ffcc00;--bg:#0a0a14;--panel:#111122;--card:#1a1a2e;--border:#2a2a4a;--text:#e0e0f0;--dim:#7070a0}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'JetBrains Mono','Fira Code',monospace;background:var(--bg);color:var(--text);line-height:1.6}
+.c{max-width:1000px;margin:0 auto;padding:2rem 1.5rem}
+.hdr{text-align:center;padding:3rem 0 2rem;border-bottom:2px solid var(--border);margin-bottom:2rem}
+.hdr h1{font-size:2rem;letter-spacing:.2em;text-transform:uppercase;color:var(--cyan);text-shadow:0 0 20px var(--cyan);margin-bottom:.5rem}
+.hdr p{color:var(--dim);font-size:.85rem}
+.bar{height:4px;background:var(--border);margin-bottom:2rem}.bar div{height:100%;background:linear-gradient(90deg,var(--cyan),var(--purple));transition:width .4s}
+.nav{display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:2rem;border-bottom:2px solid var(--border);padding-bottom:1rem}
+.nb{background:var(--card);border:1px solid var(--border);color:var(--dim);padding:.4rem 1rem;font-family:inherit;font-size:.75rem;letter-spacing:.15em;text-transform:uppercase;cursor:pointer;transition:all .2s}
+.nb:hover{border-color:var(--cyan);color:var(--cyan)}
+.nb.on{border-color:var(--cyan);color:var(--cyan);background:rgba(0,212,255,.08);text-shadow:0 0 8px var(--cyan)}
+.s{display:none}.s.on{display:block}
+.st{font-size:1.1rem;letter-spacing:.15em;text-transform:uppercase;color:var(--cyan);margin-bottom:1.5rem;padding-bottom:.5rem;border-bottom:1px solid var(--border)}
+.cd{background:var(--panel);border:1px solid var(--border);padding:1.25rem;margin-bottom:1rem}
+.ct{font-size:.8rem;letter-spacing:.2em;text-transform:uppercase;color:var(--purple);margin-bottom:.75rem}
+.cd p{font-size:.85rem;color:var(--dim);margin-bottom:.5rem}.cd p:last-child{margin-bottom:0}
+.co{border-left:3px solid var(--cyan);padding:.75rem 1rem;background:rgba(0,212,255,.05);font-size:.82rem;margin:1rem 0}
+.co.w{border-color:var(--yellow);background:rgba(255,204,0,.05)}
+.co.d{border-color:var(--red);background:rgba(255,0,60,.05)}
+.co.g{border-color:var(--green);background:rgba(0,255,136,.05)}
+pre{background:#060610;border:1px solid var(--border);padding:1rem;font-size:.78rem;overflow-x:auto;margin:.75rem 0;line-height:1.5}
+code{font-family:inherit}
+.k{color:var(--purple)}.sr{color:var(--green)}.cm{color:var(--dim)}
+.hc{color:var(--cyan)}.hp{color:var(--purple)}.hg{color:var(--green)}.hy{color:var(--yellow)}.hr{color:var(--red)}
+.fl{display:flex;align-items:center;flex-wrap:wrap;gap:.25rem;margin:1rem 0;font-size:.78rem}
+.fn{background:var(--card);border:1px solid var(--border);padding:.4rem .75rem;white-space:nowrap}
+.fn.c1{border-color:var(--cyan);color:var(--cyan)}.fn.p1{border-color:var(--purple);color:var(--purple)}
+.fn.g1{border-color:var(--green);color:var(--green)}.fn.y1{border-color:var(--yellow);color:var(--yellow)}
+.fn.r1{border-color:var(--red);color:var(--red)}
+.fa{color:var(--dim);font-size:.9rem;padding:0 .1rem}
+table{width:100%;border-collapse:collapse;font-size:.8rem;margin:1rem 0}
+th{text-align:left;padding:.5rem .75rem;background:var(--card);color:var(--dim);font-size:.72rem;letter-spacing:.15em;text-transform:uppercase;border-bottom:2px solid var(--border)}
+td{padding:.5rem .75rem;border-bottom:1px solid var(--border)}
+h3{font-size:.85rem;color:var(--cyan);margin:1.25rem 0 .5rem;letter-spacing:.1em;text-transform:uppercase}
+.sf{display:flex;align-items:center;flex-wrap:wrap;gap:.25rem;margin:.75rem 0;font-size:.75rem}
+.sb{padding:.25rem .6rem;border:1px solid}
+.sp{color:var(--dim);border-color:var(--dim)}.su{color:var(--yellow);border-color:var(--yellow)}
+.st2{color:var(--cyan);border-color:var(--cyan)}.sm{color:var(--purple);border-color:var(--purple)}
+.sr2{color:var(--green);border-color:var(--green)}.sf2{color:var(--red);border-color:var(--red)}
+.steps{display:flex;flex-direction:column}.stp{display:flex;gap:1rem;padding:.75rem 0;border-bottom:1px solid var(--border);align-items:flex-start}
+.stp:last-child{border-bottom:none}
+.sn{width:28px;height:28px;border:1px solid var(--cyan);color:var(--cyan);display:flex;align-items:center;justify-content:center;font-size:.75rem;flex-shrink:0}
+.sc{flex:1}.sc b{font-size:.85rem;display:block;margin-bottom:.25rem}.sc i{font-size:.78rem;color:var(--dim);font-style:normal}
+.sc em{font-size:.75rem;color:var(--green);font-style:normal;display:block;margin-top:.25rem}
+.qs{text-align:center;padding:1rem;background:var(--card);border:1px solid var(--border);margin-bottom:1.5rem;font-size:.85rem;color:var(--dim)}
+.qs span{color:var(--cyan);font-size:1.2rem}
+.qq{background:var(--panel);border:1px solid var(--border);margin-bottom:1rem;overflow:hidden}
+.qh{padding:1rem 1.25rem;display:flex;justify-content:space-between;align-items:flex-start;gap:1rem}
+.qt{font-size:.85rem;flex:1}
+.qb{font-size:.65rem;letter-spacing:.15em;padding:.2rem .5rem;border:1px solid;white-space:nowrap;flex-shrink:0}
+.qb.h{color:var(--red);border-color:var(--red)}.qb.m{color:var(--yellow);border-color:var(--yellow)}.qb.e{color:var(--green);border-color:var(--green)}
+.opts{padding:0 1.25rem .5rem;display:flex;flex-direction:column;gap:.4rem}
+.op{padding:.5rem .75rem;border:1px solid var(--border);cursor:pointer;font-size:.82rem;color:var(--dim);transition:all .15s;display:flex;align-items:center;gap:.5rem}
+.op:hover:not(.lk){border-color:var(--cyan);color:var(--cyan)}
+.op.ok{border-color:var(--green);color:var(--green);background:rgba(0,255,136,.05)}
+.op.no{border-color:var(--red);color:var(--red);background:rgba(255,0,60,.05)}
+.op.lk{cursor:default}
+.ol{width:18px;height:18px;border:1px solid currentColor;display:flex;align-items:center;justify-content:center;font-size:.7rem;flex-shrink:0}
+.ex{padding:.75rem 1.25rem 1rem;font-size:.8rem;color:var(--dim);border-top:1px solid var(--border);display:none}
+.ex.sh{display:block}.ex strong{color:var(--cyan)}
+.fq{margin-bottom:.5rem;border:1px solid var(--border)}
+.fh{padding:.85rem 1rem;cursor:pointer;font-size:.83rem;display:flex;justify-content:space-between;align-items:center;gap:1rem}
+.fh:hover{background:rgba(255,255,255,.02)}
+.fh .tg{color:var(--cyan);font-size:1.1rem;flex-shrink:0;transition:transform .2s}
+.fa2{display:none;padding:.75rem 1rem;font-size:.8rem;color:var(--dim);border-top:1px solid var(--border)}
+.fa2.op2{display:block}.fh.op2 .tg{transform:rotate(45deg)}
+</style>
+</head>
+<body>
+<div class="c">
+<div class="hdr"><h1>Browser Brawl</h1><p>Tracing &amp; Fine-Tuning Pipeline — Interactive Reference</p></div>
+<div class="bar"><div id="prog" style="width:14%"></div></div>
+<div class="nav">
+<button class="nb on" onclick="go('overview',this)">Overview</button>
+<button class="nb" onclick="go('capture',this)">Data Capture</button>
+<button class="nb" onclick="go('format',this)">Format Conversion</button>
+<button class="nb" onclick="go('training',this)">Training</button>
+<button class="nb" onclick="go('inference',this)">Inference</button>
+<button class="nb" onclick="go('quiz',this)">Quiz</button>
+<button class="nb" onclick="go('faq',this)">FAQ</button>
+</div>
+
+<!-- OVERVIEW -->
+<div class="s on" id="s-overview">
+<div class="st">The Full Loop</div>
+<div class="co">The self-improvement loop: play games &#8594; capture traces &#8594; train model &#8594; fight with that model &#8594; generate harder traces &#8594; repeat.</div>
+<div class="fl" style="justify-content:center;margin:1.5rem 0">
+<div class="fn c1">Game</div><div class="fa">&#8594;</div>
+<div class="fn y1">Convex DB</div><div class="fa">&#8594;</div>
+<div class="fn p1">Convert JSONL</div><div class="fa">&#8594;</div>
+<div class="fn r1">Modal GPU Train</div><div class="fa">&#8594;</div>
+<div class="fn g1">vLLM Serve</div><div class="fa">&#8594;</div>
+<div class="fn c1">BYOM Fight</div>
+</div>
+<div class="cd"><div class="ct">One-Click Pipeline Phases</div>
+<div class="sf">
+<div class="sb sp">preparing</div><div class="fa">&#8594;</div>
+<div class="sb su">uploading</div><div class="fa">&#8594;</div>
+<div class="sb st2">training</div><div class="fa">&#8594;</div>
+<div class="sb sm">merging</div><div class="fa">&#8594;</div>
+<div class="sb sr2">ready</div><div class="fa"> / </div>
+<div class="sb sf2">failed</div>
+</div>
+<p>Status pushed from Modal &#8594; Convex HTTP endpoint &#8594; <code>/training</code> dashboard via <code>useQuery</code> live subscription.</p></div>
+
+<h3>Three Storage Layers</h3>
+<table>
+<tr><th>Layer</th><th>What's stored</th><th>Used for</th></tr>
+<tr><td class="hy">Convex DB</td><td>Full Claude conversations, steps, sessions, health, network, SSE log</td><td>Training data extraction, replay UI</td></tr>
+<tr><td class="hy">Convex Storage</td><td>PNG screenshots, JPEG screencast frames, JSONL training blobs</td><td>Replay viewer, Modal download</td></tr>
+<tr><td class="hp">Modal Volume</td><td>LoRA adapter, merged model weights (~6GB bfloat16)</td><td>vLLM serving</td></tr>
+</table>
+
+<h3>Two Tables &#8212; Different Purposes</h3>
+<table>
+<tr><th>Table</th><th>Content</th><th>Truncation</th><th>Training?</th></tr>
+<tr><td class="hc">conversations</td><td>Full <code>messages[]</code> array (Anthropic native)</td><td>None</td><td class="hg">YES</td></tr>
+<tr><td class="hr">attackerSteps</td><td>Tool name, truncated summary, screenshots</td><td>5,000 chars</td><td class="hr">NO (replay only)</td></tr>
+</table>
+
+<div class="co w">Only games where the <strong>attacker won</strong> (<code>winner='attacker'</code>, <code>winReason='task_complete'</code>) produce useful training data.</div>
+<div class="co d">Only <strong>Claude Sonnet games</strong> produce valid data. Fine-tuned model games store <code>&lt;tool_call&gt;</code> XML &#8212; converter counts zero <code>tool_use</code> blocks and skips them.</div>
+</div>
+
+<!-- DATA CAPTURE -->
+<div class="s" id="s-capture">
+<div class="st">Data Capture &#8212; How Conversations Are Persisted</div>
+<div class="co"><code>recordConversation()</code> is called <strong>twice per step</strong> &#8212; once after Claude responds, once after tool results are appended.</div>
+<div class="steps">
+<div class="stp"><div class="sn">1</div><div class="sc"><b>Claude called with messages[]</b><i>Growing array contains all prior turns. Claude returns content blocks.</i></div></div>
+<div class="stp"><div class="sn">2</div><div class="sc"><b>Assistant message pushed</b><em>messages.push({ role: 'assistant', content: response.content })</em><i>Content: TextBlock + ToolUseBlock objects.</i></div></div>
+<div class="stp"><div class="sn">3</div><div class="sc"><b class="hc">recordConversation() &#8212; FIRST CALL</b><i>Persists after Claude's response, before tool results. stepNumber = currentStep + 1.</i></div></div>
+<div class="stp"><div class="sn">4</div><div class="sc"><b>MCP tools executed</b><i>Each tool_use block dispatched to Playwright MCP. Results truncated to 10,000 chars.</i></div></div>
+<div class="stp"><div class="sn">5</div><div class="sc"><b>Tool results pushed as user message</b><em>messages.push({ role: 'user', content: toolResults })</em></div></div>
+<div class="stp"><div class="sn">6</div><div class="sc"><b class="hc">recordConversation() &#8212; SECOND CALL</b><i>Complete turn persisted. This is the authoritative snapshot.</i></div></div>
+</div>
+
+<h3>Message Array at Step N</h3>
+<pre><code><span class="cm">// After step N tool results appended:</span>
+[
+  { <span class="k">role</span>: <span class="sr">'user'</span>, <span class="k">content</span>: <span class="sr">'TASK: Navigate to amazon.com...'</span> },
+  { <span class="k">role</span>: <span class="sr">'assistant'</span>, <span class="k">content</span>: [
+    { <span class="k">type</span>: <span class="sr">'text'</span>, <span class="k">text</span>: <span class="sr">"Let me snapshot..."</span> },
+    { <span class="k">type</span>: <span class="sr">'tool_use'</span>, <span class="k">name</span>: <span class="sr">'browser_snapshot'</span> }
+  ]},
+  { <span class="k">role</span>: <span class="sr">'user'</span>, <span class="k">content</span>: [
+    { <span class="k">type</span>: <span class="sr">'tool_result'</span>, <span class="k">content</span>: <span class="sr">'...'</span> }
+  ]},
+  <span class="cm">// ... steps 2 through N ...</span>
+]</code></pre>
+
+<h3>Truncation Limits</h3>
+<table>
+<tr><th>Field</th><th>Limit</th><th>Location</th></tr>
+<tr><td>Tool result in messages[]</td><td class="hy">10,000 chars</td><td>attacker-playwright.ts:219</td></tr>
+<tr><td>toolResultSummary in Convex</td><td class="hy">5,000 chars</td><td>attacker-playwright.ts:213</td></tr>
+<tr><td>Tool input JSON</td><td class="hy">2,000 chars</td><td>attacker-playwright.ts:236</td></tr>
+<tr><td>Full conversation</td><td class="hg">NO LIMIT</td><td>data-collector.ts</td></tr>
+</table>
+<div class="co g">For a 30-step game: ~60 rows in conversations table. Training uses only the <strong>last row</strong> via <code>getLatestForSession()</code>.</div>
+</div>
+
+<!-- FORMAT CONVERSION -->
+<div class="s" id="s-format">
+<div class="st">Format Conversion &#8212; Three Stages</div>
+<div class="fl" style="justify-content:center;margin:1rem 0 1.5rem">
+<div class="fn c1">Anthropic Native</div><div class="fa">&#8594; convertTrajectory() &#8594;</div>
+<div class="fn p1">ShareGPT</div><div class="fa">&#8594; toOpenAIMessages() &#8594;</div>
+<div class="fn g1">OpenAI Messages</div>
+</div>
+
+<div class="cd"><div class="ct">Stage 1 &#8212; Anthropic Native</div>
+<p><code>tool_use</code> content blocks in assistant messages, <code>tool_result</code> blocks in user messages.</p>
+<pre><code>{ <span class="k">role</span>: <span class="sr">'assistant'</span>, <span class="k">content</span>: [
+  { <span class="k">type</span>: <span class="sr">'text'</span>, <span class="k">text</span>: <span class="sr">"I'll click..."</span> },
+  { <span class="k">type</span>: <span class="sr">'tool_use'</span>, <span class="k">name</span>: <span class="sr">'browser_click'</span>, <span class="k">input</span>: {<span class="k">ref</span>:<span class="sr">'e47'</span>} }
+]}</code></pre></div>
+
+<div class="cd"><div class="ct">Stage 2 &#8212; ShareGPT (intermediate)</div>
+<p>Tool calls &#8594; <code>&lt;tool_call&gt;</code> XML. Tool results &#8594; <code>&lt;tool_response&gt;</code> XML in <code>tool</code> role.</p>
+<pre><code>{ <span class="k">from</span>: <span class="sr">'gpt'</span>,  <span class="k">value</span>: <span class="sr">"I'll click...\n&lt;tool_call&gt;\n{...}\n&lt;/tool_call&gt;"</span> }
+{ <span class="k">from</span>: <span class="sr">'tool'</span>, <span class="k">value</span>: <span class="sr">"&lt;tool_response&gt;\n{...}\n&lt;/tool_response&gt;"</span> }</code></pre></div>
+
+<div class="cd"><div class="ct">Stage 3 &#8212; OpenAI Messages (for Unsloth)</div>
+<p>Roles mapped, strings wrapped in typed content arrays for <code>FastVisionModel</code>.</p>
+<pre><code>{ <span class="k">role</span>: <span class="sr">'system'</span>,    <span class="k">content</span>: [{<span class="k">type</span>:<span class="sr">'text'</span>, <span class="k">text</span>:<span class="sr">"...&lt;tools&gt;[...]&lt;/tools&gt;"</span>}] }
+{ <span class="k">role</span>: <span class="sr">'assistant'</span>, <span class="k">content</span>: [{<span class="k">type</span>:<span class="sr">'text'</span>, <span class="k">text</span>:<span class="sr">"..&lt;tool_call&gt;..&lt;/tool_call&gt;"</span>}] }
+{ <span class="k">role</span>: <span class="sr">'tool'</span>,      <span class="k">content</span>: [{<span class="k">type</span>:<span class="sr">'text'</span>, <span class="k">text</span>:<span class="sr">"&lt;tool_response&gt;..&lt;/tool_response&gt;"</span>}] }</code></pre></div>
+
+<h3>Role Mapping</h3>
+<table>
+<tr><th>ShareGPT</th><th>OpenAI</th><th>Content</th></tr>
+<tr><td>system</td><td>system</td><td>Tool defs in &lt;tools&gt; XML + instructions</td></tr>
+<tr><td>human</td><td>user</td><td>Task description (regex-extracted from prompt)</td></tr>
+<tr><td>gpt</td><td>assistant</td><td>Reasoning + &lt;tool_call&gt; XML</td></tr>
+<tr><td>tool</td><td>tool</td><td>&lt;tool_response&gt; XML</td></tr>
+</table>
+<div class="co">System prompt wraps tool defs in <code>&lt;tools&gt;[OpenAI function JSON]&lt;/tools&gt;</code> &#8212; Qwen2.5's expected format. Training and inference prompts must match exactly.</div>
+</div>
+
+<!-- TRAINING -->
+<div class="s" id="s-training">
+<div class="st">Modal Training &#8212; Under the Hood</div>
+<div class="co">Two Modal functions: <strong>kickoff</strong> (web, no GPU, 150s timeout) spawns <strong>train</strong> (A10G GPU, 6h timeout). Avoids the 150s hard limit.</div>
+
+<h3>Resources</h3>
+<table>
+<tr><th>Resource</th><th>Value</th><th>Why</th></tr>
+<tr><td>GPU</td><td class="hc">A10G (24GB VRAM)</td><td>Fits 3B in 4-bit + LoRA in 16-bit</td></tr>
+<tr><td>Timeout</td><td>6 hours</td><td>Safety margin (actual: 20-60 min)</td></tr>
+<tr><td>Volumes</td><td>/model_cache, /data, /checkpoints</td><td>Persist between runs</td></tr>
+<tr><td>Base model</td><td>unsloth/Qwen2.5-3B-Instruct</td><td>Apache 2.0, ~3.6B params</td></tr>
+</table>
+
+<h3>QLoRA</h3>
+<div class="cd"><div class="ct">Quantized Low-Rank Adaptation</div>
+<p><strong>Q</strong>uantized base (4-bit, frozen) + trainable <strong>LoRA</strong> adapters (16-bit). ~3.5GB base + ~100MB adapters. Fits 24GB VRAM.</p>
+<pre><code>LORA_R = <span class="hy">16</span>          <span class="cm"># rank of adapter matrices</span>
+LORA_ALPHA = <span class="hy">16</span>      <span class="cm"># scaling (alpha/r = 1.0)</span>
+LEARNING_RATE = <span class="hy">2e-4</span>
+BATCH_SIZE = <span class="hy">2</span> x GRAD_ACCUM = <span class="hy">4</span>  <span class="cm"># effective batch 8</span>
+NUM_EPOCHS = <span class="hy">3</span>
+TARGETS = [<span class="sr">'q_proj'</span>,<span class="sr">'k_proj'</span>,<span class="sr">'v_proj'</span>,<span class="sr">'o_proj'</span>,<span class="sr">'gate_proj'</span>,<span class="sr">'up_proj'</span>,<span class="sr">'down_proj'</span>]</code></pre></div>
+
+<h3>Real-Time Status Callbacks</h3>
+<div class="steps">
+<div class="stp"><div class="sn">1</div><div class="sc"><b>ConvexCallback fires on each log step</b><em>POST /api/training-status { experimentName, currentStep, totalSteps, currentLoss }</em></div></div>
+<div class="stp"><div class="sn">2</div><div class="sc"><b>Convex httpAction receives POST</b><i>Calls api.training.updateStatus mutation. Unauthenticated endpoint.</i></div></div>
+<div class="stp"><div class="sn">3</div><div class="sc"><b>useQuery(api.training.list) updates live</b><i>Convex subscriptions push to all browsers instantly. No polling.</i></div></div>
+</div>
+
+<h3>Output</h3>
+<pre><code>/checkpoints/experiments/<span class="hc">{name}</span>/
+&#9500;&#9472;&#9472; final_model/     <span class="cm">&#8592; LoRA adapter only (~100MB)</span>
+&#9492;&#9472;&#9472; merged_model/    <span class="cm">&#8592; Full model (~6GB bfloat16) &#8594; vLLM</span></code></pre>
+<div class="co">vLLM can't serve LoRA adapters directly. <code>save_pretrained_merged("merged_16bit")</code> bakes adapter weights into the full model.</div>
+</div>
+
+<!-- INFERENCE -->
+<div class="s" id="s-inference">
+<div class="st">Inference &#8212; Fine-Tuned Attacker (BYOM)</div>
+<div class="co"><code>attacker-finetuned.ts</code> is a drop-in for <code>attacker-playwright.ts</code>. Same MCP tools, different model and message format.</div>
+
+<h3>Claude vs Fine-Tuned</h3>
+<table>
+<tr><th>Aspect</th><th>Claude</th><th>Qwen</th></tr>
+<tr><td>API</td><td>Anthropic SDK</td><td>HTTP fetch (OpenAI-compatible)</td></tr>
+<tr><td>Tool format</td><td>tool_use blocks</td><td>&lt;tool_call&gt; XML</td></tr>
+<tr><td>Results</td><td>tool_result blocks</td><td>&lt;tool_response&gt; XML</td></tr>
+<tr><td>System prompt</td><td>Text only</td><td>Text + &lt;tools&gt; XML defs</td></tr>
+<tr><td>Temperature</td><td>1.0 (default)</td><td><strong>0.0</strong> (deterministic)</td></tr>
+</table>
+
+<h3>Tool Call Parsing</h3>
+<pre><code><span class="cm">// Regex extraction from model output:</span>
+/<span class="sr">&lt;tool_call&gt;\s*([\s\S]*?)\s*&lt;\/tool_call&gt;</span>/g
+
+<span class="cm">// Result:</span>
+[{ <span class="k">name</span>: <span class="sr">'browser_navigate'</span>, <span class="k">arguments</span>: { <span class="k">url</span>: <span class="sr">'...'</span> } }]</code></pre>
+
+<h3>Haiku Fixup Layer</h3>
+<div class="fl">
+<div class="fn r1">Malformed JSON</div><div class="fa">&#8594; needsFixup() &#8594;</div>
+<div class="fn y1">Haiku repairs</div><div class="fa">&#8594;</div>
+<div class="fn g1">Valid JSON</div>
+</div>
+<p style="font-size:.8rem;color:var(--dim)">Detects: invalid JSON, <code>browser.*</code> refs, async IIFEs. Claude Haiku chosen for speed/cost.</p>
+
+<h3>Cold Start</h3>
+<pre><code><span class="cm">// First step only &#8212; 10s timer</span>
+<span class="k">const</span> timer = stepNumber === <span class="hy">0</span> ? setTimeout(() =&gt; {
+  emitEvent(gameId, <span class="sr">'attacker_step'</span>, {
+    description: <span class="sr">'Warming up model endpoint...'</span>
+  });
+}, <span class="hy">10_000</span>) : <span class="k">null</span>;
+<span class="cm">// Warm-up ping fires during browser creation to overlap ~2min cold start</span></code></pre>
+<div class="co w">Fine-tuned model games do NOT produce valid training data. Converter sees 0 tool_use blocks and drops the game.</div>
+</div>
+
+<!-- QUIZ -->
+<div class="s" id="s-quiz">
+<div class="st">Quiz &#8212; Test Your Understanding</div>
+<div class="qs">Score: <span id="sc">0</span> / <span id="ans">0</span> answered (10 total)</div>
+
+<div class="qq" id="q1"><div class="qh"><div class="qt">How many times is <code>recordConversation()</code> called per attacker step?</div><div class="qb m">MEDIUM</div></div>
+<div class="opts">
+<div class="op" onclick="A(this,'q1',0)"><div class="ol">A</div>Once &#8212; after Claude responds</div>
+<div class="op" data-ok onclick="A(this,'q1',1)"><div class="ol">B</div>Twice &#8212; once after Claude responds, once after tool results</div>
+<div class="op" onclick="A(this,'q1',0)"><div class="ol">C</div>Once &#8212; only after all tools complete</div>
+<div class="op" onclick="A(this,'q1',0)"><div class="ol">D</div>Once per tool call executed</div>
+</div><div class="ex" id="e-q1"><strong>B.</strong> First call captures Claude's response. Second captures the complete turn with tool results. ~60 rows for a 30-step game. Training uses only the last row.</div></div>
+
+<div class="qq" id="q2"><div class="qh"><div class="qt">Why do fine-tuned Qwen games NOT produce valid training data?</div><div class="qb h">HARD</div></div>
+<div class="opts">
+<div class="op" onclick="A(this,'q2',0)"><div class="ol">A</div>Fine-tuned model doesn't record to Convex</div>
+<div class="op" onclick="A(this,'q2',0)"><div class="ol">B</div>Different gameId format</div>
+<div class="op" data-ok onclick="A(this,'q2',1)"><div class="ol">C</div>Stores &lt;tool_call&gt; XML, not tool_use blocks &#8212; converter counts zero</div>
+<div class="op" onclick="A(this,'q2',0)"><div class="ol">D</div>toolDefinitions field is empty</div>
+</div><div class="ex" id="e-q2"><strong>C.</strong> <code>convertTrajectory()</code> counts <code>tool_use</code> blocks. Fine-tuned games have plain XML strings &#8212; zero blocks &#8594; filtered out.</div></div>
+
+<div class="qq" id="q3"><div class="qh"><div class="qt">Training data comes from which table?</div><div class="qb h">HARD</div></div>
+<div class="opts">
+<div class="op" onclick="A(this,'q3',0)"><div class="ol">A</div>attackerSteps &#8212; has tool names and inputs</div>
+<div class="op" data-ok onclick="A(this,'q3',1)"><div class="ol">B</div>conversations &#8212; full untruncated messages; attackerSteps is 5K truncated</div>
+<div class="op" onclick="A(this,'q3',0)"><div class="ol">C</div>Both merged at export time</div>
+<div class="op" onclick="A(this,'q3',0)"><div class="ol">D</div>Neither &#8212; Laminar traces</div>
+</div><div class="ex" id="e-q3"><strong>B.</strong> <code>conversations</code> has the full untruncated messages[]. Pipeline calls <code>getLatestForSession()</code> for the last row.</div></div>
+
+<div class="qq" id="q4"><div class="qh"><div class="qt">Why does Modal use a two-function design (kickoff + train)?</div><div class="qb m">MEDIUM</div></div>
+<div class="opts">
+<div class="op" onclick="A(this,'q4',0)"><div class="ol">A</div>Two GPUs for parallelism</div>
+<div class="op" data-ok onclick="A(this,'q4',1)"><div class="ol">B</div>Web endpoints have 150s timeout &#8212; kickoff spawns GPU fn, returns immediately</div>
+<div class="op" onclick="A(this,'q4',0)"><div class="ol">C</div>Security sandboxing</div>
+<div class="op" onclick="A(this,'q4',0)"><div class="ol">D</div>JSONL needs download before GPU allocation</div>
+</div><div class="ex" id="e-q4"><strong>B.</strong> Modal <code>@fastapi_endpoint</code> = 150s hard limit. Training = 20-60 min. <code>spawn()</code> is fire-and-forget.</div></div>
+
+<div class="qq" id="q5"><div class="qh"><div class="qt">What does <code>toOpenAIMessages()</code> do beyond role mapping?</div><div class="qb m">MEDIUM</div></div>
+<div class="opts">
+<div class="op" onclick="A(this,'q5',0)"><div class="ol">A</div>Converts XML to JSON</div>
+<div class="op" onclick="A(this,'q5',0)"><div class="ol">B</div>Adds image data</div>
+<div class="op" data-ok onclick="A(this,'q5',1)"><div class="ol">C</div>Wraps strings in [{type:"text", text:"..."}] for Unsloth</div>
+<div class="op" onclick="A(this,'q5',0)"><div class="ol">D</div>Splits long messages</div>
+</div><div class="ex" id="e-q5"><strong>C.</strong> Unsloth FastVisionModel requires typed content arrays, not plain strings.</div></div>
+
+<div class="qq" id="q6"><div class="qh"><div class="qt">How does <code>/training</code> get real-time step/loss updates?</div><div class="qb e">EASY</div></div>
+<div class="opts">
+<div class="op" onclick="A(this,'q6',0)"><div class="ol">A</div>Polls Modal API</div>
+<div class="op" onclick="A(this,'q6',0)"><div class="ol">B</div>Polls Convex</div>
+<div class="op" data-ok onclick="A(this,'q6',1)"><div class="ol">C</div>Modal POSTs to Convex; frontend uses useQuery live subscriptions</div>
+<div class="op" onclick="A(this,'q6',0)"><div class="ol">D</div>Modal SSE to browser</div>
+</div><div class="ex" id="e-q6"><strong>C.</strong> ConvexCallback POSTs metrics. <code>useQuery</code> pushes updates instantly via Convex subscriptions.</div></div>
+
+<div class="qq" id="q7"><div class="qh"><div class="qt">Tool result truncation limit in the messages[] array?</div><div class="qb e">EASY</div></div>
+<div class="opts">
+<div class="op" onclick="A(this,'q7',0)"><div class="ol">A</div>500 chars</div>
+<div class="op" onclick="A(this,'q7',0)"><div class="ol">B</div>5,000 chars</div>
+<div class="op" data-ok onclick="A(this,'q7',1)"><div class="ol">C</div>10,000 chars</div>
+<div class="op" onclick="A(this,'q7',0)"><div class="ol">D</div>No limit</div>
+</div><div class="ex" id="e-q7"><strong>C.</strong> 10K for messages[] (line 219). 5K is the separate attackerSteps.toolResultSummary limit.</div></div>
+
+<div class="qq" id="q8"><div class="qh"><div class="qt">Why is the LoRA merge step necessary before vLLM serving?</div><div class="qb h">HARD</div></div>
+<div class="opts">
+<div class="op" onclick="A(this,'q8',0)"><div class="ol">A</div>vLLM needs bfloat16; LoRA is float32</div>
+<div class="op" data-ok onclick="A(this,'q8',1)"><div class="ol">B</div>vLLM can't serve LoRA adapters &#8212; needs a single merged checkpoint</div>
+<div class="op" onclick="A(this,'q8',0)"><div class="ol">C</div>Merge quantizes to 8-bit</div>
+<div class="op" onclick="A(this,'q8',0)"><div class="ol">D</div>Adapter files too small for Modal volume</div>
+</div><div class="ex" id="e-q8"><strong>B.</strong> <code>save_pretrained_merged()</code> bakes W + A*B into the base. ~6GB merged vs ~100MB adapter.</div></div>
+
+<div class="qq" id="q9"><div class="qh"><div class="qt">What happens with a malformed &lt;tool_call&gt; from the fine-tuned model?</div><div class="qb m">MEDIUM</div></div>
+<div class="opts">
+<div class="op" onclick="A(this,'q9',0)"><div class="ol">A</div>Step skipped</div>
+<div class="op" onclick="A(this,'q9',0)"><div class="ol">B</div>Game aborted</div>
+<div class="op" data-ok onclick="A(this,'q9',1)"><div class="ol">C</div>needsFixup() detects it, Claude Haiku repairs the JSON</div>
+<div class="op" onclick="A(this,'q9',0)"><div class="ol">D</div>Best-effort parsing</div>
+</div><div class="ex" id="e-q9"><strong>C.</strong> Detects invalid JSON, browser.* refs, IIFEs. Haiku (fast/cheap) repairs the syntax.</div></div>
+
+<div class="qq" id="q10"><div class="qh"><div class="qt">What ensures the system prompt matches between training and inference?</div><div class="qb h">HARD</div></div>
+<div class="opts">
+<div class="op" onclick="A(this,'q10',0)"><div class="ol">A</div>Hardcoded identically in both</div>
+<div class="op" onclick="A(this,'q10',0)"><div class="ol">B</div>Stored in Convex</div>
+<div class="op" data-ok onclick="A(this,'q10',1)"><div class="ol">C</div>Both use buildSystemPrompt() from training-converter.ts</div>
+<div class="op" onclick="A(this,'q10',0)"><div class="ol">D</div>Embedded in model weights</div>
+</div><div class="ex" id="e-q10"><strong>C.</strong> Shared function used by convertTrajectory(), attacker-finetuned.ts, and eval-miniwob.ts.</div></div>
+</div>
+
+<!-- FAQ -->
+<div class="s" id="s-faq">
+<div class="st">Common Questions</div>
+
+<div class="fq"><div class="fh" onclick="tf(this)">Why does the first step get cold-start SSE but not later steps?<span class="tg">+</span></div>
+<div class="fa2">Timer only set when <code>stepNumber === 0</code>. Modal vLLM takes ~2min on cold start. Warm-up ping during browser creation overlaps most of this.</div></div>
+
+<div class="fq"><div class="fh" onclick="tf(this)">Why is temperature 0.0 for fine-tuned but 1.0 for Claude?<span class="tg">+</span></div>
+<div class="fa2">Temp=0 makes eval reproducible. Claude uses 1.0 for diverse training trajectories.</div></div>
+
+<div class="fq"><div class="fh" onclick="tf(this)">Why minSteps=1 for one-click but 3 for CLI?<span class="tg">+</span></div>
+<div class="fa2">You've already hand-selected games in the UI. Aggressive filtering would silently drop sessions you specifically picked.</div></div>
+
+<div class="fq"><div class="fh" onclick="tf(this)">NEXT_PUBLIC_CONVEX_SITE_URL vs NEXT_PUBLIC_CONVEX_URL?<span class="tg">+</span></div>
+<div class="fa2"><code>CONVEX_URL</code> (.convex.cloud) = WebSocket client SDK. <code>CONVEX_SITE_URL</code> (.convex.site) = HTTP endpoint for external services like Modal.</div></div>
+
+<div class="fq"><div class="fh" onclick="tf(this)">What if I select 5 games but 2 are fine-tuned model games?<span class="tg">+</span></div>
+<div class="fa2">The 2 are silently dropped (0 tool_use blocks). Pipeline continues with the 3 valid Claude Sonnet games.</div></div>
+
+<div class="fq"><div class="fh" onclick="tf(this)">Why Modal volumes instead of downloading each time?<span class="tg">+</span></div>
+<div class="fa2">Base model is ~6GB. Volume persists at /model_cache. First run downloads; subsequent runs load from disk instantly.</div></div>
+
+<div class="fq"><div class="fh" onclick="tf(this)">How does modal.parameter() serve multiple experiments?<span class="tg">+</span></div>
+<div class="fa2">Each unique <code>experiment_name</code> gets its own container pool. 10 experiments = 10 isolated vLLM processes, one <code>modal deploy</code>.</div></div>
+
+<div class="fq"><div class="fh" onclick="tf(this)">save_pretrained() vs save_pretrained_merged()?<span class="tg">+</span></div>
+<div class="fa2"><code>save_pretrained()</code> = LoRA adapter only (~100MB). <code>save_pretrained_merged("merged_16bit")</code> = full model with adapter baked in (~6GB). vLLM needs the merged form.</div></div>
+
+<div class="fq"><div class="fh" onclick="tf(this)">Why does convertToolResults() look backward through messages?<span class="tg">+</span></div>
+<div class="fa2"><code>tool_result</code> only has <code>tool_use_id</code>, not the tool name. <code>findToolName()</code> scans backward to find the matching <code>tool_use</code> block.</div></div>
+
+<div class="fq"><div class="fh" onclick="tf(this)">What if MODAL_TRAIN_ENDPOINT is missing on Vercel?<span class="tg">+</span></div>
+<div class="fa2">Currently: job created, data converted, THEN fails at line 161, leaving orphaned failed job. Fix: move env check to top of function.</div></div>
+</div>
+
+</div>
+<script>
+var S={c:0,a:0};
+function go(n,b){document.querySelectorAll('.s').forEach(function(x){x.classList.remove('on')});document.querySelectorAll('.nb').forEach(function(x){x.classList.remove('on')});document.getElementById('s-'+n).classList.add('on');b.classList.add('on');var o=['overview','capture','format','training','inference','quiz','faq'];document.getElementById('prog').style.width=((o.indexOf(n)+1)/o.length*100)+'%'}
+function A(el,qid,ok){var q=document.getElementById(qid);if(q.dataset.done)return;q.dataset.done='1';S.a++;q.querySelectorAll('.op').forEach(function(o){o.classList.add('lk');o.style.cursor='default'});if(ok){el.classList.add('ok');S.c++}else{el.classList.add('no');q.querySelectorAll('.op[data-ok]').forEach(function(o){o.classList.add('ok')})}document.getElementById('e-'+qid).classList.add('sh');document.getElementById('sc').textContent=S.c;document.getElementById('ans').textContent=S.a}
+function tf(el){el.nextElementSibling.classList.toggle('op2');el.classList.toggle('op2')}
+</script>
+</body>
+</html>
