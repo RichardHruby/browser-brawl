@@ -2,11 +2,10 @@ import { Stagehand } from '@browserbasehq/stagehand';
 import { getSession } from './game-session-store';
 import { emitEvent } from './sse-emitter';
 import { endGame } from './defender-agent';
-import { nanoid } from 'nanoid';
 import { initLaminar } from './laminar';
-import { recordAttackerStep, captureAndUploadScreenshot } from './data-collector';
+import { captureAndUploadScreenshot } from './data-collector';
 import { snapshotDOM } from './browserbase';
-import type { AttackerStepPayload } from '@/types/events';
+import { AttackerStepLogger } from './attacker-step-logger';
 
 // Initialize Laminar so Stagehand's underlying Anthropic calls are traced
 initLaminar();
@@ -102,6 +101,8 @@ If elements disappear or move, try to find them again.
 Be persistent and methodical.`,
     });
 
+    const logger = new AttackerStepLogger(gameId);
+
     // Capture initial screenshot + DOM snapshot (fire-and-forget)
     let latestScreenshotId: string | null = null;
     let latestDomSnap: string | null = null;
@@ -113,56 +114,6 @@ Be persistent and methodical.`,
       latestDomSnap = dom;
     });
 
-    let stepNumber = 0;
-
-    const emitStep = (description: string, status: 'thinking' | 'acting') => {
-      const sess = getSession(gameId);
-      if (!sess || sess.phase !== 'arena') return;
-
-      stepNumber++;
-      sess.attackerStatus = status;
-
-      sess.attackerSteps.push({
-        id: nanoid(8),
-        step: stepNumber,
-        description,
-        timestamp: new Date().toISOString(),
-        agentStatus: status,
-      });
-
-      emitEvent<AttackerStepPayload>(gameId, 'attacker_step', {
-        step: stepNumber,
-        description,
-        agentStatus: status,
-        isComplete: false,
-      });
-
-      emitEvent(gameId, 'status_update', {
-        attackerStatus: status,
-        defenderStatus: sess.defenderStatus,
-      });
-
-      // Persist step to Convex
-      recordAttackerStep({
-        gameId,
-        stepNumber,
-        description,
-        agentStatus: status,
-        timestamp: new Date().toISOString(),
-        domSnapshot: latestDomSnap ?? undefined,
-        screenshotBeforeId: latestScreenshotId ?? undefined,
-      });
-
-      // Refresh screenshot + DOM for next step (fire-and-forget)
-      Promise.all([
-        captureAndUploadScreenshot(session.cdpUrl).catch(() => null),
-        snapshotDOM(session.cdpUrl).catch(() => null),
-      ]).then(([ssId, dom]) => {
-        latestScreenshotId = ssId;
-        latestDomSnap = dom;
-      });
-    };
-
     const streamResult = await agent.execute({
       instruction: taskPrompt,
       maxSteps: MAX_STEPS,
@@ -171,11 +122,19 @@ Be persistent and methodical.`,
         onStepFinish: async (event: Record<string, unknown>) => {
           // Emit reasoning as a "thinking" step
           if (typeof event.text === 'string' && event.text.trim().length > 0) {
-            emitStep(event.text.trim().slice(0, 300), 'thinking');
+            logger.logThinking({
+              description: event.text.trim().slice(0, 300),
+              screenshotId: latestScreenshotId,
+              domSnapshot: latestDomSnap,
+            });
           }
 
-          // Emit tool calls as an "acting" step
+          // Emit tool calls as an "acting" step with rich tool data
           if (Array.isArray(event.toolCalls) && event.toolCalls.length > 0) {
+            const firstTool = event.toolCalls[0] as Record<string, unknown>;
+            const toolName = String(firstTool?.toolName ?? firstTool?.name ?? 'tool');
+            const toolInput = firstTool?.input ?? firstTool?.args;
+
             const toolDesc = event.toolCalls.map((tc: Record<string, unknown>) => {
               const name = String(tc.toolName ?? tc.name ?? 'tool');
               const input = tc.input ?? tc.args;
@@ -184,8 +143,24 @@ Be persistent and methodical.`,
               }
               return name;
             }).join(', ');
-            emitStep(toolDesc.slice(0, 300), 'acting');
+
+            logger.logAction({
+              description: toolDesc.slice(0, 300),
+              toolName,
+              toolInput: toolInput ? JSON.stringify(toolInput).slice(0, 2000) : undefined,
+              screenshotId: latestScreenshotId,
+              domSnapshot: latestDomSnap,
+            });
           }
+
+          // Refresh screenshot + DOM for next step (fire-and-forget)
+          Promise.all([
+            captureAndUploadScreenshot(session.cdpUrl).catch(() => null),
+            snapshotDOM(session.cdpUrl).catch(() => null),
+          ]).then(([ssId, dom]) => {
+            latestScreenshotId = ssId;
+            latestDomSnap = dom;
+          });
         },
       },
     });
@@ -202,25 +177,8 @@ Be persistent and methodical.`,
     if (!s2 || s2.phase !== 'arena') return;
 
     if (result.success) {
-      const finalStep = stepNumber + 1;
       const finalMsg = (result.message || 'Task completed').slice(0, 200);
-
-      s2.attackerStatus = 'complete';
-      s2.attackerSteps.push({
-        id: nanoid(8),
-        step: finalStep,
-        description: finalMsg,
-        timestamp: new Date().toISOString(),
-        agentStatus: 'complete',
-      });
-
-      emitEvent<AttackerStepPayload>(gameId, 'attacker_step', {
-        step: finalStep,
-        description: finalMsg,
-        agentStatus: 'complete',
-        isComplete: true,
-      });
-
+      logger.logComplete({ description: finalMsg, success: true });
       endGame(gameId, 'attacker', 'task_complete');
     } else {
       s2.attackerStatus = 'failed';

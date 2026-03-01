@@ -201,6 +201,26 @@ export async function captureAndUploadScreenshot(
   }
 }
 
+/**
+ * Download a screenshot from a URL and upload to Convex storage.
+ * Used for Browser-Use mode where screenshots are external URLs.
+ * Returns the Convex storage ID, or null on failure.
+ */
+export async function downloadAndUploadScreenshot(
+  url: string,
+): Promise<string | null> {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) return null;
+    const arrayBuf = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuf);
+    return await uploadScreenshot(buffer);
+  } catch (err) {
+    console.error('[data-collector] downloadAndUpload error:', err);
+    return null;
+  }
+}
+
 export async function uploadScreenshot(
   pngBuffer: Buffer,
 ): Promise<string | null> {

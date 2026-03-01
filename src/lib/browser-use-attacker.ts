@@ -2,8 +2,13 @@ import { getBuClient, stopTask } from './browser-use-api';
 import { getSession } from './game-session-store';
 import { emitEvent } from './sse-emitter';
 import { endGame } from './defender-agent';
-import { nanoid } from 'nanoid';
-import type { AttackerStepPayload } from '@/types/events';
+import { initLaminar } from './laminar';
+import { downloadAndUploadScreenshot } from './data-collector';
+import { snapshotDOM } from './browserbase';
+import { AttackerStepLogger } from './attacker-step-logger';
+
+// Initialize Laminar so any underlying Anthropic calls are traced
+initLaminar();
 
 /**
  * Run the attacker via the browser-use AI agent.
@@ -31,15 +36,20 @@ export async function runBrowserUseAttackerLoop(
   };
   signal.addEventListener('abort', abortTask, { once: true });
 
+  const logger = new AttackerStepLogger(gameId);
+
   try {
+    session.attackerStatus = 'acting';
     emitEvent(gameId, 'status_update', {
       attackerStatus: 'acting',
       defenderStatus: session.defenderStatus,
     });
-    session.attackerStatus = 'acting';
+
+    // Kick off initial DOM snapshot (fire-and-forget)
+    let latestDomSnap: string | null = null;
+    snapshotDOM(session.cdpUrl).then(dom => { latestDomSnap = dom; }).catch(() => {});
 
     // Run the AI agent task on the existing session
-    // browserSessionId is from client.sessions.create(), so it's a valid sessionId
     console.log('[browser-use attacker] dispatching task to session:', session.browserSessionId);
     const taskRun = buClient.run(taskPrompt, {
       sessionId: session.browserSessionId,
@@ -68,25 +78,14 @@ export async function runBrowserUseAttackerLoop(
         s.buTaskId = taskRun.taskId;
       }
 
-      // Log the full step object to see what data we actually get
       console.log('[browser-use attacker] step received:', JSON.stringify(step, null, 2));
 
       // Phase 1: Emit reasoning as a "thinking" step
       const thinkingText = step.nextGoal || step.evaluationPreviousGoal || step.memory;
       if (thinkingText) {
-        const thinkStep = step.number * 2 - 1;
-        s.attackerSteps.push({
-          id: nanoid(8),
-          step: thinkStep,
+        logger.logThinking({
           description: thinkingText.slice(0, 300),
-          timestamp: new Date().toISOString(),
-          agentStatus: 'thinking',
-        });
-        emitEvent<AttackerStepPayload>(gameId, 'attacker_step', {
-          step: thinkStep,
-          description: thinkingText.slice(0, 300),
-          agentStatus: 'thinking',
-          isComplete: false,
+          domSnapshot: latestDomSnap,
         });
       }
 
@@ -94,22 +93,20 @@ export async function runBrowserUseAttackerLoop(
       const actionDesc = step.actions?.length
         ? step.actions.join(', ')
         : step.memory || `Step ${step.number}`;
-      const actStep = step.number * 2;
-      s.attackerSteps.push({
-        id: nanoid(8),
-        step: actStep,
+
+      logger.logAction({
         description: actionDesc.slice(0, 300),
-        timestamp: new Date().toISOString(),
-        agentStatus: 'acting',
-      });
-      emitEvent<AttackerStepPayload>(gameId, 'attacker_step', {
-        step: actStep,
-        description: actionDesc.slice(0, 300),
-        agentStatus: 'acting',
-        isComplete: false,
-        url: step.url,
+        toolName: step.actions?.[0],
         screenshotUrl: step.screenshotUrl ?? undefined,
+        domSnapshot: latestDomSnap,
       });
+
+      // Fire-and-forget: download screenshot from Browser-Use URL and upload to Convex
+      if (step.screenshotUrl) {
+        downloadAndUploadScreenshot(step.screenshotUrl).catch(() => {});
+      }
+      // Refresh DOM snapshot for next step
+      snapshotDOM(session.cdpUrl).then(dom => { latestDomSnap = dom; }).catch(() => {});
     }
 
     // Task finished — get the result
@@ -118,26 +115,14 @@ export async function runBrowserUseAttackerLoop(
     if (!s || s.phase !== 'arena') return;
 
     const isSuccess = result?.isSuccess === true;
-    const stepNumber = s.attackerSteps.reduce((max, existingStep) => (
-      Math.max(max, existingStep.step)
-    ), 0) + 1;
     const finalDescription = typeof result?.output === 'string'
       ? result.output.slice(0, 200)
       : isSuccess ? 'Task completed' : 'Task ended';
 
-    s.attackerSteps.push({
-      id: nanoid(8),
-      step: stepNumber,
+    logger.logComplete({
       description: finalDescription,
-      timestamp: new Date().toISOString(),
-      agentStatus: isSuccess ? 'complete' : 'failed',
-    });
-
-    emitEvent<AttackerStepPayload>(gameId, 'attacker_step', {
-      step: stepNumber,
-      description: finalDescription,
-      agentStatus: isSuccess ? 'complete' : 'failed',
-      isComplete: isSuccess,
+      success: isSuccess,
+      domSnapshot: latestDomSnap,
     });
 
     if (isSuccess) {
