@@ -7,7 +7,7 @@ import { emitEvent } from './sse-emitter';
 import { endGame } from './defender-agent';
 import { getAnthropicApiKey } from './env';
 import { recordConversation, captureAndUploadScreenshot } from './data-collector';
-import { snapshotDOM } from './browserbase';
+import { snapshotDOM } from './cdp';
 import { AttackerStepLogger } from './attacker-step-logger';
 import type { TurnChangePayload } from '@/types/events';
 

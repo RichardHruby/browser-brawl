@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { observe, Laminar } from '@lmnr-ai/lmnr';
 import { getSession, createGate, type ServerGameSession } from './game-session-store';
 import { getDisruptionsForDifficulty, getDisruptionById } from './disruptions';
-import { injectJS, snapshotDOM } from './browserbase';
+import { injectJS, snapshotDOM } from './cdp';
 import { emitEvent } from './sse-emitter';
 import { nanoid } from 'nanoid';
 import { getAnthropicApiKey } from './env';

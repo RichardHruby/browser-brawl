@@ -9,11 +9,6 @@ const OPTIONS: { value: AttackerType; label: string; desc: string }[] = [
     desc: 'Local agent via Claude + Playwright',
   },
   {
-    value: 'stagehand',
-    label: 'STAGEHAND',
-    desc: 'Local agent via Stagehand runtime',
-  },
-  {
     value: 'browser-use',
     label: 'BROWSER-USE',
     desc: 'Cloud agent via browser-use API',
