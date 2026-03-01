@@ -5,9 +5,10 @@ import { getSession } from './game-session-store';
 import { emitEvent } from './sse-emitter';
 import { endGame } from './defender-agent';
 import { nanoid } from 'nanoid';
+import { getAnthropicApiKey } from './env';
 import type { AttackerStepPayload } from '@/types/events';
 
-const anthropic = new Anthropic();
+const anthropic = new Anthropic({ apiKey: getAnthropicApiKey() });
 
 /**
  * Run the attacker agent loop:
@@ -88,6 +89,7 @@ IMPORTANT:
       });
 
       // Call Claude (pass abort signal so the request is cancelled on game end)
+      console.log(`[attacker] Step ${stepNumber + 1} — calling Claude...`);
       const response = await anthropic.messages.create({
         model: 'claude-sonnet-4-20250514',
         max_tokens: 4096,
@@ -113,6 +115,7 @@ IMPORTANT:
 
         stepNumber++;
         const isComplete = finalText.toLowerCase().includes('task complete');
+        console.log(`[attacker] Text response (complete=${isComplete}): ${finalText.slice(0, 150)}`);
 
         emitEvent<AttackerStepPayload>(gameId, 'attacker_step', {
           step: stepNumber,
@@ -152,6 +155,7 @@ IMPORTANT:
 
         // Emit step event
         const description = `${toolUse.name}(${summarizeInput(toolUse.input)})`;
+        console.log(`[attacker] Tool: ${description}`);
         s.attackerSteps.push({
           id: nanoid(8),
           step: stepNumber,
