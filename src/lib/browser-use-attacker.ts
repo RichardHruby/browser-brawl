@@ -81,11 +81,17 @@ export async function runBrowserUseAttackerLoop(
 
       log('[browser-use attacker] step received:', JSON.stringify(step, null, 2));
 
-      // Browser-Use gives us a screenshot URL; upload it first so step records
-      // can reference Convex storage IDs directly.
-      let screenshotId: string | null = null;
+      // Do not block SSE/log emission on screenshot upload. Upload in the background.
+      // This keeps AttackerPanel logs responsive even when storage/upload is slow.
       if (step.screenshotUrl) {
-        screenshotId = await downloadAndUploadScreenshot(step.screenshotUrl).catch(() => null);
+        void downloadAndUploadScreenshot(step.screenshotUrl)
+          .then((storageId) => {
+            if (!storageId) return;
+            log('[browser-use attacker] screenshot uploaded (unlinked step):', storageId);
+          })
+          .catch((err) => {
+            logError('[browser-use attacker] screenshot upload failed:', err);
+          });
       }
 
       // Phase 1: Emit reasoning as a "thinking" step
@@ -93,7 +99,6 @@ export async function runBrowserUseAttackerLoop(
       if (thinkingText) {
         logger.logThinking({
           description: thinkingText.slice(0, 300),
-          screenshotId,
           domSnapshot: latestDomSnap,
         });
       }
@@ -106,7 +111,6 @@ export async function runBrowserUseAttackerLoop(
       logger.logAction({
         description: actionDesc.slice(0, 300),
         toolName: step.actions?.[0],
-        screenshotId,
         screenshotUrl: step.screenshotUrl ?? undefined,
         domSnapshot: latestDomSnap,
       });
