@@ -2,13 +2,9 @@ import { Stagehand } from '@browserbasehq/stagehand';
 import { getSession } from './game-session-store';
 import { emitEvent } from './sse-emitter';
 import { endGame } from './defender-agent';
-import { initLaminar } from './laminar';
 import { captureAndUploadScreenshot } from './data-collector';
 import { snapshotDOM } from './browserbase';
 import { AttackerStepLogger } from './attacker-step-logger';
-
-// Initialize Laminar so Stagehand's underlying Anthropic calls are traced
-initLaminar();
 
 const MAX_STEPS = 50;
 

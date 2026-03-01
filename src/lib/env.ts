@@ -32,3 +32,7 @@ export function getAnthropicApiKey(): string | undefined {
 export function getLaminarApiKey(): string | undefined {
   return loadFromEnvLocal('LMNR_PROJECT_API_KEY') ?? process.env.LMNR_PROJECT_API_KEY;
 }
+
+export function getBrowserUseApiKey(): string | undefined {
+  return loadFromEnvLocal('BROWSER_USE_API_KEY') ?? process.env.BROWSER_USE_API_KEY;
+}

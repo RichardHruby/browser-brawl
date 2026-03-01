@@ -1,11 +1,12 @@
 import { BrowserUse } from 'browser-use-sdk';
+import { getBrowserUseApiKey } from './env';
 
 let buClient: BrowserUse | null = null;
 
 export function getBuClient(): BrowserUse {
   if (buClient) return buClient;
 
-  const apiKey = process.env.BROWSER_USE_API_KEY?.trim();
+  const apiKey = getBrowserUseApiKey()?.trim();
   if (!apiKey) {
     throw new Error('BROWSER_USE_API_KEY is not configured');
   }

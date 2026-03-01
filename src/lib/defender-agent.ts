@@ -5,14 +5,11 @@ import { injectJS, snapshotDOM } from './browserbase';
 import { emitEvent } from './sse-emitter';
 import { nanoid } from 'nanoid';
 import { getAnthropicApiKey } from './env';
-import { initLaminar } from './laminar';
 import { recordDefenderAction, finalizeGame, recordHealthChange, captureAndUploadScreenshot, setSessionRecording } from './data-collector';
 import { stopScreencast } from './screencast';
 import type { DisruptionEvent } from '@/types/game';
 import type { DefenderDisruptionPayload, HealthUpdatePayload, TurnChangePayload } from '@/types/events';
 
-// Initialize Laminar before creating Anthropic client so all calls are traced
-initLaminar();
 const client = new Anthropic({ apiKey: getAnthropicApiKey() });
 
 const DIFFICULTY_INTERVAL: Record<string, number> = {

@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as conversations from "../conversations.js";
 import type * as events from "../events.js";
 import type * as health from "../health.js";
 import type * as network from "../network.js";
@@ -22,6 +23,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  conversations: typeof conversations;
   events: typeof events;
   health: typeof health;
   network: typeof network;
