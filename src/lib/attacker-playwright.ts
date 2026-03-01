@@ -6,7 +6,7 @@ import { emitEvent } from './sse-emitter';
 import { endGame } from './defender-agent';
 import { nanoid } from 'nanoid';
 import { getAnthropicApiKey } from './env';
-import { recordAttackerStep, captureAndUploadScreenshot } from './data-collector';
+import { recordAttackerStep, recordConversation, captureAndUploadScreenshot } from './data-collector';
 import { snapshotDOM } from './browserbase';
 import type { AttackerStepPayload, TurnChangePayload } from '@/types/events';
 
@@ -53,6 +53,9 @@ export async function runAttackerLoop(gameId: string, signal: AbortSignal): Prom
       description: tool.description ?? '',
       input_schema: tool.inputSchema as Anthropic.Tool['input_schema'],
     }));
+
+    // Cache tool definitions as JSON for training data persistence
+    const toolDefsJson = JSON.stringify(tools);
 
     // 3. Build initial message
     const taskPrompt = session.task.startUrl
@@ -110,6 +113,17 @@ IMPORTANT:
       // Process response content
       const assistantContent = response.content;
       messages.push({ role: 'assistant', content: assistantContent });
+
+      const blockTypes = assistantContent.map(b => b.type).join(', ');
+      console.log(`[training-data] 🤖 Claude response | step=${stepNumber + 1} blocks=[${blockTypes}] stop=${response.stop_reason}`);
+
+      // Persist full conversation for training data extraction
+      recordConversation({
+        gameId,
+        stepNumber: stepNumber + 1,
+        messages: JSON.stringify(messages),
+        toolDefinitions: toolDefsJson,
+      });
 
       // Check if there are tool uses
       const toolUses = assistantContent.filter(
@@ -230,7 +244,8 @@ IMPORTANT:
             ?.map(c => c.text ?? '')
             .join('\n') ?? 'OK';
 
-          toolResultSummary = resultContent.slice(0, 500);
+          toolResultSummary = resultContent.slice(0, 5000);
+          console.log(`[training-data] 🔧 Tool result | ${toolUse.name} full=${resultContent.length}chars saved=${toolResultSummary.length}chars`);
 
           toolResults.push({
             type: 'tool_result',
@@ -265,6 +280,15 @@ IMPORTANT:
 
       // Add tool results to conversation
       messages.push({ role: 'user', content: toolResults });
+
+      console.log(`[training-data] 💾 Saving full turn | step=${stepNumber} toolResults=${toolResults.length}`);
+      // Persist conversation with tool results included
+      recordConversation({
+        gameId,
+        stepNumber,
+        messages: JSON.stringify(messages),
+        toolDefinitions: toolDefsJson,
+      });
 
       // Turn-based: check if attacker's turn is exhausted
       if (s.mode === 'turnbased' && toolUses.length > 0) {

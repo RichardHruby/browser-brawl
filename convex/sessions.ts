@@ -114,3 +114,17 @@ export const get = query({
       .unique();
   },
 });
+
+/** Bulk export for training data extraction — returns up to `limit` successful sessions */
+export const listSuccessful = query({
+  args: {
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const results = await ctx.db.query('sessions').order('desc').collect();
+    const successful = results.filter(
+      (s) => s.winner === 'attacker' && s.winReason === 'task_complete',
+    );
+    return successful.slice(0, args.limit ?? 1000);
+  },
+});
