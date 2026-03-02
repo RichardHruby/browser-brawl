@@ -17,6 +17,7 @@ import type * as screenshots from "../screenshots.js";
 import type * as sessions from "../sessions.js";
 import type * as steps from "../steps.js";
 import type * as training from "../training.js";
+import type * as waitlist from "../waitlist.js";
 
 import type {
   ApiFromModules,
@@ -34,6 +35,7 @@ declare const fullApi: ApiFromModules<{
   sessions: typeof sessions;
   steps: typeof steps;
   training: typeof training;
+  waitlist: typeof waitlist;
 }>;
 
 /**
