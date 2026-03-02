@@ -1,9 +1,8 @@
 'use client';
 
-import { useQuery } from 'convex/react';
+import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { useCallback, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { DIFFICULTY_COLORS, WINNER_SHORT } from '@/lib/constants';
 import { formatDuration, formatDate, formatWinReason, formatModel } from '@/lib/format';
@@ -15,8 +14,10 @@ export default function HistoryPage() {
   const [diffFilter, setDiffFilter] = useState<Difficulty | ''>('');
   const [winnerFilter, setWinnerFilter] = useState<Winner | ''>('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [isKickingOff, setIsKickingOff] = useState(false);
-  const router = useRouter();
+  const [showWaitlist, setShowWaitlist] = useState(false);
+  const [waitlistEmail, setWaitlistEmail] = useState('');
+  const [waitlistStatus, setWaitlistStatus] = useState<'idle' | 'submitting' | 'success'>('idle');
+  const joinWaitlist = useMutation(api.waitlist.join);
 
   const sessions = useQuery(api.sessions.list, {
     difficulty: diffFilter || undefined,
@@ -175,31 +176,14 @@ export default function HistoryPage() {
               </div>
             </div>
 
-            {/* Kickoff Finetune button with tooltip */}
+            {/* Kickoff Finetune button — opens waitlist modal */}
             <div className="relative group/tooltip">
               <button
-                onClick={async () => {
-                  if (selected.size === 0 || isKickingOff) return;
-                  setIsKickingOff(true);
-                  try {
-                    const res = await fetch('/api/training/start', {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ gameIds: Array.from(selected), textOnly: true }),
-                    });
-                    const data = await res.json();
-                    if (res.ok) {
-                      router.push('/training');
-                    } else {
-                      alert(`Failed to start training: ${data.error || 'Unknown error'}`);
-                    }
-                  } catch (err) {
-                    alert(`Network error: ${err}`);
-                  } finally {
-                    setIsKickingOff(false);
-                  }
+                onClick={() => {
+                  if (selected.size === 0) return;
+                  setShowWaitlist(true);
                 }}
-                disabled={selected.size === 0 || isKickingOff}
+                disabled={selected.size === 0}
                 className="font-display text-xs font-bold tracking-widest uppercase px-4 py-2 rounded transition-all duration-200 hover:scale-105 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:scale-100"
                 style={{
                   background: selected.size > 0 ? 'linear-gradient(135deg, #131325, #1a1a35)' : 'var(--color-bg-card)',
@@ -208,7 +192,7 @@ export default function HistoryPage() {
                   boxShadow: selected.size > 0 ? '0 0 12px rgba(204, 68, 255, 0.3)' : 'none',
                 }}
               >
-                {isKickingOff ? 'Starting...' : 'Kickoff Finetune'}
+                Kickoff Finetune
               </button>
               <div
                 className="absolute top-full left-1/2 -translate-x-1/2 mt-2 px-3 py-2 rounded text-xs font-mono whitespace-nowrap opacity-0 group-hover/tooltip:opacity-100 transition-opacity duration-200 pointer-events-none z-50"
@@ -247,6 +231,141 @@ export default function HistoryPage() {
           </div>
         </div>
       </div>
+
+      {/* Waitlist modal */}
+      {showWaitlist && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center px-4"
+          style={{ background: 'rgba(0, 0, 0, 0.7)', backdropFilter: 'blur(4px)' }}
+          onClick={() => {
+            if (waitlistStatus !== 'submitting') {
+              setShowWaitlist(false);
+              setWaitlistEmail('');
+              setWaitlistStatus('idle');
+            }
+          }}
+        >
+          <div
+            className="w-full max-w-md p-8"
+            style={{
+              background: 'var(--color-bg-panel)',
+              border: '2px solid #cc44ff44',
+              boxShadow: '0 0 40px rgba(204, 68, 255, 0.08)',
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {waitlistStatus === 'success' ? (
+              <div className="text-center flex flex-col items-center gap-6">
+                <h2
+                  className="font-display text-2xl font-black tracking-[0.2em] uppercase"
+                  style={{
+                    color: '#cc44ff',
+                    textShadow: '0 0 16px rgba(204, 68, 255, 0.6)',
+                  }}
+                >
+                  YOU&apos;RE ON THE LIST
+                </h2>
+                <p
+                  className="font-game text-base leading-relaxed"
+                  style={{ color: 'var(--color-text-secondary)' }}
+                >
+                  We&apos;ll email you when fine-tuning and Bring Your Own Model are available.
+                </p>
+                <button
+                  onClick={() => {
+                    setShowWaitlist(false);
+                    setWaitlistEmail('');
+                    setWaitlistStatus('idle');
+                  }}
+                  className="font-display text-xs font-bold tracking-[0.3em] uppercase px-6 py-3 transition-all duration-200 hover:scale-105"
+                  style={{
+                    color: '#cc44ff',
+                    border: '2px solid #cc44ff',
+                    background: 'rgba(204, 68, 255, 0.08)',
+                  }}
+                >
+                  CLOSE
+                </button>
+              </div>
+            ) : (
+              <form
+                onSubmit={async (e) => {
+                  e.preventDefault();
+                  if (!waitlistEmail.trim()) return;
+                  setWaitlistStatus('submitting');
+                  try {
+                    await joinWaitlist({ email: waitlistEmail.trim(), source: 'history-finetune' });
+                    setWaitlistStatus('success');
+                  } catch {
+                    setWaitlistStatus('success');
+                  }
+                }}
+                className="flex flex-col gap-6"
+              >
+                <div className="text-center">
+                  <h2
+                    className="font-display text-2xl font-black tracking-[0.15em] uppercase mb-3"
+                    style={{
+                      color: '#cc44ff',
+                      textShadow: '0 0 16px rgba(204, 68, 255, 0.6)',
+                    }}
+                  >
+                    EARLY ACCESS
+                  </h2>
+                  <p
+                    className="font-game text-base leading-relaxed"
+                    style={{ color: 'var(--color-text-secondary)' }}
+                  >
+                    Fine-tuning pipeline &amp; Bring Your Own Model are coming soon.
+                    <br />
+                    Get notified when they go live.
+                  </p>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <label
+                    htmlFor="waitlist-modal-email"
+                    className="font-mono text-[10px] tracking-wider"
+                    style={{ color: 'var(--color-text-secondary)' }}
+                  >
+                    EMAIL ADDRESS
+                  </label>
+                  <input
+                    id="waitlist-modal-email"
+                    type="email"
+                    required
+                    autoFocus
+                    value={waitlistEmail}
+                    onChange={(e) => setWaitlistEmail(e.target.value)}
+                    placeholder="you@example.com"
+                    className="w-full px-3 py-2.5 font-mono text-sm transition-all duration-200 outline-none"
+                    style={{
+                      background: 'var(--color-bg-deep)',
+                      border: '1px solid #aa44ff55',
+                      color: 'var(--color-text-primary)',
+                      boxShadow: waitlistEmail ? '0 0 8px #aa44ff33' : 'none',
+                    }}
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={waitlistStatus === 'submitting' || !waitlistEmail.trim()}
+                  className="w-full px-6 py-3 font-display text-sm font-black tracking-[0.3em] uppercase transition-all duration-300 cursor-pointer disabled:cursor-not-allowed disabled:opacity-30"
+                  style={{
+                    background: 'linear-gradient(135deg, rgba(204, 68, 255, 0.15), rgba(170, 68, 255, 0.08))',
+                    border: '2px solid #cc44ff',
+                    color: '#cc44ff',
+                    boxShadow: '0 0 20px rgba(204, 68, 255, 0.2)',
+                  }}
+                >
+                  {waitlistStatus === 'submitting' ? 'JOINING...' : 'JOIN WAITLIST'}
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Table */}
       <div className="flex-1 px-6 py-4">
