@@ -7,7 +7,10 @@ import { FighterSelect } from './FighterSelect';
 import { ArenaSelector } from './ArenaSelector';
 import { DifficultyBar } from './DifficultyBar';
 import { ModeToggle } from './ModeToggle';
+import { TASKS } from '@/lib/tasks';
 import type { AttackerType, Difficulty, GameMode, Task } from '@/types/game';
+
+const DEFAULT_TASK = TASKS.find(t => t.id === 'amazon-toothpaste') ?? null;
 
 interface Props {
   onStart: (difficulty: Difficulty, task: Task, mode: GameMode, attackerType: AttackerType, modelUrl?: string) => void;
@@ -15,7 +18,7 @@ interface Props {
 
 export function LobbyScreenV1({ onStart }: Props) {
   const [difficulty, setDifficulty] = useState<Difficulty>('easy');
-  const [task, setTask] = useState<Task | null>(null);
+  const [task, setTask] = useState<Task | null>(DEFAULT_TASK);
   const [mode, setMode] = useState<GameMode>('realtime');
   const [attackerType, setAttackerType] = useState<AttackerType>('playwright-mcp');
   const canStart = !!task;
