@@ -1,4 +1,4 @@
-import { mutation, query } from './_generated/server';
+import { mutation } from './_generated/server';
 import { v } from 'convex/values';
 
 export const join = mutation({
@@ -18,12 +18,5 @@ export const join = mutation({
       joinedAt: new Date().toISOString(),
       source: args.source,
     });
-  },
-});
-
-export const list = query({
-  args: {},
-  handler: async (ctx) => {
-    return ctx.db.query('waitlist').order('desc').collect();
   },
 });
