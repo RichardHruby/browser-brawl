@@ -6,7 +6,7 @@ import { WinnerBanner } from '@/components/end/WinnerBanner';
 import { useGameState } from '@/hooks/useGameState';
 import { useGameSSE } from '@/hooks/useGameSSE';
 import { ArenaScreen } from '@/components/arena/ArenaScreen';
-import type { AttackerType, Difficulty, Task } from '@/types/game';
+import type { AttackerType, Difficulty, GameMode, Task } from '@/types/game';
 
 export default function Home() {
   const { state, startGame, setArenaReady, handleSSEEvent, reset } = useGameState();
@@ -16,9 +16,7 @@ export default function Home() {
     handleSSEEvent
   );
 
-  async function handleStart(difficulty: Difficulty, task: Task, attackerType: AttackerType, modelUrl?: string) {
-    // TODO: re-enable turn-based mode toggle when ready
-    const mode = 'realtime';
+  async function handleStart(difficulty: Difficulty, task: Task, mode: GameMode, attackerType: AttackerType, modelUrl?: string) {
     startGame(difficulty, task, mode, attackerType);
     try {
       const res = await fetch('/api/game/start', {

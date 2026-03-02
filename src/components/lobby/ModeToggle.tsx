@@ -4,7 +4,7 @@ import type { GameMode } from '@/types/game';
 
 const OPTIONS: { value: GameMode; label: string; color: string; tooltip: string }[] = [
   { value: 'realtime',  label: 'REALTIME',   color: '#00d4ff', tooltip: 'Both agents run simultaneously — defender fires disruptions on a timer while the attacker works.' },
-  { value: 'turnbased', label: 'TURN-BASED', color: '#cc44ff', tooltip: 'Attacker takes N steps, then the defender strikes — structured back-and-forth.' },
+  // TODO: add new game modes here
 ];
 
 interface Props {
