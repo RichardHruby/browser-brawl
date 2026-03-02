@@ -18,10 +18,7 @@ export function LobbyScreenV1({ onStart }: Props) {
   const [task, setTask] = useState<Task | null>(null);
   const [mode, setMode] = useState<GameMode>('realtime');
   const [attackerType, setAttackerType] = useState<AttackerType>('playwright-mcp');
-  const [byomEnabled, setByomEnabled] = useState(false);
-  const [modelUrl, setModelUrl] = useState('');
-
-  const canStart = !!task && (!byomEnabled || modelUrl.trim().length > 0);
+  const canStart = !!task;
 
   return (
     <div
@@ -81,69 +78,30 @@ export function LobbyScreenV1({ onStart }: Props) {
               </h2>
               <div
                 className="flex-1 flex items-center justify-center transition-all duration-300"
-                style={{ opacity: byomEnabled ? 0.35 : 1, pointerEvents: byomEnabled ? 'none' : 'auto' }}
               >
                 <FighterSelect value={attackerType} onChange={setAttackerType} />
               </div>
 
-              {/* Bring Your Own Model */}
+              {/* Bring Your Own Model — links to waitlist */}
               <div
                 className="mt-4 pt-3"
                 style={{ borderTop: '1px solid var(--color-border)' }}
               >
-                <button
-                  onClick={() => setByomEnabled(!byomEnabled)}
-                  className="flex items-center gap-2 cursor-pointer w-full group"
+                <Link
+                  href="/waitlist"
+                  className="flex items-center gap-2 w-full group"
                 >
                   <div
-                    className="w-4 h-4 flex items-center justify-center transition-all duration-200 flex-shrink-0"
-                    style={{
-                      border: byomEnabled ? '2px solid #aa44ff' : '2px solid var(--color-border)',
-                      background: byomEnabled ? '#aa44ff22' : 'transparent',
-                      boxShadow: byomEnabled ? '0 0 8px #aa44ff66' : 'none',
-                    }}
-                  >
-                    {byomEnabled && (
-                      <div className="w-2 h-2" style={{ background: '#aa44ff' }} />
-                    )}
-                  </div>
+                    className="w-4 h-4 flex items-center justify-center flex-shrink-0"
+                    style={{ border: '2px solid var(--color-border)' }}
+                  />
                   <span
-                    className="font-display text-[11px] font-bold tracking-[0.3em] uppercase transition-colors duration-200"
-                    style={{ color: byomEnabled ? '#aa44ff' : 'var(--color-text-secondary)' }}
+                    className="font-display text-[11px] font-bold tracking-[0.3em] uppercase transition-colors duration-200 group-hover:underline"
+                    style={{ color: 'var(--color-text-secondary)' }}
                   >
                     BRING YOUR OWN MODEL
                   </span>
-                </button>
-
-                {byomEnabled && (
-                  <div className="mt-3 flex flex-col gap-2">
-                    <label
-                      className="font-mono text-[10px] tracking-wider"
-                      style={{ color: 'var(--color-text-secondary)' }}
-                    >
-                      MODEL ENDPOINT URL
-                    </label>
-                    <input
-                      type="url"
-                      value={modelUrl}
-                      onChange={(e) => setModelUrl(e.target.value)}
-                      placeholder="https://your-modal-endpoint.modal.run"
-                      className="w-full px-3 py-2 font-mono text-xs transition-all duration-200 outline-none"
-                      style={{
-                        background: 'var(--color-bg-deep)',
-                        border: '1px solid #aa44ff55',
-                        color: 'var(--color-text-primary)',
-                        boxShadow: modelUrl ? '0 0 8px #aa44ff33' : 'none',
-                      }}
-                    />
-                    <p
-                      className="font-mono text-[9px] leading-relaxed"
-                      style={{ color: 'var(--color-text-secondary)', opacity: 0.6 }}
-                    >
-                      OpenAI-compatible vLLM endpoint (e.g. Modal). Uses Playwright MCP tools with {'<tool_call>'} XML format.
-                    </p>
-                  </div>
-                )}
+                </Link>
               </div>
             </div>
           </div>
@@ -248,7 +206,7 @@ export function LobbyScreenV1({ onStart }: Props) {
               [ PRIOR TRACES ]
             </Link>
             <Link
-              href="/training"
+              href="/waitlist"
               className="font-mono text-sm tracking-widest font-bold transition-all duration-200 hover:underline"
               style={{ color: '#cc44ff', opacity: 0.6 }}
             >
@@ -260,7 +218,7 @@ export function LobbyScreenV1({ onStart }: Props) {
 
           <div className="order-1 sm:order-2 w-full max-w-sm sm:max-w-none sm:flex-1 flex justify-center">
             <button
-              onClick={() => task && onStart(difficulty, task, mode, byomEnabled ? 'finetuned' : attackerType, byomEnabled ? modelUrl : undefined)}
+              onClick={() => task && onStart(difficulty, task, mode, attackerType)}
               disabled={!canStart}
               className="w-full max-w-sm sm:w-auto px-6 sm:px-12 py-3 font-display text-base sm:text-lg font-black tracking-[0.2em] sm:tracking-[0.3em] uppercase transition-all duration-300 cursor-pointer disabled:cursor-not-allowed"
               style={{

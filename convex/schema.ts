@@ -127,4 +127,11 @@ export default defineSchema({
     // Convex file storage for the training JSONL
     trainingDataStorageId: v.optional(v.id('_storage')),
   }).index('by_experimentName', ['experimentName']),
+
+  // Early access waitlist
+  waitlist: defineTable({
+    email: v.string(),
+    joinedAt: v.string(),
+    source: v.optional(v.string()),
+  }).index('by_email', ['email']),
 });

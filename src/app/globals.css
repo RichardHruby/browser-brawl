@@ -152,6 +152,10 @@ body {
   color: var(--color-defender);
   text-shadow: 0 0 8px var(--color-defender);
 }
+.neon-purple {
+  color: #cc44ff;
+  text-shadow: 0 0 8px #cc44ff;
+}
 
 .border-neon-cyan {
   border-color: var(--color-attacker);
