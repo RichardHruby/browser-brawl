@@ -8,8 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "vitest run",
-    "eval:miniwob": "tsx scripts/eval-miniwob.ts",
-    "defend": "node --import tsx/esm defender/src/index.ts"
+    "eval:miniwob": "tsx scripts/eval-miniwob.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
