@@ -2,14 +2,10 @@ import { getBuClient, stopTask } from './browser-use-api';
 import { getSession } from './game-session-store';
 import { emitEvent } from './sse-emitter';
 import { endGame } from './defender-agent';
-import { initLaminar } from './laminar';
-import { downloadAndUploadScreenshot } from './data-collector';
+import { downloadAndUploadScreenshot, recordConversation } from './data-collector';
 import { snapshotDOM } from './cdp';
 import { AttackerStepLogger } from './attacker-step-logger';
 import { log, logError } from './log';
-
-// Initialize Laminar so any underlying Anthropic calls are traced
-initLaminar();
 
 /**
  * Run the attacker via the browser-use AI agent.
@@ -39,6 +35,13 @@ export async function runBrowserUseAttackerLoop(
 
   const logger = new AttackerStepLogger(gameId);
 
+  // Synthetic conversation history for replay UI & conversations table
+  const syntheticMessages: Array<{ role: string; content: string }> = [
+    { role: 'user', content: `TASK: ${taskPrompt}` },
+  ];
+  let conversationsRecorded = 0;
+  let screenshotsLinked = 0;
+
   try {
     session.attackerStatus = 'acting';
     emitEvent(gameId, 'status_update', {
@@ -49,6 +52,9 @@ export async function runBrowserUseAttackerLoop(
     // Kick off initial DOM snapshot (fire-and-forget)
     let latestDomSnap: string | null = null;
     snapshotDOM(session.cdpUrl).then(dom => { latestDomSnap = dom; }).catch(() => {});
+
+    // Track screenshot upload from previous step so we can link it to the current step
+    let pendingScreenshot: Promise<string | null> = Promise.resolve(null);
 
     // Run the AI agent task on the existing session
     log('[browser-use attacker] dispatching task to session:', session.browserSessionId);
@@ -67,6 +73,8 @@ export async function runBrowserUseAttackerLoop(
     };
     checkTaskId().catch(() => {});
 
+    let isFirstStep = true;
+
     // Stream steps via async iteration
     for await (const step of taskRun) {
       if (signal.aborted) break;
@@ -79,27 +87,48 @@ export async function runBrowserUseAttackerLoop(
         s.buTaskId = taskRun.taskId;
       }
 
-      log('[browser-use attacker] step received:', JSON.stringify(step, null, 2));
-
-      // Do not block SSE/log emission on screenshot upload. Upload in the background.
-      // This keeps AttackerPanel logs responsive even when storage/upload is slow.
-      if (step.screenshotUrl) {
-        void downloadAndUploadScreenshot(step.screenshotUrl)
-          .then((storageId) => {
-            if (!storageId) return;
-            log('[browser-use attacker] screenshot uploaded (unlinked step):', storageId);
-          })
-          .catch((err) => {
-            logError('[browser-use attacker] screenshot upload failed:', err);
-          });
+      // Diagnostic: log step shape on first step so we know what fields the SDK provides
+      if (isFirstStep) {
+        log(`[tracing] browser-use step keys: [${Object.keys(step).join(', ')}]`);
+        log(`[tracing] browser-use step sample:`, JSON.stringify(step, null, 2));
+        isFirstStep = false;
+      } else {
+        log('[browser-use attacker] step received:', JSON.stringify(step, null, 2));
       }
+
+      // Await the previous step's screenshot upload so we can link it to this step
+      const screenshotId = await pendingScreenshot;
+      if (screenshotId) screenshotsLinked++;
+
+      // Start uploading this step's screenshot (will be linked to the NEXT step or final)
+      if (step.screenshotUrl) {
+        pendingScreenshot = downloadAndUploadScreenshot(step.screenshotUrl).catch((err) => {
+          logError('[browser-use attacker] screenshot upload failed:', err);
+          return null;
+        });
+      } else {
+        pendingScreenshot = Promise.resolve(null);
+      }
+
+      // Extract available data from step for tool input/result fields
+      const actionsJson = step.actions?.length
+        ? JSON.stringify(step.actions).slice(0, 2000)
+        : undefined;
+      const evalResult = step.evaluationPreviousGoal || step.memory || undefined;
+      const toolResult = typeof evalResult === 'string' ? evalResult.slice(0, 500) : undefined;
 
       // Phase 1: Emit reasoning as a "thinking" step
       const thinkingText = step.nextGoal || step.evaluationPreviousGoal || step.memory;
       if (thinkingText) {
         logger.logThinking({
           description: thinkingText.slice(0, 300),
+          screenshotId: screenshotId,
           domSnapshot: latestDomSnap,
+        });
+
+        syntheticMessages.push({
+          role: 'assistant',
+          content: `[Thinking] ${thinkingText}`,
         });
       }
 
@@ -111,12 +140,39 @@ export async function runBrowserUseAttackerLoop(
       logger.logAction({
         description: actionDesc.slice(0, 300),
         toolName: step.actions?.[0],
+        toolInput: actionsJson,
+        toolResult: toolResult,
+        screenshotId: screenshotId,
         screenshotUrl: step.screenshotUrl ?? undefined,
         domSnapshot: latestDomSnap,
       });
+
+      syntheticMessages.push({
+        role: 'assistant',
+        content: `[Action] ${actionDesc}`,
+      });
+      if (toolResult) {
+        syntheticMessages.push({
+          role: 'user',
+          content: `[Result] ${toolResult}`,
+        });
+      }
+
+      // Persist synthetic conversation for replay
+      recordConversation({
+        gameId,
+        stepNumber: logger.currentStep,
+        messages: JSON.stringify(syntheticMessages),
+      });
+      conversationsRecorded++;
+
       // Refresh DOM snapshot for next step
       snapshotDOM(session.cdpUrl).then(dom => { latestDomSnap = dom; }).catch(() => {});
     }
+
+    // Await final screenshot upload
+    const finalScreenshotId = await pendingScreenshot;
+    if (finalScreenshotId) screenshotsLinked++;
 
     // Task finished — get the result
     const result = taskRun.result;
@@ -131,8 +187,23 @@ export async function runBrowserUseAttackerLoop(
     logger.logComplete({
       description: finalDescription,
       success: isSuccess,
+      screenshotId: finalScreenshotId,
       domSnapshot: latestDomSnap,
     });
+
+    // Record final conversation state
+    syntheticMessages.push({
+      role: 'assistant',
+      content: `[Complete] ${finalDescription}`,
+    });
+    recordConversation({
+      gameId,
+      stepNumber: logger.currentStep,
+      messages: JSON.stringify(syntheticMessages),
+    });
+    conversationsRecorded++;
+
+    log(`[tracing] browser-use summary | steps=${logger.currentStep} screenshotsLinked=${screenshotsLinked} conversations=${conversationsRecorded}`);
 
     if (isSuccess) {
       s.attackerStatus = 'complete';
