@@ -14,12 +14,15 @@ function ScreenshotViewer({ storageId }: { storageId: Id<'_storage'> | undefined
   const url = useQuery(api.screenshots.getUrl, storageId ? { storageId } : 'skip');
   if (!url) return null;
   return (
-    <img
-      src={url}
-      alt="Screenshot"
-      className="w-full rounded"
-      style={{ border: '2px solid var(--color-border)' }}
-    />
+    <>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={url}
+        alt="Screenshot"
+        className="w-full rounded"
+        style={{ border: '2px solid var(--color-border)' }}
+      />
+    </>
   );
 }
 
@@ -146,11 +149,14 @@ function ScreencastPlayer({ storageId }: { storageId: Id<'_storage'> }) {
     <div className="flex flex-col flex-1 min-h-0">
       <div className="flex-1 min-h-0 rounded overflow-hidden" style={{ border: '2px solid var(--color-border)' }}>
         {frame && (
-          <img
-            src={`data:image/jpeg;base64,${frame.d}`}
-            alt={`Frame ${frameIndex + 1}`}
-            className="w-full h-full object-contain"
-          />
+          <>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={`data:image/jpeg;base64,${frame.d}`}
+              alt={`Frame ${frameIndex + 1}`}
+              className="w-full h-full object-contain"
+            />
+          </>
         )}
       </div>
 

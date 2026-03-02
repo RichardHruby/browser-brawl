@@ -67,14 +67,14 @@ export async function GET(request: Request) {
         winner: session.winner || 'unknown',
         winReason: session.winReason || 'unknown',
         durationMs: session.durationSeconds ? session.durationSeconds * 1000 : 0,
-        messages: messages as any,
-        toolDefinitions: toolDefinitions as any,
-        steps: steps.map((s: any) => ({
+        messages: messages as RawTrajectory['messages'],
+        toolDefinitions: toolDefinitions as RawTrajectory['toolDefinitions'],
+        steps: steps.map((s) => ({
           stepNumber: s.stepNumber,
           toolName: s.toolName,
           screenshotBeforeId: s.screenshotBeforeId,
         })),
-        defenderActions: actions.map((a: any) => ({
+        defenderActions: actions.map((a) => ({
           actionNumber: a.actionNumber,
           disruptionId: a.disruptionId,
           disruptionName: a.disruptionName,

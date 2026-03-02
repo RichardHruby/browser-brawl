@@ -44,7 +44,6 @@ export interface ServerGameSession {
 
 // Global singleton store — survives across API route invocations in the same process
 declare global {
-  // eslint-disable-next-line no-var
   var __gameSessions: Map<string, ServerGameSession> | undefined;
 }
 

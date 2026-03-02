@@ -24,8 +24,6 @@ export function ArenaScreen({ state, onAbort }: Props) {
         health={state.health}
         elapsed={formatted}
         task={state.task}
-        attackerStatus={state.attackerStatus}
-        defenderStatus={state.defenderStatus}
         onAbort={onAbort}
         mode={state.mode}
         currentTurn={state.currentTurn}

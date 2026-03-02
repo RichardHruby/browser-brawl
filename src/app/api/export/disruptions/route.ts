@@ -17,7 +17,7 @@ export async function GET(request: Request) {
   let actions = await client.query(api.steps.listAllActions, { limit: 5000 });
 
   if (gameIdFilter) {
-    actions = actions.filter((a: any) => gameIdFilter.has(a.gameId));
+    actions = actions.filter((a) => gameIdFilter.has(a.gameId));
   }
 
   const headers = [

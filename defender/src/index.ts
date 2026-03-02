@@ -23,8 +23,8 @@ const [url, defenderGoal] = process.argv.slice(2);
 
 if (!url || !defenderGoal) {
   console.error(
-    'Usage: npm run defend -- "<url>" "<defender-goal>"\n' +
-      'Example: npm run defend -- "https://example.com" "block clicks on the buy button"'
+    'Usage: node --import tsx/esm defender/src/index.ts "<url>" "<defender-goal>"\n' +
+      'Example: node --import tsx/esm defender/src/index.ts "https://example.com" "block clicks on the buy button"'
   );
   process.exit(1);
 }

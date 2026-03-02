@@ -1,5 +1,6 @@
 import { ConvexHttpClient } from 'convex/browser';
 import { api } from '../../../../../convex/_generated/api';
+import type { Id } from '../../../../../convex/_generated/dataModel';
 import {
   convertTrajectory,
   toOpenAIMessages,
@@ -136,11 +137,11 @@ export async function POST(request: Request) {
     if (!uploadRes.ok) {
       throw new Error(`Failed to upload training data: ${uploadRes.status}`);
     }
-    const { storageId } = await uploadRes.json() as { storageId: string };
+    const { storageId } = await uploadRes.json() as { storageId: Id<'_storage'> };
 
     await client.mutation(api.training.setTrainingData, {
       experimentName,
-      trainingDataStorageId: storageId as any,
+      trainingDataStorageId: storageId,
     });
 
     // 4. Get the download URL for Modal

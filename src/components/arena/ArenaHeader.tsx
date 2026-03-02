@@ -3,14 +3,12 @@
 import { HealthBar } from './HealthBar';
 import { TurnIndicator } from './TurnIndicator';
 import { DIFFICULTY_COLORS, ATTACKER_TYPE_LABELS, ATTACKER_TYPE_COLORS } from '@/lib/constants';
-import type { Task, AttackerStatus, DefenderStatus, GameMode, TurnOwner, Difficulty, AttackerType } from '@/types/game';
+import type { Task, GameMode, TurnOwner, Difficulty, AttackerType } from '@/types/game';
 
 interface Props {
   health: number;
   elapsed: string;
   task: Task | null;
-  attackerStatus: AttackerStatus;
-  defenderStatus: DefenderStatus;
   onAbort: () => void;
   mode: GameMode;
   currentTurn: TurnOwner | null;
@@ -21,7 +19,7 @@ interface Props {
   attackerType: AttackerType;
 }
 
-export function ArenaHeader({ health, elapsed, task, attackerStatus, defenderStatus, onAbort, mode, currentTurn, turnNumber, attackerStepsThisTurn, attackerStepsPerTurn, difficulty, attackerType }: Props) {
+export function ArenaHeader({ health, elapsed, task, onAbort, mode, currentTurn, turnNumber, attackerStepsThisTurn, attackerStepsPerTurn, difficulty, attackerType }: Props) {
   const diffColor = DIFFICULTY_COLORS[difficulty];
   const attackerTypeColor = ATTACKER_TYPE_COLORS[attackerType];
   return (

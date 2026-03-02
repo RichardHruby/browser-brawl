@@ -6,6 +6,7 @@ import {
   convertToolResults,
   convertTrajectory,
   type AnthropicToolDef,
+  type AnthropicMessage,
   type RawTrajectory,
 } from '../convert-to-sharegpt';
 
@@ -246,7 +247,7 @@ describe('convertAssistantMessage', () => {
 
 describe('convertToolResults', () => {
   it('should convert tool_result to <tool_response> with correct tool name', () => {
-    const messages = [
+    const messages: AnthropicMessage[] = [
       {
         role: 'assistant' as const,
         content: [
@@ -269,10 +270,14 @@ describe('convertToolResults', () => {
         ],
       },
     ];
+    const toolResultContent = messages[1].content;
+    if (!Array.isArray(toolResultContent)) {
+      throw new Error('Expected tool result content array');
+    }
 
     const result = convertToolResults(
-      messages[1].content as any,
-      messages as any,
+      toolResultContent,
+      messages,
       1,
     );
     expect(result).toContain('<tool_response>');
@@ -281,7 +286,7 @@ describe('convertToolResults', () => {
   });
 
   it('should handle error tool results', () => {
-    const messages = [
+    const messages: AnthropicMessage[] = [
       {
         role: 'assistant' as const,
         content: [
@@ -305,10 +310,14 @@ describe('convertToolResults', () => {
         ],
       },
     ];
+    const toolResultContent = messages[1].content;
+    if (!Array.isArray(toolResultContent)) {
+      throw new Error('Expected tool result content array');
+    }
 
     const result = convertToolResults(
-      messages[1].content as any,
-      messages as any,
+      toolResultContent,
+      messages,
       1,
     );
     expect(result).toContain('Error: Element not found');

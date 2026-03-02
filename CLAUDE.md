@@ -142,7 +142,7 @@ All in `.env.local` (gitignored):
 
 Standalone CLI in `defender/src/` — separate from the integrated game.
 
-- **Entry:** `npm run defend -- "<url>" "<goal>"`
+- **Entry:** `node --import tsx/esm defender/src/index.ts "<url>" "<goal>"`
 - **Script:** `node --import tsx/esm defender/src/index.ts`
 - **TypeScript:** Uses `tsconfig.defender.json` (`module: NodeNext`), separate from root tsconfig
 - **Windows:** Uses `npx.cmd` instead of `npx` on `win32`

@@ -24,6 +24,7 @@ export {
   convertToolResults,
   convertTrajectory,
   type AnthropicToolDef,
+  type AnthropicMessage,
   type RawTrajectory,
   type ShareGPTTrainingExample,
 } from '../src/lib/training-converter';

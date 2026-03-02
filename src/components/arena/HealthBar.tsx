@@ -8,7 +8,7 @@ interface Props {
 }
 
 export function HealthBar({ health, variant = 'arena' }: Props) {
-  const { shaking, color, isCritical, ghostHealth } = useHealthBar(health);
+  const { color, isCritical, ghostHealth } = useHealthBar(health);
   const isStatic = variant === 'static';
 
   if (isStatic) {

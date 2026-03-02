@@ -12,6 +12,7 @@
 
 import { ConvexHttpClient } from 'convex/browser';
 import { api } from '../convex/_generated/api.js';
+import type { Id } from '../convex/_generated/dataModel';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -69,11 +70,11 @@ async function main() {
     _id: string;
     gameId: string;
     taskDescription?: string;
-    startUrl?: string;
+    taskStartUrl?: string;
     difficulty?: string;
     winner?: string;
     winReason?: string;
-    durationMs?: number;
+    durationSeconds?: number;
   }>;
 
   if (GAME_ID) {
@@ -121,21 +122,21 @@ async function main() {
 
     // Fetch screenshot URLs for steps that have them
     const stepsWithScreenshots = await Promise.all(
-      steps.map(async (step: Record<string, unknown>) => {
+      steps.map(async (step) => {
         let screenshotUrl: string | undefined;
         if (step.screenshotBeforeId) {
           try {
             screenshotUrl = await client.query(api.screenshots.getUrl, {
-              storageId: step.screenshotBeforeId as any,
+              storageId: step.screenshotBeforeId as Id<'_storage'>,
             }) ?? undefined;
           } catch {
             // screenshot may have been deleted
           }
         }
         return {
-          stepNumber: step.stepNumber as number,
-          toolName: step.toolName as string | undefined,
-          screenshotBeforeId: step.screenshotBeforeId as string | undefined,
+          stepNumber: step.stepNumber,
+          toolName: step.toolName,
+          screenshotBeforeId: step.screenshotBeforeId,
           screenshotUrl,
         };
       }),
@@ -160,22 +161,20 @@ async function main() {
       gameId,
       task: {
         description: session.taskDescription || 'unknown',
-        startUrl: session.startUrl,
+        startUrl: session.taskStartUrl,
         difficulty: session.difficulty || 'medium',
       },
       winner: session.winner || 'unknown',
       winReason: session.winReason || 'unknown',
-      durationMs: session.durationMs || 0,
+      durationMs: session.durationSeconds ? session.durationSeconds * 1000 : 0,
       messages,
       toolDefinitions,
       steps: stepsWithScreenshots,
-      defenderActions: (
-        actions as Array<Record<string, unknown>>
-      ).map((a) => ({
-        actionNumber: a.actionNumber as number,
-        disruptionId: a.disruptionId as string,
-        disruptionName: a.disruptionName as string,
-        description: a.description as string,
+      defenderActions: actions.map((a) => ({
+        actionNumber: a.actionNumber,
+        disruptionId: a.disruptionId,
+        disruptionName: a.disruptionName,
+        description: a.description,
       })),
     };
 

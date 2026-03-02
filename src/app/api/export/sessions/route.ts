@@ -17,7 +17,7 @@ export async function GET(request: Request) {
   let sessions = await client.query(api.sessions.list, { limit: 1000 });
 
   if (gameIdFilter) {
-    sessions = sessions.filter((s: any) => gameIdFilter.has(s.gameId));
+    sessions = sessions.filter((s) => gameIdFilter.has(s.gameId));
   }
 
   const headers = [

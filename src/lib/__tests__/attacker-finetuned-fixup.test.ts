@@ -34,11 +34,7 @@ describe('needsFixup()', () => {
   });
 
   it('returns true when JSON parse fails (unescaped inner quotes)', () => {
-    // The "q" inside the string breaks JSON.parse
-    const text = `<tool_call>
-{"name": "browser_run_code", "arguments": {"code": "async (page) => { await page.type('input[name=\"q\"]', 'hello') }"}}
-</tool_call>`;
-    // Simulate what the model actually produces (raw unescaped quotes):
+    // Simulate what the model actually produces (raw unescaped inner quotes):
     const badText = `<tool_call>
 {"name": "browser_run_code", "arguments": {"code": "async (page) => { await page.type('input[name="q"]', 'hello') }"}}
 </tool_call>`;
