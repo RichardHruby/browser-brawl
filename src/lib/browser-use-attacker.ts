@@ -114,8 +114,11 @@ export async function runBrowserUseAttackerLoop(
       const actionsJson = step.actions?.length
         ? JSON.stringify(step.actions).slice(0, 2000)
         : undefined;
-      const evalResult = step.evaluationPreviousGoal || step.memory || undefined;
-      const toolResult = typeof evalResult === 'string' ? evalResult.slice(0, 500) : undefined;
+      // Only use evaluationPreviousGoal for toolResult (not memory — that duplicates thinking text)
+      const evalResult = step.evaluationPreviousGoal || undefined;
+      const toolResult = typeof evalResult === 'string' && evalResult.length > 0
+        ? evalResult.slice(0, 500)
+        : undefined;
 
       // Phase 1: Emit reasoning as a "thinking" step
       const thinkingText = step.nextGoal || step.evaluationPreviousGoal || step.memory;
