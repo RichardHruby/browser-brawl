@@ -6,17 +6,15 @@ import { GlitchText } from '@/components/shared/GlitchText';
 import { FighterSelect } from './FighterSelect';
 import { ArenaSelector } from './ArenaSelector';
 import { DifficultyBar } from './DifficultyBar';
-import { ModeToggle } from './ModeToggle';
-import type { AttackerType, Difficulty, GameMode, Task } from '@/types/game';
+import type { AttackerType, Difficulty, Task } from '@/types/game';
 
 interface Props {
-  onStart: (difficulty: Difficulty, task: Task, mode: GameMode, attackerType: AttackerType, modelUrl?: string) => void;
+  onStart: (difficulty: Difficulty, task: Task, attackerType: AttackerType, modelUrl?: string) => void;
 }
 
 export function LobbyScreenV1({ onStart }: Props) {
   const [difficulty, setDifficulty] = useState<Difficulty>('easy');
   const [task, setTask] = useState<Task | null>(null);
-  const [mode, setMode] = useState<GameMode>('realtime');
   const [attackerType, setAttackerType] = useState<AttackerType>('playwright-mcp');
   const canStart = !!task;
 
@@ -169,20 +167,7 @@ export function LobbyScreenV1({ onStart }: Props) {
                 <DifficultyBar value={difficulty} onChange={setDifficulty} />
               </div>
 
-              {/* Mode section */}
-              <div className="flex flex-col gap-1">
-                <h3
-                  className="font-display text-[11px] font-bold tracking-[0.3em] uppercase px-3"
-                  style={{ color: 'var(--color-text-secondary)' }}
-                >
-                  MODE
-                </h3>
-                <div
-                  className="w-full h-px"
-                  style={{ background: 'var(--color-border)' }}
-                />
-                <ModeToggle value={mode} onChange={setMode} />
-              </div>
+              {/* TODO: re-enable turn-based mode toggle when ready */}
             </div>
           </div>
         </div>
@@ -218,7 +203,7 @@ export function LobbyScreenV1({ onStart }: Props) {
 
           <div className="order-1 sm:order-2 w-full max-w-sm sm:max-w-none sm:flex-1 flex justify-center">
             <button
-              onClick={() => task && onStart(difficulty, task, mode, attackerType)}
+              onClick={() => task && onStart(difficulty, task, attackerType)}
               disabled={!canStart}
               className="w-full max-w-sm sm:w-auto px-6 sm:px-12 py-3 font-display text-base sm:text-lg font-black tracking-[0.2em] sm:tracking-[0.3em] uppercase transition-all duration-300 cursor-pointer disabled:cursor-not-allowed"
               style={{
