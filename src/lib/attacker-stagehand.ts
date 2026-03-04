@@ -2,7 +2,7 @@ import { Stagehand } from '@browserbasehq/stagehand';
 import { getSession } from './game-session-store';
 import { emitEvent } from './sse-emitter';
 import { endGame } from './defender-agent';
-import { captureAndUploadScreenshot } from './data-collector';
+import { captureAndUploadScreenshot, recordConversation } from './data-collector';
 import { snapshotDOM } from './cdp';
 import { AttackerStepLogger } from './attacker-step-logger';
 import { log } from './log';
@@ -112,6 +112,13 @@ Be persistent and methodical.`,
 
     const logger = new AttackerStepLogger(gameId);
 
+    // Synthetic conversation history for replay UI & conversations table
+    const syntheticMessages: Array<{ role: string; content: string }> = [
+      { role: 'user', content: `TASK: ${taskPrompt}` },
+    ];
+    let conversationsRecorded = 0;
+    let isFirstCallback = true;
+
     // Capture initial screenshot + DOM snapshot (fire-and-forget)
     let latestScreenshotId: string | null = null;
     let latestDomSnap: string | null = null;
@@ -129,12 +136,27 @@ Be persistent and methodical.`,
       callbacks: {
         // Fires after each LLM step completes (tools have executed)
         onStepFinish: async (event: Record<string, unknown>) => {
+          // Diagnostic: log event shape on first callback
+          if (isFirstCallback) {
+            log(`[tracing] stagehand onStepFinish keys: [${Object.keys(event).join(', ')}]`);
+            if (Array.isArray(event.toolCalls) && event.toolCalls.length > 0) {
+              const firstTc = event.toolCalls[0] as Record<string, unknown>;
+              log(`[tracing] stagehand toolCall[0] keys: [${Object.keys(firstTc).join(', ')}]`);
+            }
+            isFirstCallback = false;
+          }
+
           // Emit reasoning as a "thinking" step
           if (typeof event.text === 'string' && event.text.trim().length > 0) {
             logger.logThinking({
               description: event.text.trim().slice(0, 300),
               screenshotId: latestScreenshotId,
               domSnapshot: latestDomSnap,
+            });
+
+            syntheticMessages.push({
+              role: 'assistant',
+              content: `[Thinking] ${event.text.trim()}`,
             });
           }
 
@@ -143,6 +165,12 @@ Be persistent and methodical.`,
             const firstTool = event.toolCalls[0] as Record<string, unknown>;
             const toolName = String(firstTool?.toolName ?? firstTool?.name ?? 'tool');
             const toolInput = firstTool?.input ?? firstTool?.args;
+
+            // Check for tool results — Stagehand may expose result/output on each tool call
+            const toolResultRaw = firstTool?.result ?? firstTool?.output;
+            const toolResult = toolResultRaw != null
+              ? (typeof toolResultRaw === 'string' ? toolResultRaw : JSON.stringify(toolResultRaw)).slice(0, 500)
+              : undefined;
 
             const toolDesc = event.toolCalls.map((tc: Record<string, unknown>) => {
               const name = String(tc.toolName ?? tc.name ?? 'tool');
@@ -157,10 +185,30 @@ Be persistent and methodical.`,
               description: toolDesc.slice(0, 300),
               toolName,
               toolInput: toolInput ? JSON.stringify(toolInput).slice(0, 2000) : undefined,
+              toolResult,
               screenshotId: latestScreenshotId,
               domSnapshot: latestDomSnap,
             });
+
+            syntheticMessages.push({
+              role: 'assistant',
+              content: `[Action] ${toolDesc}`,
+            });
+            if (toolResult) {
+              syntheticMessages.push({
+                role: 'user',
+                content: `[Result] ${toolResult}`,
+              });
+            }
           }
+
+          // Persist synthetic conversation for replay
+          recordConversation({
+            gameId,
+            stepNumber: logger.currentStep,
+            messages: JSON.stringify(syntheticMessages),
+          });
+          conversationsRecorded++;
 
           // Refresh screenshot + DOM for next step (fire-and-forget)
           Promise.all([
@@ -193,8 +241,23 @@ Be persistent and methodical.`,
     if (result.success) {
       const finalMsg = (result.message || 'Task completed').slice(0, 200);
       logger.logComplete({ description: finalMsg, success: true });
+
+      // Record final conversation state
+      syntheticMessages.push({
+        role: 'assistant',
+        content: `[Complete] ${finalMsg}`,
+      });
+      recordConversation({
+        gameId,
+        stepNumber: logger.currentStep,
+        messages: JSON.stringify(syntheticMessages),
+      });
+      conversationsRecorded++;
+
+      log(`[tracing] stagehand summary | steps=${logger.currentStep} conversations=${conversationsRecorded}`);
       endGame(gameId, 'attacker', 'task_complete');
     } else {
+      log(`[tracing] stagehand summary | steps=${logger.currentStep} conversations=${conversationsRecorded} result=failed`);
       s2.attackerStatus = 'failed';
       emitEvent(gameId, 'status_update', {
         attackerStatus: 'failed',
