@@ -112,8 +112,10 @@ export async function POST(req: NextRequest) {
     taskStartUrl: task.startUrl,
     difficulty,
     mode: gameMode,
+    attackerType,
     attackerModel: attackerType === 'finetuned' ? 'finetuned-qwen' : 'claude-sonnet-4-6',
     defenderModel: 'claude-haiku-4-5-20251001',
+    hasDefender: !noDefender,
   });
 
   // 2c. Start network request capture via CDP
