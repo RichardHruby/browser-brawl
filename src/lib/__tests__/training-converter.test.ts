@@ -2,9 +2,11 @@ import { describe, it, expect } from 'vitest';
 import {
   toOpenAIMessages,
   convertTrajectory,
+  trimIncompleteTrailingTurn,
   type ShareGPTTrainingExample,
   type RawTrajectory,
   type AnthropicToolDef,
+  type AnthropicMessage,
 } from '@/lib/training-converter';
 
 // ── Fixtures ───────────────────────────────────────────────────────
@@ -209,12 +211,196 @@ describe('toOpenAIMessages', () => {
   });
 });
 
+// ── trimIncompleteTrailingTurn tests ───────────────────────────────
+
+describe('trimIncompleteTrailingTurn', () => {
+  it('removes trailing user messages (tool results without assistant response)', () => {
+    const messages: AnthropicMessage[] = [
+      { role: 'user', content: 'Do something' },
+      {
+        role: 'assistant',
+        content: [
+          { type: 'tool_use', id: 'tu_1', name: 'browser_snapshot', input: {} },
+        ],
+      },
+      {
+        role: 'user',
+        content: [
+          { type: 'tool_result', tool_use_id: 'tu_1', content: 'result' },
+        ],
+      },
+    ];
+
+    const trimmed = trimIncompleteTrailingTurn(messages);
+    expect(trimmed.length).toBe(2);
+    expect(trimmed[trimmed.length - 1].role).toBe('assistant');
+  });
+
+  it('preserves conversation ending with assistant message', () => {
+    const messages: AnthropicMessage[] = [
+      { role: 'user', content: 'Do something' },
+      { role: 'assistant', content: 'TASK COMPLETE' },
+    ];
+
+    const trimmed = trimIncompleteTrailingTurn(messages);
+    expect(trimmed.length).toBe(2);
+    expect(trimmed[trimmed.length - 1].role).toBe('assistant');
+  });
+
+  it('does not modify the original array', () => {
+    const messages: AnthropicMessage[] = [
+      { role: 'user', content: 'Do something' },
+      {
+        role: 'assistant',
+        content: [
+          { type: 'tool_use', id: 'tu_1', name: 'browser_snapshot', input: {} },
+        ],
+      },
+      {
+        role: 'user',
+        content: [
+          { type: 'tool_result', tool_use_id: 'tu_1', content: 'result' },
+        ],
+      },
+    ];
+
+    trimIncompleteTrailingTurn(messages);
+    expect(messages.length).toBe(3); // original unchanged
+  });
+
+  it('handles empty array', () => {
+    const trimmed = trimIncompleteTrailingTurn([]);
+    expect(trimmed).toEqual([]);
+  });
+});
+
+// ── convertTrajectory quality filters ─────────────────────────────
+
+describe('convertTrajectory quality filters', () => {
+  it('skips games where defender won (default requireAttackerWin=true)', () => {
+    const raw = makeTrajectory({
+      winner: 'defender',
+      winReason: 'health_depleted',
+    });
+
+    const result = convertTrajectory(raw);
+    expect(result).toBeNull();
+  });
+
+  it('skips games with unknown winner', () => {
+    const raw = makeTrajectory({
+      winner: 'unknown',
+      winReason: 'unknown',
+    });
+
+    const result = convertTrajectory(raw);
+    expect(result).toBeNull();
+  });
+
+  it('includes defender-win games when requireAttackerWin=false', () => {
+    const raw = makeTrajectory({
+      winner: 'defender',
+      winReason: 'health_depleted',
+    });
+
+    const result = convertTrajectory(raw, { requireAttackerWin: false });
+    expect(result).not.toBeNull();
+  });
+
+  it('trims trailing tool results and still produces valid output', () => {
+    // Simulate a conversation that was recorded mid-turn
+    const raw = makeTrajectory({
+      messages: [
+        {
+          role: 'user',
+          content: 'TASK: Add toothpaste\n\nIMPORTANT: do it',
+        },
+        {
+          role: 'assistant',
+          content: [
+            { type: 'text', text: 'Taking snapshot.' },
+            { type: 'tool_use', id: 'tu_1', name: 'browser_snapshot', input: {} },
+          ],
+        },
+        {
+          role: 'user',
+          content: [
+            { type: 'tool_result', tool_use_id: 'tu_1', content: '[snapshot]' },
+          ],
+        },
+        {
+          role: 'assistant',
+          content: [
+            { type: 'text', text: 'Clicking button.' },
+            { type: 'tool_use', id: 'tu_2', name: 'browser_click', input: { ref: 'e1' } },
+          ],
+        },
+        {
+          role: 'user',
+          content: [
+            { type: 'tool_result', tool_use_id: 'tu_2', content: 'Clicked' },
+          ],
+        },
+        {
+          role: 'assistant',
+          content: [
+            { type: 'text', text: 'Clicking again.' },
+            { type: 'tool_use', id: 'tu_3', name: 'browser_click', input: { ref: 'e2' } },
+          ],
+        },
+        // Trailing tool result with no assistant response (game ended mid-turn)
+        {
+          role: 'user',
+          content: [
+            { type: 'tool_result', tool_use_id: 'tu_3', content: 'Error: timeout' },
+          ],
+        },
+      ] as AnthropicMessage[],
+    });
+
+    const result = convertTrajectory(raw, { minToolCalls: 1 });
+    expect(result).not.toBeNull();
+
+    // Last converted message should be assistant (gpt), not tool
+    const lastConv = result!.conversations[result!.conversations.length - 1];
+    expect(lastConv.from).toBe('gpt');
+  });
+
+  it('rejects conversations that end with tool message after trimming', () => {
+    // Edge case: all messages are tool results after the initial user message
+    const raw = makeTrajectory({
+      messages: [
+        { role: 'user', content: 'TASK: do something' },
+        // No assistant messages at all — just user messages
+        {
+          role: 'user',
+          content: [
+            { type: 'tool_result', tool_use_id: 'tu_1', content: 'result' },
+          ],
+        },
+      ] as AnthropicMessage[],
+    });
+
+    const result = convertTrajectory(raw, { minToolCalls: 0, requireAttackerWin: true });
+    // After trimming, only the first user message remains → too few messages
+    // and even if it had enough, last message is 'human' not 'gpt'
+    expect(result).toBeNull();
+  });
+
+  it('supports legacy numeric minSteps parameter', () => {
+    const raw = makeTrajectory();
+    // 3 tool calls in the fixture, so minSteps=5 should filter it out
+    const result = convertTrajectory(raw, 5);
+    expect(result).toBeNull();
+  });
+});
+
 // ── End-to-end: convertTrajectory → toOpenAIMessages ───────────────
 
 describe('convertTrajectory → toOpenAIMessages pipeline', () => {
   it('produces valid OpenAI Messages from raw Anthropic trajectory', () => {
     const raw = makeTrajectory();
-    const sharegpt = convertTrajectory(raw, 1);
+    const sharegpt = convertTrajectory(raw, { minToolCalls: 1 });
     expect(sharegpt).not.toBeNull();
 
     const openai = toOpenAIMessages(sharegpt!);
@@ -234,7 +420,7 @@ describe('convertTrajectory → toOpenAIMessages pipeline', () => {
 
   it('preserves tool_call XML in assistant messages through the pipeline', () => {
     const raw = makeTrajectory();
-    const sharegpt = convertTrajectory(raw, 1)!;
+    const sharegpt = convertTrajectory(raw, { minToolCalls: 1 })!;
     const openai = toOpenAIMessages(sharegpt);
 
     const assistantMessages = openai.messages.filter((m) => m.role === 'assistant');
@@ -247,7 +433,7 @@ describe('convertTrajectory → toOpenAIMessages pipeline', () => {
 
   it('preserves tool_response XML in tool messages through the pipeline', () => {
     const raw = makeTrajectory();
-    const sharegpt = convertTrajectory(raw, 1)!;
+    const sharegpt = convertTrajectory(raw, { minToolCalls: 1 })!;
     const openai = toOpenAIMessages(sharegpt);
 
     const toolMessages = openai.messages.filter((m) => m.role === 'tool');
@@ -264,13 +450,13 @@ describe('convertTrajectory → toOpenAIMessages pipeline', () => {
       ],
     });
 
-    const sharegpt = convertTrajectory(raw, 3);
+    const sharegpt = convertTrajectory(raw, { minToolCalls: 3 });
     expect(sharegpt).toBeNull();
   });
 
   it('output format matches what Unsloth expects', () => {
     const raw = makeTrajectory();
-    const sharegpt = convertTrajectory(raw, 1)!;
+    const sharegpt = convertTrajectory(raw, { minToolCalls: 1 })!;
     const openai = toOpenAIMessages(sharegpt);
 
     // Unsloth expects: { messages: [{ role, content: [{ type, text }] }] }
@@ -292,5 +478,13 @@ describe('convertTrajectory → toOpenAIMessages pipeline', () => {
     const jsonl = JSON.stringify(openai);
     const parsed = JSON.parse(jsonl);
     expect(parsed.messages.length).toBe(openai.messages.length);
+  });
+
+  it('ensures converted conversation ends with assistant message', () => {
+    const raw = makeTrajectory();
+    const sharegpt = convertTrajectory(raw, { minToolCalls: 1 })!;
+
+    const lastConv = sharegpt.conversations[sharegpt.conversations.length - 1];
+    expect(lastConv.from).toBe('gpt');
   });
 });

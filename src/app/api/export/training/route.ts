@@ -23,6 +23,9 @@ export async function GET(request: Request) {
     return new Response('No gameIds provided', { status: 400 });
   }
 
+  // Allow overriding winner filter for export/inspection
+  const includeAll = searchParams.get('includeAll') === 'true';
+
   const client = new ConvexHttpClient(convexUrl);
   const results: string[] = [];
 
@@ -82,7 +85,9 @@ export async function GET(request: Request) {
         })),
       };
 
-      const converted = convertTrajectory(trajectory);
+      const converted = convertTrajectory(trajectory, {
+        requireAttackerWin: !includeAll,
+      });
       if (converted) {
         results.push(JSON.stringify(converted));
       }

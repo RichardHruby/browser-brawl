@@ -216,15 +216,69 @@ function findToolName(
   return 'unknown_tool';
 }
 
+export interface ConvertOptions {
+  /** Minimum number of tool calls required (default 3) */
+  minToolCalls?: number;
+  /** Only include games won by the attacker via task completion (default true) */
+  requireAttackerWin?: boolean;
+}
+
+/**
+ * Trim trailing incomplete turns from an Anthropic message array.
+ *
+ * Conversations are recorded after each Claude turn, so the last message may be
+ * a tool_result with no subsequent assistant response (game ended mid-turn).
+ * For training, we want conversations that end with an assistant message —
+ * ideally one containing "TASK COMPLETE".
+ *
+ * This function removes trailing user/tool_result messages that have no
+ * corresponding assistant response.
+ */
+export function trimIncompleteTrailingTurn(
+  messages: AnthropicMessage[],
+): AnthropicMessage[] {
+  const trimmed = [...messages];
+
+  // Remove trailing user messages (tool_result turns) that lack an assistant response
+  while (
+    trimmed.length > 0 &&
+    trimmed[trimmed.length - 1].role === 'user'
+  ) {
+    trimmed.pop();
+  }
+
+  return trimmed;
+}
+
 /**
  * Convert a full Anthropic conversation to ShareGPT format.
- * @param minSteps Minimum number of tool calls required (default 3)
  */
 export function convertTrajectory(
   raw: RawTrajectory,
-  minSteps: number = 3,
+  minStepsOrOptions: number | ConvertOptions = {},
 ): ShareGPTTrainingExample | null {
-  const { messages, toolDefinitions } = raw;
+  // Support legacy numeric minSteps parameter
+  const opts: ConvertOptions =
+    typeof minStepsOrOptions === 'number'
+      ? { minToolCalls: minStepsOrOptions }
+      : minStepsOrOptions;
+
+  const minToolCalls = opts.minToolCalls ?? 3;
+  const requireAttackerWin = opts.requireAttackerWin ?? true;
+
+  // Quality filter: only attacker wins with task completion
+  if (requireAttackerWin) {
+    if (raw.winner !== 'attacker' || raw.winReason !== 'task_complete') {
+      console.error(
+        `[convert] SKIP ${raw.gameId} — not an attacker win (winner=${raw.winner}, reason=${raw.winReason})`,
+      );
+      return null;
+    }
+  }
+
+  const { toolDefinitions } = raw;
+  // Trim trailing incomplete turns (tool results with no assistant response)
+  const messages = trimIncompleteTrailingTurn(raw.messages);
 
   if (!messages || messages.length < 2) {
     console.error(
@@ -281,10 +335,19 @@ export function convertTrajectory(
     }
   }
 
-  // Quality filter: minimum steps
-  if (numToolCalls < minSteps) {
+  // Quality filter: minimum tool calls
+  if (numToolCalls < minToolCalls) {
     console.error(
-      `[convert] SKIP ${raw.gameId} — only ${numToolCalls} tool calls (min ${minSteps})`,
+      `[convert] SKIP ${raw.gameId} — only ${numToolCalls} tool calls (min ${minToolCalls})`,
+    );
+    return null;
+  }
+
+  // Quality filter: conversation should end with an assistant message
+  const lastConv = conversations[conversations.length - 1];
+  if (lastConv.from !== 'gpt') {
+    console.error(
+      `[convert] SKIP ${raw.gameId} — conversation ends with '${lastConv.from}' instead of assistant`,
     );
     return null;
   }
