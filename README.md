@@ -4,7 +4,7 @@
 
 One AI agent (the attacker) tries to complete a task on a real webpage. Another AI agent (the defender) tries to block it with JavaScript injections. They compete in real time inside a cloud browser. Every match produces rich, structured training data — tool calls, DOM snapshots, screenshots, full conversation traces — that you can use to fine-tune smaller browser models.
 
-During the hackathon we validated the training pipeline by converting Browser Brawl traces into fine-tuning data and successfully training Qwen2.5-3B..
+We built this during YC's 24 hour browser use hackathon - during that we validated the training pipeline by converting Browser Brawl traces into fine-tuning data which was used to run supervised fine tuning on Qwen2.5-3B.
 
 ---
 
@@ -60,8 +60,8 @@ flowchart LR
   L4 --> A1
 ```
 
-1. **Lobby**  
-   Choose a real web task (Amazon, Google Flights, Hacker News).
+1. **Lobby**
+   Choose a browser agent and a real web task for it to accomplish (Amazon shopping cart, Google Flights, Hacker News), as well as a defender agent difficulty.
 
 2. **Arena**  
    - Attacker navigates the website using Playwright tools  
@@ -77,6 +77,7 @@ flowchart LR
    - DOM snapshots
    - screenshots
    - full agent conversations
+   - View and replay full game traces at [browser-brawl.com/history](https://browser-brawl.com/history)
 
 This data becomes training trajectories for browser agents.
 
@@ -87,58 +88,9 @@ This data becomes training trajectories for browser agents.
 Select games on the history page, click **Kickoff Finetune**, and the full pipeline runs automatically — no Python environment or CLI needed.
 
 ```mermaid
-flowchart TD
-  subgraph UI["Browser UI"]
-    H["/history\nselect games → Kickoff Finetune"]
-    T["/training\nlive status dashboard"]
-    L["Lobby\nBYOM toggle + endpoint URL"]
-  end
-
-  subgraph API["Next.js API Route"]
-    S["POST /api/training/start\nfetch conversations from Convex\nconvert: Anthropic → ShareGPT → OpenAI Messages"]
-  end
-
-  subgraph Convex["Convex"]
-    DB["conversations table\nfull Claude messages + tool calls"]
-    FS["file storage\nJSONL training blob"]
-    JT["trainingJobs table\nstatus + step/loss metrics"]
-  end
-
-  subgraph Modal["Modal — GPU Cloud"]
-    K["kickoff endpoint\nweb fn, spawns GPU job"]
-    TR["train\nUnsloth QLoRA on A10G\nQwen2.5-3B-Instruct"]
-    MG["merge\nLoRA adapter → base model"]
-    SV["serve\nvLLM endpoint, OpenAI-compatible"]
-  end
-
-  H --> S
-  S -->|query| DB
-  S -->|upload JSONL| FS
-  FS -->|download URL| S
-  S -->|fire-and-forget POST| K
-  K -->|spawn async| TR
-  TR -->|status callbacks| JT
-  TR --> MG
-  MG --> SV
-  JT -->|useQuery live updates| T
-  SV -->|serve URL| T
-  T -->|paste URL| L
-  L -->|fight with fine-tuned model| L
+flowchart LR
+  H["/history - select games"] --> S["Next.js API Route - fetch & convert"] --> FS["Convex - upload JSONL"] --> K["Modal - fire-and-forget POST"] --> TR["Unsloth QLoRA on A10G"] --> SV["vLLM serve endpoint"]
 ```
-
-Status transitions streamed live to `/training` via Convex subscriptions: `preparing → uploading → training → merging → ready`.
-
-### Bring Your Own Model (BYOM)
-
-Once you have a fine-tuned model, close the loop — fight with it directly in the game.
-
-1. In the lobby, enable **Bring Your Own Model**
-2. Paste your vLLM endpoint URL (OpenAI-compatible — e.g. the serve URL from `/training`)
-3. Hit **FIGHT** — the fine-tuned model controls the attacker using the same Playwright MCP tool interface it was trained on
-
-The model outputs `<tool_call>` XML matching the training data format. Results return as `<tool_response>` XML. Cold start handling built in: a warm-up ping fires during browser creation to overlap the ~2min Modal cold start with the ~8s browser spin-up.
-
-This closes the self-improvement loop: **play games → collect traces → train model → fight with that model → generate harder traces → repeat.**
 
 ---
 
@@ -209,18 +161,19 @@ NEXT_PUBLIC_CONVEX_SITE_URL=https://...convex.site
 MODAL_TRAIN_ENDPOINT=https://your-workspace--browser-brawl-train-pipeline-kickoff.modal.run
 ```
 
-### Training Pipeline
-
-**One-click (recommended):**
-1. Play games and collect successful traces
-2. Go to `/history`, select winning sessions, click **Kickoff Finetune**
-3. Watch live progress on `/training` (`preparing → uploading → training → merging → ready`)
-4. Copy the serve URL from `/training` → paste into the lobby BYOM field → **FIGHT**
 ---
 
-## Collaborators
+## Roadmap
 
-- **Richard Hruby** — [GitHub](https://github.com/RichardHruby)
-- **Mehul Kalia** — [GitHub](http://github.com/mehulkalia/)
+- **Bring Your Own Model** - fight with your fine-tuned model directly in the arena
+- **Supervised fine-tune Qwen 3.5** (mid-sized) on adversarial and non-adversarial browser traces
+- **New game modes:**
+  - Race mode - multiple browser agents racing to complete the same task
+  - Tower defense mode - defender places all perturbations upfront with a budget, attacker has a time limit
+
+Have an idea you want us to add? Reach out:
+
+- **Richard Hruby** - [GitHub](https://github.com/RichardHruby) | [hruby.richard@gmail.com](mailto:hruby.richard@gmail.com) | [@HrubyOnRails](https://x.com/HrubyOnRails)
+- **Mehul Kalia** - [GitHub](http://github.com/mehulkalia/) | [mehultkalia@gmail.com](mailto:mehultkalia@gmail.com) | [@MehulKalia_](https://x.com/MehulKalia_)
 
 ---
