@@ -18,6 +18,18 @@ export async function POST(request: Request) {
     return Response.json({ error: 'NEXT_PUBLIC_CONVEX_SITE_URL not configured' }, { status: 500 });
   }
 
+  const modalTrainUrl = process.env.MODAL_TRAIN_ENDPOINT;
+  if (!modalTrainUrl) {
+    return Response.json(
+      {
+        error:
+          'MODAL_TRAIN_ENDPOINT not set. Deploy the training endpoint first: ' +
+          'modal deploy scripts/modal_train_pipeline.py',
+      },
+      { status: 500 },
+    );
+  }
+
   let body: { gameIds?: string[]; textOnly?: boolean };
   try {
     body = await request.json();
@@ -99,8 +111,8 @@ export async function POST(request: Request) {
         })),
       };
 
-      // ShareGPT → OpenAI Messages
-      const sharegpt = convertTrajectory(trajectory, 1); // low min for kickoff
+      // ShareGPT → OpenAI Messages (trim incomplete trailing turns)
+      const sharegpt = convertTrajectory(trajectory, 1);
       if (!sharegpt) continue;
       const openai = toOpenAIMessages(sharegpt);
       openaiLines.push(JSON.stringify(openai));
@@ -158,14 +170,6 @@ export async function POST(request: Request) {
       experimentName,
       status: 'training',
     });
-
-    const modalTrainUrl = process.env.MODAL_TRAIN_ENDPOINT;
-    if (!modalTrainUrl) {
-      throw new Error(
-        'MODAL_TRAIN_ENDPOINT not set. Deploy the training endpoint first: ' +
-        'modal deploy scripts/modal_train_pipeline.py',
-      );
-    }
 
     // Fire-and-forget: Modal endpoint kicks off async training
     // and calls back to Convex HTTP endpoint with status updates
