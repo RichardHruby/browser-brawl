@@ -250,7 +250,7 @@ def main():
 
     attacker_types = []
     if not args.finetuned_only:
-        attacker_types.append("playwright-mcp")   # Claude Sonnet 4 baseline
+        attacker_types.append("playwright-mcp")   # Claude Sonnet 4.6 baseline
     if not args.baseline_only:
         attacker_types.append("finetuned")        # Fine-tuned Qwen2.5-3B
 

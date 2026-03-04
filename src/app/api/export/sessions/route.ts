@@ -23,7 +23,7 @@ export async function GET(request: Request) {
   const headers = [
     'gameId', 'taskId', 'taskLabel', 'taskDescription', 'taskStartUrl',
     'difficulty', 'mode', 'phase', 'winner', 'winReason',
-    'healthFinal', 'durationSeconds', 'attackerModel', 'defenderModel',
+    'healthFinal', 'durationSeconds', 'attackerType', 'attackerModel', 'defenderModel',
     'startedAt', 'endedAt',
   ];
 
@@ -43,6 +43,7 @@ export async function GET(request: Request) {
       s.winReason ?? '',
       s.healthFinal?.toString() ?? '',
       s.durationSeconds?.toString() ?? '',
+      s.attackerType ?? '',
       s.attackerModel,
       s.defenderModel,
       s.startedAt,
