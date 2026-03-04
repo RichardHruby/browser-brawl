@@ -7,7 +7,7 @@ Cat vs Mouse browser agent game — one AI agent (mouse) tries to complete a tas
 - **Frontend:** Next.js 16 + TypeScript + Tailwind CSS 4
 - **Backend/Agents:** TypeScript/Node.js (all in Next.js API routes)
 - **Browser Infrastructure:** Browser-Use API (cloud browser with CDP + live view)
-- **AI Models:** Anthropic SDK — Claude Sonnet 4 (attacker) + Claude Haiku 4.5 (defender)
+- **AI Models:** Anthropic SDK — Claude Sonnet 4.6 (attacker) + Claude Haiku 4.5 (defender)
 - **Browser Automation:** Playwright MCP (attacker) + CDP WebSocket injection (defender)
 - **Real-time:** Server-Sent Events (SSE) for streaming to frontend
 - **Data/Storage:** Convex (real-time DB + file storage for game data, screenshots, recordings)
@@ -47,7 +47,7 @@ All in `.env.local` (gitignored):
 
 ### Attacker Agent (Mouse) — `src/lib/attacker-agent.ts`
 
-- **Model:** `claude-sonnet-4-20250514`
+- **Model:** `claude-sonnet-4-6`
 - **Browser control:** Playwright MCP spawned as subprocess via `StdioClientTransport`
 - **Loop:** Snapshot → Claude reasons → tool calls (click, type, navigate, etc.) → repeat (max 50 steps)
 - **Completion:** Claude outputs "TASK COMPLETE" in response
@@ -484,7 +484,7 @@ npx tsx scripts/eval-miniwob.ts --finetuned-url <FT_URL> --vanilla-url <VN_URL> 
 ## Current Status
 
 The game is fully playable end-to-end:
-- Attacker (Claude Sonnet 4) successfully completes tasks like adding items to cart on Amazon/Target
+- Attacker (Claude Sonnet 4.6) successfully completes tasks like adding items to cart on Amazon/Target
 - Defender (Claude Haiku 4.5) fires a mix of prebuilt and custom injections, all consistently hitting
 - Custom injections generate targeted JS that hides search results, disables add-to-cart buttons, blocks clicks, etc.
 - Health system works — defender wins by depleting health, attacker wins by completing the task

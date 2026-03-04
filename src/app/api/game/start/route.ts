@@ -112,7 +112,7 @@ export async function POST(req: NextRequest) {
     taskStartUrl: task.startUrl,
     difficulty,
     mode: gameMode,
-    attackerModel: attackerType === 'finetuned' ? 'finetuned-qwen' : 'claude-sonnet-4-20250514',
+    attackerModel: attackerType === 'finetuned' ? 'finetuned-qwen' : 'claude-sonnet-4-6',
     defenderModel: 'claude-haiku-4-5-20251001',
   });
 

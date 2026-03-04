@@ -179,7 +179,7 @@ This closes the self-improvement loop: **play games → collect traces → train
 | Layer | Technology |
 |-------|-----------|
 | **Frontend** | Next.js 16, React 19, TypeScript 5, Tailwind CSS 4 |
-| **LLM** | Anthropic SDK — Claude Sonnet 4 (attacker), Claude Haiku 4.5 (defender) |
+| **LLM** | Anthropic SDK — Claude Sonnet 4.6 (attacker), Claude Haiku 4.5 (defender) |
 | **Cloud Browsers** | Browser-Use API (managed sessions with CDP + live view) |
 | **Real-time Streaming** | Server-Sent Events (SSE) |
 | **Database & Storage** | [Convex](https://convex.dev) (real-time DB + file storage) |

@@ -261,7 +261,7 @@ async function callSonnet(
   stopReason: string;
 }> {
   const response = await anthropicClient.messages.create({
-    model: 'claude-sonnet-4-20250514',
+    model: 'claude-sonnet-4-6',
     max_tokens: 4096,
     system: systemPrompt,
     tools: tools.map(t => ({
@@ -1002,7 +1002,7 @@ async function main() {
 
   // Run Sonnet (native Anthropic API)
   if (SONNET && !FINETUNED_ONLY && !VANILLA_ONLY) {
-    console.log(`\n[eval] === Running sonnet (Claude Sonnet 4) ===`);
+    console.log(`\n[eval] === Running sonnet (Claude Sonnet 4.6) ===`);
     const anthropicClient = new Anthropic({ apiKey: ANTHROPIC_API_KEY });
     const results: EpisodeResult[] = [];
 

@@ -66,7 +66,7 @@ export async function runAttackerLoop(gameId: string, signal: AbortSignal): Prom
 
   const stagehand = new Stagehand({
     env: 'LOCAL',
-    model: 'anthropic/claude-sonnet-4-5',
+    model: 'anthropic/claude-sonnet-4-6',
     localBrowserLaunchOptions: {
       cdpUrl: wsUrl,
     },
@@ -100,7 +100,7 @@ export async function runAttackerLoop(gameId: string, signal: AbortSignal): Prom
       : session.task.description;
 
     const agent = stagehand.agent({
-      model: 'anthropic/claude-sonnet-4-5',
+      model: 'anthropic/claude-sonnet-4-6',
       mode: 'hybrid',
       stream: true,
       systemPrompt: `You are a browser automation agent completing a task on a webpage.
