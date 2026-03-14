@@ -4,15 +4,16 @@ import { useQuery, useMutation } from 'convex/react';
 import { api } from '../../../convex/_generated/api';
 import { useCallback, useState } from 'react';
 import Link from 'next/link';
-import { DIFFICULTY_COLORS, WINNER_SHORT } from '@/lib/constants';
+import { DIFFICULTY_COLORS, WINNER_SHORT, ATTACKER_TYPE_LABELS, ATTACKER_TYPE_COLORS } from '@/lib/constants';
 import { formatDuration, formatDate, formatWinReason, formatModel } from '@/lib/format';
-import type { Difficulty } from '@/types/game';
+import type { Difficulty, AttackerType } from '@/types/game';
 
 type Winner = 'attacker' | 'defender';
 
 export default function HistoryPage() {
   const [diffFilter, setDiffFilter] = useState<Difficulty | ''>('');
   const [winnerFilter, setWinnerFilter] = useState<Winner | ''>('');
+  const [attackerTypeFilter, setAttackerTypeFilter] = useState<AttackerType | ''>('');
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [showWaitlist, setShowWaitlist] = useState(false);
   const [waitlistEmail, setWaitlistEmail] = useState('');
@@ -22,6 +23,7 @@ export default function HistoryPage() {
   const sessions = useQuery(api.sessions.list, {
     difficulty: diffFilter || undefined,
     winner: winnerFilter || undefined,
+    attackerType: attackerTypeFilter || undefined,
     limit: 50,
   });
 
@@ -128,6 +130,25 @@ export default function HistoryPage() {
               <option value="">All Winners</option>
               <option value="attacker">Attacker Won</option>
               <option value="defender">Defender Won</option>
+            </select>
+
+            <select
+              value={attackerTypeFilter}
+              onChange={(e) => {
+                setAttackerTypeFilter(e.target.value as AttackerType | '');
+                setSelected(new Set());
+              }}
+              className="font-mono text-xs px-3 py-1.5 appearance-none cursor-pointer"
+              style={{
+                background: 'var(--color-bg-card)',
+                color: 'var(--color-text-primary)',
+                border: '1px solid var(--color-border)',
+              }}
+            >
+              <option value="">All Attackers</option>
+              {Object.entries(ATTACKER_TYPE_LABELS).map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
             </select>
 
             {selected.size > 0 && (
@@ -386,6 +407,7 @@ export default function HistoryPage() {
               <th className="text-left px-3 py-2 font-mono text-[10px] uppercase tracking-wider" style={{ color: 'var(--color-text-secondary)' }}>Date</th>
               <th className="text-left px-3 py-2 font-mono text-[10px] uppercase tracking-wider" style={{ color: 'var(--color-text-secondary)' }}>Task</th>
               <th className="text-left px-3 py-2 font-mono text-[10px] uppercase tracking-wider" style={{ color: 'var(--color-text-secondary)' }}>Attacker</th>
+              <th className="text-left px-3 py-2 font-mono text-[10px] uppercase tracking-wider" style={{ color: 'var(--color-text-secondary)' }}>Base Model</th>
               <th className="text-left px-3 py-2 font-mono text-[10px] uppercase tracking-wider" style={{ color: 'var(--color-text-secondary)' }}>Difficulty</th>
               <th className="text-left px-3 py-2 font-mono text-[10px] uppercase tracking-wider" style={{ color: 'var(--color-text-secondary)' }}>Winner</th>
               <th className="text-left px-3 py-2 font-mono text-[10px] uppercase tracking-wider" style={{ color: 'var(--color-text-secondary)' }}>Reason</th>
@@ -397,13 +419,13 @@ export default function HistoryPage() {
           <tbody>
             {sessions === undefined ? (
               <tr>
-                <td colSpan={10} className="text-center py-12 font-mono" style={{ color: 'var(--color-text-secondary)' }}>
+                <td colSpan={11} className="text-center py-12 font-mono" style={{ color: 'var(--color-text-secondary)' }}>
                   Loading...
                 </td>
               </tr>
             ) : sessions.length === 0 ? (
               <tr>
-                <td colSpan={10} className="text-center py-12 font-mono" style={{ color: 'var(--color-text-secondary)' }}>
+                <td colSpan={11} className="text-center py-12 font-mono" style={{ color: 'var(--color-text-secondary)' }}>
                   No sessions found
                 </td>
               </tr>
@@ -433,11 +455,26 @@ export default function HistoryPage() {
                     {s.taskLabel}
                   </td>
                   <td className="px-3 py-2">
-                    <div className="flex flex-col gap-0.5">
+                    {s.attackerType ? (
+                      <span
+                        className="font-mono text-[10px] px-1.5 py-0.5"
+                        style={{
+                          color: ATTACKER_TYPE_COLORS[s.attackerType as AttackerType] ?? '#888',
+                          background: `${ATTACKER_TYPE_COLORS[s.attackerType as AttackerType] ?? '#888'}20`,
+                        }}
+                      >
+                        {ATTACKER_TYPE_LABELS[s.attackerType as AttackerType] ?? s.attackerType}
+                      </span>
+                    ) : (
                       <span className="font-mono text-[10px]" style={{ color: 'var(--color-text-secondary)' }}>
                         {formatModel(s.attackerModel)}
                       </span>
-                    </div>
+                    )}
+                  </td>
+                  <td className="px-3 py-2">
+                    <span className="font-mono text-[10px]" style={{ color: 'var(--color-text-secondary)' }}>
+                      {formatModel(s.attackerModel)}
+                    </span>
                   </td>
                   <td className="px-3 py-2">
                     <span

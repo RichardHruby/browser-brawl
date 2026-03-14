@@ -16,8 +16,10 @@ export const create = mutation({
     ),
     mode: v.union(v.literal('realtime'), v.literal('turnbased')),
     startedAt: v.string(),
+    attackerType: v.optional(v.string()),
     attackerModel: v.string(),
     defenderModel: v.string(),
+    hasDefender: v.optional(v.boolean()),
   },
   handler: async (ctx, args) => {
     return ctx.db.insert('sessions', {
@@ -69,6 +71,7 @@ export const list = query({
       ),
     ),
     winner: v.optional(v.union(v.literal('attacker'), v.literal('defender'))),
+    attackerType: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     const q = ctx.db.query('sessions').order('desc');
@@ -80,6 +83,9 @@ export const list = query({
     }
     if (args.winner) {
       filtered = filtered.filter((s) => s.winner === args.winner);
+    }
+    if (args.attackerType) {
+      filtered = filtered.filter((s) => s.attackerType === args.attackerType);
     }
 
     const limit = args.limit ?? 50;
@@ -124,6 +130,24 @@ export const listSuccessful = query({
     const results = await ctx.db.query('sessions').order('desc').collect();
     const successful = results.filter(
       (s) => s.winner === 'attacker' && s.winReason === 'task_complete',
+    );
+    return successful.slice(0, args.limit ?? 1000);
+  },
+});
+
+/** Filter successful sessions by defender status for ablation study training splits */
+export const listSuccessfulByDefender = query({
+  args: {
+    hasDefender: v.optional(v.boolean()),
+    limit: v.optional(v.number()),
+  },
+  handler: async (ctx, args) => {
+    const results = await ctx.db.query('sessions').order('desc').collect();
+    const successful = results.filter(
+      (s) =>
+        s.winner === 'attacker' &&
+        s.winReason === 'task_complete' &&
+        (args.hasDefender === undefined || s.hasDefender === args.hasDefender),
     );
     return successful.slice(0, args.limit ?? 1000);
   },
