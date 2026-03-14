@@ -159,10 +159,10 @@ export function ModelPicker({ value, onChange, visible }: Props) {
                 className="font-display text-xs font-bold tracking-[0.3em] uppercase mb-1"
                 style={{ color: '#cc44ff', textShadow: '0 0 8px rgba(204,68,255,0.5)' }}
               >
-                EARLY ACCESS
+                FRONTIER ACCESS
               </p>
               <p className="font-mono text-[11px]" style={{ color: 'var(--color-text-secondary)' }}>
-                {waitlistModel} is coming soon.
+                {waitlistModel} and other top-tier models are available on request.
               </p>
             </div>
             <div className="flex gap-2 justify-center">
@@ -179,7 +179,7 @@ export function ModelPicker({ value, onChange, visible }: Props) {
               </Link>
               <button
                 onClick={() => setWaitlistModel(null)}
-                className="px-4 py-1.5 font-mono text-[11px] tracking-wide transition-all duration-200"
+                className="px-4 py-1.5 font-mono text-[11px] tracking-wide transition-all duration-200 cursor-pointer"
                 style={{
                   color: 'var(--color-text-secondary)',
                   border: '1.5px solid var(--color-border)',
