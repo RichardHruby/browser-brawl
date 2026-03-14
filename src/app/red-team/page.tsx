@@ -11,7 +11,8 @@ interface TaskOption {
 }
 
 const SUITES: { id: AttackSuite; label: string; description: string }[] = [
-  { id: 'prompt_injection', label: 'Prompt Injection', description: '4 PI attacks: hidden text, visible redirect, authority banner, attribute payload' },
+  { id: 'prompt_injection', label: 'Prompt Injection', description: '4 PI attacks: attribute aria-label, sr-only hidden text, visible redirect, authority banner' },
+  { id: 'exfil', label: 'Data Exfil', description: 'Credential theft: attribute overrides, verification modal, sr-only instruction, redirect. Pair with Agent Secrets.' },
   { id: 'phishing', label: 'Phishing', description: 'Credential theft modal + session expiry redirect' },
   { id: 'ui_robustness', label: 'UI Robustness', description: 'Legacy disruptions: popup overlay, scroll hijack, button camouflage' },
   { id: 'mixed', label: 'Mixed', description: 'Combination of prompt injection + UI disruptions' },

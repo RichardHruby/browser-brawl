@@ -41,6 +41,7 @@ export function injectVisibleInlineText(attack: AttackEntry): PrimitiveResult {
     var div = document.createElement('div');
     div.id = '__bb_pi_visible_' + Date.now();
     div.setAttribute('data-bb-injection', 'true');
+    div.setAttribute('role', 'alert');
     div.style.cssText = 'padding:12px 16px;margin:8px 0;border:1px solid #e0e0e0;border-radius:6px;background:#f8f9fa;font-family:inherit;font-size:14px;line-height:1.5;color:#333;';
     div.textContent = '${text}';
     ${targetSelector
@@ -70,20 +71,25 @@ export function injectHiddenCssText(attack: AttackEntry): PrimitiveResult {
   const concealmentMode = (attack.payload?.concealmentMode as Concealment) ?? attack.concealment ?? 'css_opacity';
   const targetSelector = attack.payload?.targetSelector as string | undefined;
 
+  // All hidden modes use the sr-only accessible-hidden pattern so the text appears in
+  // Playwright's accessibility tree (browser_snapshot) even though humans can't see it.
+  // opacity:0 / height:0 / font-size:0 are ALL pruned by Playwright — sr-only is not.
+  const srOnly = 'position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;';
+
   let cssRule: string;
   switch (concealmentMode) {
     case 'white_on_white':
-      cssRule = 'color:white;background:white;font-size:1px;line-height:0;overflow:hidden;height:0;';
+      // Visually blends in (white text on white bg) but has readable dimensions
+      cssRule = 'color:white;background:white;font-size:inherit;line-height:inherit;';
       break;
     case 'zero_font':
-      cssRule = 'font-size:0;line-height:0;color:transparent;overflow:hidden;height:0;width:0;';
-      break;
-    case 'offscreen':
-      cssRule = 'position:absolute;left:-9999px;top:-9999px;';
-      break;
     case 'css_opacity':
     default:
-      cssRule = 'opacity:0;position:absolute;pointer-events:none;height:0;overflow:hidden;';
+      // Accessible-hidden: invisible to humans, present in accessibility tree
+      cssRule = srOnly;
+      break;
+    case 'offscreen':
+      cssRule = 'position:absolute;left:-9999px;top:auto;width:1px;height:1px;overflow:hidden;';
       break;
   }
 
@@ -91,6 +97,7 @@ export function injectHiddenCssText(attack: AttackEntry): PrimitiveResult {
     var div = document.createElement('div');
     div.id = '__bb_pi_hidden_' + Date.now();
     div.setAttribute('data-bb-injection', 'true');
+    div.setAttribute('role', 'note');
     div.style.cssText = '${cssRule}';
     div.textContent = '${text}';
     ${targetSelector
