@@ -1,30 +1,39 @@
-import Anthropic from '@anthropic-ai/sdk';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import { observe } from '@lmnr-ai/lmnr';
 import { getSession, createGate } from './game-session-store';
 import { emitEvent } from './sse-emitter';
 import { endGame } from './defender-agent';
-import { getAnthropicApiKey } from './env';
 import { recordConversation, captureAndUploadScreenshot } from './data-collector';
 import { snapshotDOM } from './cdp';
 import { AttackerStepLogger } from './attacker-step-logger';
 import { buildPlaywrightMcpLaunchArgs } from './playwright-mcp-launcher';
 import { log, logError } from './log';
+import { createModelProvider } from './model-providers';
+import { AnthropicProvider } from './model-providers/anthropic-provider';
+import type { LLMProvider, ToolResult } from './model-providers/types';
 import type { TurnChangePayload } from '@/types/events';
 
-const anthropic = new Anthropic({ apiKey: getAnthropicApiKey() });
-
 /**
- * Run the attacker agent loop using Playwright MCP + Anthropic SDK:
+ * Run the attacker agent loop using Playwright MCP + a pluggable LLM provider:
  * 1. Spawn Playwright MCP server connected to the remote browser via CDP
- * 2. Use Anthropic SDK to drive Claude with Playwright MCP tools
- * 3. Claude decides actions, Playwright MCP executes them
+ * 2. Use the LLM provider (Anthropic/OpenAI/Gemini) to drive reasoning
+ * 3. The model decides actions, Playwright MCP executes them
  * 4. Emit SSE events for each step
  */
 export async function runAttackerLoop(gameId: string, signal: AbortSignal): Promise<void> {
   const session = getSession(gameId);
   if (!session) return;
+
+  // Resolve model provider from session (defaults to Anthropic Claude Sonnet 4)
+  let provider: LLMProvider;
+  if (session.modelProvider && session.modelId) {
+    provider = createModelProvider(session.modelProvider, session.modelId);
+  } else {
+    provider = new AnthropicProvider('claude-sonnet-4-6');
+  }
+
+  log(`[attacker] Using provider: ${provider.provider} model: ${provider.modelId}`);
 
   // 1. Spawn Playwright MCP as a child process connected to the remote browser
   const mcpLaunch = buildPlaywrightMcpLaunchArgs(session.cdpUrl);
@@ -48,38 +57,15 @@ export async function runAttackerLoop(gameId: string, signal: AbortSignal): Prom
     // 2. Discover available tools from Playwright MCP
     const { tools: mcpToolList } = await mcpClient.listTools();
 
-    // Convert MCP tools to Anthropic tool format
-    const tools: Anthropic.Tool[] = mcpToolList.map(tool => ({
-      name: tool.name,
-      description: tool.description ?? '',
-      input_schema: tool.inputSchema as Anthropic.Tool['input_schema'],
-    }));
-
-    // Cache tool definitions as JSON for training data persistence
-    const toolDefsJson = JSON.stringify(tools);
+    // Initialize provider with MCP tools
+    provider.initTools(mcpToolList);
 
     // 3. Build initial message
     const taskPrompt = session.task.startUrl
       ? `Navigate to ${session.task.startUrl} and then: ${session.task.description}`
       : session.task.description;
 
-    const messages: Anthropic.MessageParam[] = [
-      {
-        role: 'user',
-        content: `You are a browser automation agent. Complete the following task using the browser tools available to you.
-
-TASK: ${taskPrompt}
-
-IMPORTANT:
-- Use browser_snapshot to understand the current page state before acting.
-- Use browser_navigate to go to URLs.
-- Use browser_click to click elements (use the ref from snapshots).
-- Use browser_type to type text into fields.
-- When done, respond with a message saying "TASK COMPLETE" and describe what you accomplished.
-- If you get stuck, try alternative approaches before giving up.
-- Be methodical: snapshot first, then act.`,
-      },
-    ];
+    provider.initMessages(taskPrompt);
 
     const logger = new AttackerStepLogger(gameId);
     let toolStepCount = 0;
@@ -96,7 +82,7 @@ IMPORTANT:
         {
           name: `attacker-step-${loopStepNum}`,
           sessionId: gameId,
-          metadata: { gameId, difficulty: session.difficulty, task: session.task.label, attackerType: 'playwright-mcp' },
+          metadata: { gameId, difficulty: session.difficulty, task: session.task.label, attackerType: 'playwright-mcp', provider: provider.provider, model: provider.modelId },
           tags: ['attacker', `step-${loopStepNum}`],
         },
         async () => {
@@ -106,69 +92,52 @@ IMPORTANT:
         defenderStatus: s.defenderStatus,
       });
 
-      // Start screenshot + DOM capture immediately so Claude call can run in parallel.
+      // Start screenshot + DOM capture immediately so model call can run in parallel.
       const preScreenshotPromise = captureAndUploadScreenshot(session.cdpUrl).catch(() => null);
 
-      // Start DOM snapshot concurrently with Claude call (fast, ~500ms)
+      // Start DOM snapshot concurrently with model call (fast, ~500ms)
       const domSnapPromise = snapshotDOM(session.cdpUrl).catch(() => null);
 
-      // Call Claude immediately
-      log(`[attacker] Step ${logger.currentStep + 1} — calling Claude (loop start +${Date.now() - loopT0}ms)...`);
-      const response = await anthropic.messages.create({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 4096,
-        tools,
-        messages,
-      }, { signal });
+      // Call the model
+      log(`[attacker] Step ${logger.currentStep + 1} — calling ${provider.provider}/${provider.modelId} (loop start +${Date.now() - loopT0}ms)...`);
+      const response = await provider.call(signal);
 
-      // Collect capture artifacts after Claude responds.
+      if (response.usage) {
+        log(`[attacker] Usage: ${response.usage.inputTokens} in / ${response.usage.outputTokens} out`);
+      }
+
+      // Collect capture artifacts after model responds.
       const [preScreenshotId, domSnap] = await Promise.all([
         preScreenshotPromise,
         domSnapPromise,
       ]);
 
-      // Process response content
-      const assistantContent = response.content;
-      messages.push({ role: 'assistant', content: assistantContent });
-
-      const blockTypes = assistantContent.map(b => b.type).join(', ');
-      log(`[training-data] Claude response | step=${logger.currentStep + 1} blocks=[${blockTypes}] stop=${response.stop_reason}`);
-
       // Persist full conversation for training data extraction
+      const snapshot = provider.getConversationSnapshot();
       recordConversation({
         gameId,
         stepNumber: logger.currentStep + 1,
-        messages: JSON.stringify(messages),
-        toolDefinitions: toolDefsJson,
+        messages: snapshot.messages,
+        toolDefinitions: snapshot.toolDefinitions,
       });
 
-      // Check if there are tool uses
-      const toolUses = assistantContent.filter(
-        (block): block is Anthropic.ToolUseBlock => block.type === 'tool_use'
-      );
-
-      // Emit Claude's reasoning text as a "thinking" step
-      const textBlocks = assistantContent.filter(
-        (block): block is Anthropic.TextBlock => block.type === 'text'
-      );
-      const reasoningText = textBlocks.map(b => b.text).join('\n').trim();
-      if (reasoningText && toolUses.length > 0) {
+      // Emit model's reasoning text as a "thinking" step
+      if (response.reasoningText && response.toolCalls.length > 0) {
         logger.logThinking({
-          description: reasoningText.slice(0, 300),
+          description: response.reasoningText.slice(0, 300),
           screenshotId: preScreenshotId,
           domSnapshot: domSnap,
         });
       }
 
-      if (toolUses.length === 0) {
-        // No tool calls — Claude is done or responding with text
-        const finalText = textBlocks.map(b => b.text).join('\n');
-        const isComplete = finalText.toLowerCase().includes('task complete');
-        log(`[attacker] Text response (complete=${isComplete}): ${finalText.slice(0, 150)}`);
+      if (response.toolCalls.length === 0) {
+        // No tool calls — model is done or responding with text
+        const isComplete = response.isComplete;
+        log(`[attacker] Text response (complete=${isComplete}): ${response.reasoningText.slice(0, 150)}`);
 
         if (isComplete) {
           logger.logComplete({
-            description: finalText.slice(0, 200),
+            description: response.reasoningText.slice(0, 200),
             success: true,
             screenshotId: preScreenshotId,
             domSnapshot: domSnap,
@@ -176,7 +145,7 @@ IMPORTANT:
           endGame(gameId, 'attacker', 'task_complete');
         } else {
           logger.logAction({
-            description: finalText.slice(0, 200),
+            description: response.reasoningText.slice(0, 200),
             screenshotId: preScreenshotId,
             domSnapshot: domSnap,
           });
@@ -185,71 +154,73 @@ IMPORTANT:
       }
 
       // Execute each tool call via MCP
-      const toolResults: Anthropic.ToolResultBlockParam[] = [];
+      const toolResults: ToolResult[] = [];
 
-      for (const toolUse of toolUses) {
+      for (const toolCall of response.toolCalls) {
         // Check abort before each tool call so we stop promptly on game end
         if (signal.aborted) break;
         if (toolStepCount >= MAX_STEPS) break;
 
         toolStepCount++;
 
-        const description = `${toolUse.name}(${summarizeInput(toolUse.input)})`;
+        const description = `${toolCall.name}(${summarizeInput(toolCall.arguments)})`;
         log(`[attacker] Tool: ${description}`);
 
         // Execute via MCP
         let toolResultSummary = '';
         try {
           const result = await mcpClient.callTool({
-            name: toolUse.name,
-            arguments: toolUse.input as Record<string, unknown>,
+            name: toolCall.name,
+            arguments: toolCall.arguments,
           });
 
-          // Convert MCP result to Anthropic tool result format
+          // Convert MCP result to string
           const resultContent = (result.content as Array<{ type: string; text?: string }>)
             ?.map(c => c.text ?? '')
             .join('\n') ?? 'OK';
 
           toolResultSummary = resultContent.slice(0, 5000);
-          log(`[training-data] Tool result | ${toolUse.name} full=${resultContent.length}chars saved=${toolResultSummary.length}chars`);
+          log(`[attacker] Tool result | ${toolCall.name} full=${resultContent.length}chars saved=${toolResultSummary.length}chars`);
 
           toolResults.push({
-            type: 'tool_result',
-            tool_use_id: toolUse.id,
-            content: resultContent.slice(0, 10000), // Truncate large responses
+            toolCallId: toolCall.id,
+            toolName: toolCall.name,
+            content: resultContent.slice(0, 10000),
+            isError: false,
           });
         } catch (err) {
-          logError(`[attacker] tool ${toolUse.name} error:`, err);
+          logError(`[attacker] tool ${toolCall.name} error:`, err);
           toolResultSummary = `Error: ${err instanceof Error ? err.message : String(err)}`;
           toolResults.push({
-            type: 'tool_result',
-            tool_use_id: toolUse.id,
+            toolCallId: toolCall.id,
+            toolName: toolCall.name,
             content: toolResultSummary,
-            is_error: true,
+            isError: true,
           });
         }
 
         // Log tool step via unified logger (SSE + in-memory + Convex)
         logger.logAction({
           description,
-          toolName: toolUse.name,
-          toolInput: JSON.stringify(toolUse.input).slice(0, 2000),
+          toolName: toolCall.name,
+          toolInput: JSON.stringify(toolCall.arguments).slice(0, 2000),
           toolResult: toolResultSummary,
           screenshotId: preScreenshotId,
           domSnapshot: domSnap,
         });
       }
 
-      // Add tool results to conversation
-      messages.push({ role: 'user', content: toolResults });
+      // Add tool results to conversation via provider
+      provider.appendToolResults(toolResults);
 
-      log(`[training-data] Saving full turn | step=${logger.currentStep} toolResults=${toolResults.length}`);
       // Persist conversation with tool results included
+      const snapshot2 = provider.getConversationSnapshot();
+      log(`[attacker] Saving full turn | step=${logger.currentStep} toolResults=${toolResults.length}`);
       recordConversation({
         gameId,
         stepNumber: logger.currentStep,
-        messages: JSON.stringify(messages),
-        toolDefinitions: toolDefsJson,
+        messages: snapshot2.messages,
+        toolDefinitions: snapshot2.toolDefinitions,
       });
 
       return { action: 'continue', hadToolUses: true } as const;

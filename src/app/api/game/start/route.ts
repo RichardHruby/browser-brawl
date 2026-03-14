@@ -10,11 +10,11 @@ import { createGameRecord, recordNetworkRequest } from '@/lib/data-collector';
 import { startNetworkCapture } from '@/lib/cdp';
 import { startScreencast } from '@/lib/screencast';
 import { runBrowserUseAttackerLoop } from '@/lib/browser-use-attacker';
-import type { AttackerType, Difficulty } from '@/types/game';
+import type { AttackerType, Difficulty, ModelProvider, ModelId } from '@/types/game';
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { taskId, difficulty = 'easy', customTask, mode = 'realtime', attackerType = 'playwright-mcp', modelUrl, noDefender = false } = body as {
+  const { taskId, difficulty = 'easy', customTask, mode = 'realtime', attackerType = 'playwright-mcp', modelUrl, noDefender = false, modelProvider, modelId } = body as {
     taskId?: string;
     difficulty?: Difficulty;
     customTask?: string;
@@ -22,6 +22,8 @@ export async function POST(req: NextRequest) {
     attackerType?: AttackerType;
     modelUrl?: string;
     noDefender?: boolean;
+    modelProvider?: ModelProvider;
+    modelId?: ModelId;
   };
   const gameMode = mode === 'turnbased' ? 'turnbased' : 'realtime' as const;
 
@@ -81,7 +83,7 @@ export async function POST(req: NextRequest) {
     console.log('[start] session created:', browserSessionId);
     console.log('[start] CDP URL:', cdpUrl);
     console.log('[start] live view:', liveViewUrl);
-    console.log('[start] mode:', gameMode, '| difficulty:', difficulty, '| attackerType:', attackerType);
+    console.log('[start] mode:', gameMode, '| difficulty:', difficulty, '| attackerType:', attackerType, '| model:', modelProvider ? `${modelProvider}/${modelId}` : 'default');
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error('[start] browser-use create error:', message);
@@ -101,6 +103,8 @@ export async function POST(req: NextRequest) {
     mode: gameMode,
     attackerType,
     modelUrl,
+    modelProvider: attackerType === 'playwright-mcp' ? (modelProvider ?? 'anthropic') : undefined,
+    modelId: attackerType === 'playwright-mcp' ? (modelId ?? 'claude-sonnet-4-6') : undefined,
   });
 
   // 2b. Persist to Convex for training data collection
@@ -112,7 +116,7 @@ export async function POST(req: NextRequest) {
     taskStartUrl: task.startUrl,
     difficulty,
     mode: gameMode,
-    attackerModel: attackerType === 'finetuned' ? 'finetuned-qwen' : 'claude-sonnet-4-20250514',
+    attackerModel: attackerType === 'finetuned' ? 'finetuned-qwen' : (modelId ?? 'claude-sonnet-4-6'),
     defenderModel: 'claude-haiku-4-5-20251001',
   });
 

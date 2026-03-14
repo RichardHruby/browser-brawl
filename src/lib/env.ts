@@ -37,3 +37,11 @@ export function getBrowserUseApiKey(): string | undefined {
   return loadFromEnvLocal('BROWSER_USE_API_KEY') ?? process.env.BROWSER_USE_API_KEY;
 }
 
+export function getOpenAIApiKey(): string | undefined {
+  return loadFromEnvLocal('OPENAI_API_KEY') ?? process.env.OPENAI_API_KEY;
+}
+
+export function getGeminiApiKey(): string | undefined {
+  return loadFromEnvLocal('GEMINI_API_KEY') ?? process.env.GEMINI_API_KEY;
+}
+

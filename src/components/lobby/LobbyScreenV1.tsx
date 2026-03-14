@@ -7,13 +7,14 @@ import { FighterSelect } from './FighterSelect';
 import { ArenaSelector } from './ArenaSelector';
 import { DifficultyBar } from './DifficultyBar';
 import { ModeToggle } from './ModeToggle';
+import { ModelPicker } from './ModelPicker';
 import { TASKS } from '@/lib/tasks';
-import type { AttackerType, Difficulty, GameMode, Task } from '@/types/game';
+import type { AttackerType, Difficulty, GameMode, ModelId, ModelProvider, Task } from '@/types/game';
 
 const DEFAULT_TASK = TASKS.find(t => t.id === 'amazon-toothpaste') ?? null;
 
 interface Props {
-  onStart: (difficulty: Difficulty, task: Task, mode: GameMode, attackerType: AttackerType, modelUrl?: string) => void;
+  onStart: (difficulty: Difficulty, task: Task, mode: GameMode, attackerType: AttackerType, modelUrl?: string, modelProvider?: ModelProvider, modelId?: ModelId) => void;
 }
 
 export function LobbyScreenV1({ onStart }: Props) {
@@ -21,6 +22,8 @@ export function LobbyScreenV1({ onStart }: Props) {
   const [task, setTask] = useState<Task | null>(DEFAULT_TASK);
   const [mode, setMode] = useState<GameMode>('realtime');
   const [attackerType, setAttackerType] = useState<AttackerType>('playwright-mcp');
+  const [modelProvider, setModelProvider] = useState<ModelProvider>('anthropic');
+  const [modelId, setModelId] = useState<ModelId>('claude-sonnet-4-6');
   const canStart = !!task;
 
   return (
@@ -98,27 +101,15 @@ export function LobbyScreenV1({ onStart }: Props) {
                 <FighterSelect value={attackerType} onChange={setAttackerType} />
               </div>
 
-              {/* Bring Your Own Model — links to waitlist */}
-              <div
-                className="mt-4 pt-3"
-                style={{ borderTop: '1px solid var(--color-border)' }}
-              >
-                <Link
-                  href="/waitlist"
-                  className="flex items-center gap-2 w-full group"
-                >
-                  <div
-                    className="w-4 h-4 flex items-center justify-center flex-shrink-0"
-                    style={{ border: '2px solid var(--color-border)' }}
-                  />
-                  <span
-                    className="font-display text-[11px] font-bold tracking-[0.3em] uppercase transition-colors duration-200 group-hover:underline"
-                    style={{ color: 'var(--color-text-secondary)' }}
-                  >
-                    BRING YOUR OWN MODEL
-                  </span>
-                </Link>
-              </div>
+              {/* Model picker — only visible for Playwright MCP */}
+              <ModelPicker
+                value={modelId}
+                onChange={(id, provider) => {
+                  setModelId(id);
+                  setModelProvider(provider);
+                }}
+                visible={attackerType === 'playwright-mcp'}
+              />
             </div>
           </div>
 
@@ -234,7 +225,7 @@ export function LobbyScreenV1({ onStart }: Props) {
 
           <div className="order-1 sm:order-2 w-full max-w-sm sm:max-w-none sm:flex-1 flex justify-center">
             <button
-              onClick={() => task && onStart(difficulty, task, mode, attackerType)}
+              onClick={() => task && onStart(difficulty, task, mode, attackerType, undefined, modelProvider, modelId)}
               disabled={!canStart}
               className="w-full max-w-sm sm:w-auto px-6 sm:px-12 py-3 font-display text-base sm:text-lg font-black tracking-[0.2em] sm:tracking-[0.3em] uppercase transition-all duration-300 cursor-pointer disabled:cursor-not-allowed"
               style={{
