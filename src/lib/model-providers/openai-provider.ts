@@ -30,18 +30,25 @@ IMPORTANT:
 - Be methodical: snapshot first, then act.`;
 
 export class OpenAIProvider implements LLMProvider {
-  readonly provider = 'openai';
+  readonly provider: string = 'openai';
   readonly modelId: string;
-  private apiKey: string;
+  protected apiKey: string;
+  protected apiUrl: string = 'https://api.openai.com/v1/chat/completions';
+  protected providerLabel: string = 'OpenAI';
   private tools: OpenAITool[] = [];
   private toolDefsJson = '';
   private messages: OpenAIMessage[] = [];
 
-  constructor(modelId: string) {
+  constructor(modelId: string, apiKey?: string, apiUrl?: string) {
     this.modelId = modelId;
-    const key = getOpenAIApiKey();
-    if (!key) throw new Error('OPENAI_API_KEY not set in .env.local');
-    this.apiKey = key;
+    if (apiKey) {
+      this.apiKey = apiKey;
+    } else {
+      const key = getOpenAIApiKey();
+      if (!key) throw new Error('OPENAI_API_KEY not set in .env.local');
+      this.apiKey = key;
+    }
+    if (apiUrl) this.apiUrl = apiUrl;
   }
 
   initTools(mcpTools: McpToolDef[]): void {
@@ -64,7 +71,7 @@ export class OpenAIProvider implements LLMProvider {
   }
 
   async call(signal: AbortSignal): Promise<ModelResponse> {
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+    const res = await fetch(this.apiUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -81,12 +88,12 @@ export class OpenAIProvider implements LLMProvider {
 
     if (!res.ok) {
       const body = await res.text().catch(() => '');
-      throw new Error(`OpenAI API ${res.status}: ${body}`);
+      throw new Error(`${this.providerLabel} API ${res.status}: ${body}`);
     }
 
     const data = await res.json();
     const choice = data.choices?.[0];
-    if (!choice) throw new Error('OpenAI returned no choices');
+    if (!choice) throw new Error(`${this.providerLabel} returned no choices`);
     const msg = choice.message;
 
     // Push assistant message to conversation

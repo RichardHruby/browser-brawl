@@ -45,3 +45,7 @@ export function getGeminiApiKey(): string | undefined {
   return loadFromEnvLocal('GEMINI_API_KEY') ?? process.env.GEMINI_API_KEY;
 }
 
+export function getXAIApiKey(): string | undefined {
+  return loadFromEnvLocal('XAI_API_KEY') ?? process.env.XAI_API_KEY;
+}
+

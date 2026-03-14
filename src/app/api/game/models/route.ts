@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getAnthropicApiKey, getOpenAIApiKey, getGeminiApiKey } from '@/lib/env';
+import { getAnthropicApiKey, getOpenAIApiKey, getGeminiApiKey, getXAIApiKey } from '@/lib/env';
 import { AVAILABLE_MODELS } from '@/lib/models';
 import type { ModelProvider } from '@/types/game';
 
@@ -8,6 +8,7 @@ export async function GET() {
     anthropic: !!getAnthropicApiKey(),
     openai: !!getOpenAIApiKey(),
     gemini: !!getGeminiApiKey(),
+    xai: !!getXAIApiKey(),
   };
 
   const models = AVAILABLE_MODELS.map(m => ({
