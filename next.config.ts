@@ -9,6 +9,7 @@ const nextConfig: NextConfig = {
     "@esbuild/win32-x64",
     "@browserbasehq/stagehand",
     "@playwright/mcp",
+    "@google/genai",
   ],
   outputFileTracingIncludes: {
     "/api/game/start": [

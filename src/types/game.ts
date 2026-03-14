@@ -6,6 +6,20 @@ export type AttackerStatus = 'idle' | 'thinking' | 'acting' | 'complete' | 'fail
 export type DefenderStatus = 'idle' | 'plotting' | 'striking' | 'cooling_down';
 export type TurnOwner = 'attacker' | 'defender';
 
+// Model provider for the playwright-mcp harness
+export type ModelProvider = 'anthropic' | 'openai' | 'gemini' | 'xai';
+
+// Specific model IDs per provider
+export type ModelId =
+  | 'claude-opus-4-6'
+  | 'claude-sonnet-4-6'
+  | 'gpt-5.4'
+  | 'gpt-5-mini'
+  | 'gemini-3.1-pro-preview'
+  | 'gemini-3-flash-preview'
+  | 'grok-4-0709'
+  | 'grok-4-1-fast-reasoning';
+
 export interface Task {
   id: string;
   label: string;

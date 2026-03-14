@@ -1,4 +1,4 @@
-import type { AgentEvent, DisruptionEvent, Difficulty, GameMode, GamePhase, AttackerStatus, AttackerType, DefenderStatus, TurnOwner, Task } from '@/types/game';
+import type { AgentEvent, DisruptionEvent, Difficulty, GameMode, GamePhase, AttackerStatus, AttackerType, DefenderStatus, TurnOwner, Task, ModelProvider, ModelId } from '@/types/game';
 
 // Server-side extended session with runtime fields
 export interface ServerGameSession {
@@ -10,6 +10,8 @@ export interface ServerGameSession {
   difficulty: Difficulty;
   attackerType: AttackerType;
   modelUrl?: string;
+  modelProvider?: ModelProvider;
+  modelId?: ModelId;
   phase: GamePhase;
   health: number;
   startedAt: string;
@@ -40,6 +42,7 @@ export interface ServerGameSession {
   knownStepIds: Set<string>;
   buTaskId: string | null;
   buSessionId: string | null;
+  skipScreenshots: boolean;
 }
 
 // Global singleton store — survives across API route invocations in the same process
@@ -73,9 +76,13 @@ export function createSession(params: {
   mode: GameMode;
   attackerType: AttackerType;
   modelUrl?: string;
+  modelProvider?: ModelProvider;
+  modelId?: ModelId;
+  skipScreenshots?: boolean;
 }): ServerGameSession {
   const session: ServerGameSession = {
     ...params,
+    skipScreenshots: params.skipScreenshots ?? false,
     phase: 'loading' as GamePhase,
     health: 100,
     startedAt: new Date().toISOString(),
