@@ -10,7 +10,8 @@ export type SSEEventType =
   | 'timer_tick'
   | 'turn_change'
   | 'game_over'
-  | 'live_url_ready';
+  | 'live_url_ready'
+  | 'judge_verdict';
 
 export interface SSEEnvelope<T = unknown> {
   type: SSEEventType;
@@ -40,6 +41,12 @@ export interface DefenderDisruptionPayload {
   healthDamage: number;
   success: boolean;
   reasoning: string;
+  // Structured labels (present when attackSpec is used)
+  attackFamily?: string;
+  objective?: string;
+  concealment?: string;
+  authority?: string;
+  placement?: string;
 }
 
 export interface DefenderActivityPayload {
@@ -76,4 +83,10 @@ export interface GameOverPayload {
   reason: string;
   finalHealth: number;
   elapsedSeconds: number;
+}
+
+export interface JudgeVerdictPayload {
+  actionNumber: number;
+  agentResponse: 'followed' | 'ignored' | 'partial';
+  judgeReasoning: string;
 }

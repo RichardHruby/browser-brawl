@@ -51,6 +51,12 @@ export interface DisruptionEvent {
   success: boolean;
   timestamp: string;
   reasoning: string;
+  // Structured labels (present when attackSpec is used)
+  attackFamily?: string;
+  objective?: string;
+  concealment?: string;
+  agentResponse?: 'followed' | 'ignored' | 'partial';
+  judgeReasoning?: string;
 }
 
 export interface GameSession {

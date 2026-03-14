@@ -488,17 +488,66 @@ export default function ReplayPage({ params }: { params: Promise<{ gameId: strin
                   {toDisplayString(selectedActionData.description)}
                 </div>
 
-                <div className="flex gap-3">
+                <div className="flex gap-3 flex-wrap">
                   <span className="font-mono text-xs px-2 py-0.5" style={{
                     background: selectedActionData.success ? 'var(--color-defender-dim)' : 'rgba(100, 100, 100, 0.15)',
                     color: selectedActionData.success ? 'var(--color-defender)' : 'var(--color-text-secondary)',
                   }}>
                     {selectedActionData.success ? 'HIT' : 'MISS'}
                   </span>
-                  <span className="font-mono text-xs" style={{ color: 'var(--color-health-low)' }}>
-                    -{selectedActionData.healthDamage} HP
-                  </span>
+                  {selectedActionData.healthDamage > 0 && (
+                    <span className="font-mono text-xs" style={{ color: 'var(--color-health-low)' }}>
+                      -{selectedActionData.healthDamage} HP
+                    </span>
+                  )}
                 </div>
+
+                {selectedActionData.attackFamily && (
+                  <div>
+                    <h3 className="font-mono text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--color-text-secondary)' }}>
+                      Attack Metadata
+                    </h3>
+                    <div className="flex gap-2 flex-wrap">
+                      {[
+                        { label: 'family', value: selectedActionData.attackFamily, color: '#cc44ff' },
+                        { label: 'objective', value: selectedActionData.objective, color: '#ff6600' },
+                        { label: 'concealment', value: selectedActionData.concealment, color: '#ffaa00' },
+                        { label: 'authority', value: selectedActionData.authority, color: '#3b82f6' },
+                        { label: 'placement', value: selectedActionData.placement, color: '#00d4ff' },
+                      ].filter(m => m.value).map(m => (
+                        <div key={m.label} className="font-mono text-xs px-2 py-1 rounded"
+                          style={{ background: `${m.color}12`, border: `1px solid ${m.color}30` }}>
+                          <span style={{ color: 'var(--color-text-secondary)' }}>{m.label}: </span>
+                          <span style={{ color: m.color }}>{toDisplayString(m.value)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {selectedActionData.agentResponse && (
+                  <div>
+                    <h3 className="font-mono text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--color-text-secondary)' }}>
+                      Judge Verdict
+                    </h3>
+                    <div className="p-3 rounded" style={{ background: 'var(--color-bg-card)', border: '2px solid var(--color-border)' }}>
+                      <span className="font-mono text-sm font-bold px-2 py-0.5 rounded"
+                        style={{
+                          color: selectedActionData.agentResponse === 'followed' ? '#00ff88'
+                            : selectedActionData.agentResponse === 'partial' ? '#ffaa00' : '#6e6e99',
+                          background: selectedActionData.agentResponse === 'followed' ? '#00ff8818'
+                            : selectedActionData.agentResponse === 'partial' ? '#ffaa0018' : '#6e6e9918',
+                        }}>
+                        {selectedActionData.agentResponse.toUpperCase()}
+                      </span>
+                      {selectedActionData.judgeReasoning && (
+                        <p className="font-game text-sm mt-2" style={{ color: 'var(--color-text-primary)' }}>
+                          {toDisplayString(selectedActionData.judgeReasoning)}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 <div>
                   <h3 className="font-mono text-xs uppercase tracking-wider mb-2" style={{ color: 'var(--color-text-secondary)' }}>
@@ -596,11 +645,27 @@ export default function ReplayPage({ params }: { params: Promise<{ gameId: strin
                     style={{ color: action.success ? 'var(--color-defender)' : 'var(--color-text-secondary)' }}>
                     {toDisplayString(action.disruptionName)}
                   </span>
+                  {action.agentResponse && (
+                    <span className="shrink-0 w-2 h-2 rounded-full"
+                      style={{
+                        background: action.agentResponse === 'followed' ? '#00ff88'
+                          : action.agentResponse === 'partial' ? '#ffaa00' : '#6e6e99',
+                      }}
+                      title={`Judge: ${action.agentResponse}`}
+                    />
+                  )}
                   {action.success ? (
-                    <span className="shrink-0 text-[10px] font-mono font-bold"
-                      style={{ color: 'var(--color-health-low)' }}>
-                      -{action.healthDamage}
-                    </span>
+                    action.healthDamage > 0 ? (
+                      <span className="shrink-0 text-[10px] font-mono font-bold"
+                        style={{ color: 'var(--color-health-low)' }}>
+                        -{action.healthDamage}
+                      </span>
+                    ) : (
+                      <span className="shrink-0 text-[10px] font-mono font-bold"
+                        style={{ color: 'var(--color-defender)' }}>
+                        INJ
+                      </span>
+                    )
                   ) : (
                     <span className="shrink-0 text-[10px] font-mono"
                       style={{ color: 'var(--color-text-secondary)', opacity: 0.6 }}>

@@ -36,9 +36,41 @@ export const recordDefenderAction = mutation({
     screenshotBeforeId: v.optional(v.id('_storage')),
     screenshotAfterId: v.optional(v.id('_storage')),
     attackerStepAtTime: v.optional(v.number()),
+    // Structured labels (controllable defender)
+    attackFamily: v.optional(v.string()),
+    objective: v.optional(v.string()),
+    concealment: v.optional(v.string()),
+    authority: v.optional(v.string()),
+    placement: v.optional(v.string()),
+    agentResponse: v.optional(v.string()),
+    judgeReasoning: v.optional(v.string()),
   },
   handler: async (ctx, args) => {
     return ctx.db.insert('defenderActions', args);
+  },
+});
+
+// Update judge verdict on an existing defender action (async, after injection)
+export const updateJudgeVerdict = mutation({
+  args: {
+    gameId: v.string(),
+    actionNumber: v.number(),
+    agentResponse: v.string(),
+    judgeReasoning: v.string(),
+  },
+  handler: async (ctx, args) => {
+    const existing = await ctx.db
+      .query('defenderActions')
+      .withIndex('by_gameId', (q) =>
+        q.eq('gameId', args.gameId).eq('actionNumber', args.actionNumber),
+      )
+      .first();
+    if (existing) {
+      await ctx.db.patch(existing._id, {
+        agentResponse: args.agentResponse,
+        judgeReasoning: args.judgeReasoning,
+      });
+    }
   },
 });
 

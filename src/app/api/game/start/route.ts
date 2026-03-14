@@ -11,10 +11,12 @@ import { startNetworkCapture } from '@/lib/cdp';
 import { startScreencast } from '@/lib/screencast';
 import { runBrowserUseAttackerLoop } from '@/lib/browser-use-attacker';
 import type { AttackerType, Difficulty, ModelProvider, ModelId } from '@/types/game';
+import type { AttackSpec, AttackSuite } from '@/lib/attack-spec';
+import { expandSuite } from '@/lib/attack-spec';
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { taskId, difficulty = 'easy', customTask, mode = 'realtime', attackerType = 'playwright-mcp', modelUrl, noDefender = false, modelProvider, modelId } = body as {
+  const { taskId, difficulty = 'easy', customTask, mode = 'realtime', attackerType = 'playwright-mcp', modelUrl, noDefender = false, modelProvider, modelId, attackSpec: rawAttackSpec, attackSuite, agentSecrets } = body as {
     taskId?: string;
     difficulty?: Difficulty;
     customTask?: string;
@@ -24,6 +26,9 @@ export async function POST(req: NextRequest) {
     noDefender?: boolean;
     modelProvider?: ModelProvider;
     modelId?: ModelId;
+    attackSpec?: AttackSpec;
+    attackSuite?: AttackSuite;
+    agentSecrets?: Record<string, string>;
   };
   const gameMode = mode === 'turnbased' ? 'turnbased' : 'realtime' as const;
 
@@ -34,6 +39,19 @@ export async function POST(req: NextRequest) {
 
   if (!task) {
     return NextResponse.json({ error: 'Task not found' }, { status: 400 });
+  }
+
+  // Resolve attack spec: explicit spec > suite preset > null (legacy mode)
+  let resolvedAttackSpec: AttackSpec | undefined;
+  if (rawAttackSpec) {
+    resolvedAttackSpec = rawAttackSpec;
+  } else if (attackSuite) {
+    resolvedAttackSpec = expandSuite(attackSuite, task);
+  }
+  const hasAttackSpec = !!resolvedAttackSpec;
+
+  if (hasAttackSpec) {
+    console.log('[start] controllable defender mode — suite:', attackSuite ?? 'custom', '| attacks:', resolvedAttackSpec!.attacks.length);
   }
 
   const gameId = nanoid(10);
@@ -105,6 +123,9 @@ export async function POST(req: NextRequest) {
     modelUrl,
     modelProvider: attackerType === 'playwright-mcp' ? (modelProvider ?? 'anthropic') : undefined,
     modelId: attackerType === 'playwright-mcp' ? (modelId ?? 'claude-sonnet-4-6') : undefined,
+    attackSpec: resolvedAttackSpec,
+    attackSuite,
+    agentSecrets,
   });
 
   // 2b. Persist to Convex for training data collection
@@ -188,10 +209,12 @@ export async function POST(req: NextRequest) {
     });
   }
 
-  // 6. Start defender loop (skip if noDefender=true, e.g. for eval runs)
+  // 6. Start defender loop
+  // If attackSpec is set, always enable defender (overrides noDefender)
   // Turn-based: start immediately — defender just waits for attacker's signal, no browser needed yet
   // Realtime: delay 8s to let the browser load before injecting disruptions
-  if (!noDefender) {
+  const shouldRunDefender = hasAttackSpec || !noDefender;
+  if (shouldRunDefender) {
     if (gameMode === 'turnbased') {
       startDefenderLoop(gameId);
     } else {

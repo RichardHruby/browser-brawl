@@ -114,11 +114,33 @@ export function recordDefenderAction(params: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   screenshotAfterId?: any;
   attackerStepAtTime?: number;
+  // Structured labels (controllable defender)
+  attackFamily?: string;
+  objective?: string;
+  concealment?: string;
+  authority?: string;
+  placement?: string;
+  agentResponse?: string;
+  judgeReasoning?: string;
 }): void {
   const c = getClient();
   if (!c) return;
 
   fire(c.mutation(api.steps.recordDefenderAction, params));
+}
+
+// ── Judge verdict update (async, for controllable defender) ──────────
+
+export function updateJudgeVerdict(params: {
+  gameId: string;
+  actionNumber: number;
+  agentResponse: string;
+  judgeReasoning: string;
+}): void {
+  const c = getClient();
+  if (!c) return;
+
+  fire(c.mutation(api.steps.updateJudgeVerdict, params));
 }
 
 // ── Conversation history (for training data) ──────────────────────
