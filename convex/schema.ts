@@ -34,9 +34,6 @@ export default defineSchema({
     hasDefender: v.optional(v.boolean()),
     durationSeconds: v.optional(v.number()),
     recordingStorageId: v.optional(v.id('_storage')),
-    // BYOM / attacker type fields (added by byom-finetuned branch)
-    attackerType: v.optional(v.string()),
-    hasDefender: v.optional(v.boolean()),
     // Controllable defender fields
     attackSuite: v.optional(v.string()),
   }).index('by_gameId', ['gameId']),
