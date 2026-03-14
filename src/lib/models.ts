@@ -4,19 +4,22 @@ export interface ModelConfig {
   provider: ModelProvider;
   modelId: ModelId;
   displayName: string;
+  /** If true, the model is not yet open — clicking it shows the waitlist prompt */
+  gated?: boolean;
 }
 
 export const AVAILABLE_MODELS: ModelConfig[] = [
-  { provider: 'anthropic', modelId: 'claude-sonnet-4-6', displayName: 'Claude Sonnet 4' },
-  { provider: 'openai', modelId: 'gpt-5.4', displayName: 'GPT-5.4' },
+  { provider: 'anthropic', modelId: 'claude-sonnet-4-6', displayName: 'Claude Sonnet 4.6' },
+  { provider: 'anthropic', modelId: 'claude-opus-4-6', displayName: 'Claude Opus 4.6', gated: true },
   { provider: 'openai', modelId: 'gpt-5-mini', displayName: 'GPT-5 Mini' },
-  { provider: 'gemini', modelId: 'gemini-3.1-pro-preview', displayName: 'Gemini 3.1 Pro' },
+  { provider: 'openai', modelId: 'gpt-5.4', displayName: 'GPT-5.4', gated: true },
   { provider: 'gemini', modelId: 'gemini-3-flash-preview', displayName: 'Gemini 3 Flash' },
-  { provider: 'xai', modelId: 'grok-4-0709', displayName: 'Grok 4' },
+  { provider: 'gemini', modelId: 'gemini-3.1-pro-preview', displayName: 'Gemini 3.1 Pro', gated: true },
   { provider: 'xai', modelId: 'grok-4-1-fast-reasoning', displayName: 'Grok 4.1 Fast' },
+  { provider: 'xai', modelId: 'grok-4-0709', displayName: 'Grok 4', gated: true },
 ];
 
-export const DEFAULT_MODEL: ModelConfig = AVAILABLE_MODELS[0];
+export const DEFAULT_MODEL: ModelConfig = AVAILABLE_MODELS.find(m => !m.gated)!;
 
 /** Provider display names and colors for the UI */
 export const PROVIDER_META: Record<ModelProvider, { label: string; color: string }> = {

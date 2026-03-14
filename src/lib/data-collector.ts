@@ -37,8 +37,10 @@ export function createGameRecord(params: {
   taskStartUrl: string;
   difficulty: 'easy' | 'medium' | 'hard' | 'nightmare';
   mode: 'realtime' | 'turnbased';
+  attackerType: string;
   attackerModel: string;
   defenderModel: string;
+  hasDefender?: boolean;
 }): void {
   const c = getClient();
   if (!c) return;

@@ -28,8 +28,10 @@ export default defineSchema({
         v.literal('aborted'),
       ),
     ),
+    attackerType: v.optional(v.string()),
     attackerModel: v.string(),
     defenderModel: v.string(),
+    hasDefender: v.optional(v.boolean()),
     durationSeconds: v.optional(v.number()),
     recordingStorageId: v.optional(v.id('_storage')),
     // BYOM / attacker type fields (added by byom-finetuned branch)

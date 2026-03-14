@@ -94,9 +94,7 @@ export default function WaitlistPage() {
                   className="font-game text-base leading-relaxed"
                   style={{ color: 'var(--color-text-secondary)' }}
                 >
-                  Fine-tuning pipeline &amp; Bring Your Own Model are coming soon.
-                  <br />
-                  Get notified when they go live.
+                  Frontier model access, fine-tuning pipeline &amp; Bring Your Own Model — get notified when they go live.
                 </p>
               </div>
 

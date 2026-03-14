@@ -48,7 +48,7 @@ The fine-tuned model was trained on Playwright MCP's 22 tool schemas with `<tool
 | `--vanilla-api-key <KEY>` | API key for vanilla endpoint (Bearer auth) |
 | `--finetuned-model <ID>` | Model ID for fine-tuned endpoint |
 | `--vanilla-model <ID>` | Model ID for vanilla endpoint |
-| `--sonnet` | Run Claude Sonnet 4 evaluation |
+| `--sonnet` | Run Claude Sonnet 4.6 evaluation |
 | `--anthropic-api-key <KEY>` | Anthropic API key (or use `ANTHROPIC_API_KEY` env var) |
 | `--miniwob-dir <path>` | Path to `miniwob-plusplus/miniwob/html/` (required) |
 | `--tasks <id1,id2,...>` | Comma-separated task IDs (default: all 25) |
@@ -123,7 +123,7 @@ npx tsx scripts/eval-miniwob.ts \
   --miniwob-dir ../miniwob-plusplus/miniwob/html
 ```
 
-### 3. Claude Sonnet 4 (ceiling comparison)
+### 3. Claude Sonnet 4.6 (ceiling comparison)
 
 ```bash
 npx tsx scripts/eval-miniwob.ts \

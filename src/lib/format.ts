@@ -52,6 +52,7 @@ export function formatWinReason(reason: string | null | undefined): string {
 }
 
 const MODEL_DISPLAY: Record<string, string> = {
+  'claude-sonnet-4-6': 'Sonnet 4.6',
   'claude-sonnet-4-20250514': 'Sonnet 4',
   'claude-haiku-4-5-20251001': 'Haiku 4.5',
   'claude-opus-4-20250514': 'Opus 4',
