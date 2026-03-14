@@ -4,17 +4,14 @@
 
 One AI agent (the attacker) tries to complete a task on a real webpage. Another AI agent (the defender) tries to block it with JavaScript injections. They compete in real time inside a cloud browser. Every match produces rich, structured training data — tool calls, DOM snapshots, screenshots, full conversation traces — that you can use to fine-tune smaller browser models.
 
-We've proven this works: traces from Browser Brawl fine-tune Qwen2.5-3B into a capable browser agent. Two wins out of two games on Hacker News upvote with a single training example.
-
-> Built at the [Browser Use](https://browser-use.com) Web Agents Hackathon at [Y Combinator](https://events.ycombinator.com/browser-use-hackathon), San Francisco — Feb 28–Mar 1, 2026.
+We built this during YC's 24 hour browser use hackathon - during that we validated the training pipeline by converting Browser Brawl traces into fine-tuning data which was used to run supervised fine tuning on Qwen2.5-3B.
 
 ---
 
 ## The Idea: Adversarial Data Generation for Browser Agents
 
-Browser agent training data is expensive. You either pay humans to label trajectories or you script narrow synthetic tasks. Both are slow, brittle, and boring.
-
-We took inspiration from **Generative Adversarial Networks** (Goodfellow et al., 2014). In a GAN, a generator learns to produce realistic outputs by competing against a discriminator that tries to distinguish real from fake. The adversarial pressure forces both networks to improve — the generator produces increasingly realistic data, and the discriminator becomes a better judge.
+Browser agent training data is expensive. 
+We took inspiration from **Generative Adversarial Networks**. In a GAN, a generator learns to produce realistic outputs by competing against a discriminator that tries to distinguish real from fake. The adversarial pressure forces both networks to improve — the generator produces increasingly realistic data, and the discriminator becomes a better judge.
 
 Browser Brawl applies this intuition to browser agents:
 
@@ -25,9 +22,14 @@ Browser Brawl applies this intuition to browser agents:
 | Adversarial pressure improves both | Harder disruptions force richer, more resilient trajectories |
 | Training signal from the competition | Training data from every match — win or lose |
 
-The analogy isn't perfect — there's no shared gradient, no minimax objective, and the agents don't co-train in a single loop. But the core insight holds: **adversarial competition between agents produces richer, more diverse training data than either agent would generate alone.** The defender forces the attacker to recover from popups, hidden buttons, scroll hijacks, and DOM mutations — exactly the kind of edge cases that make browser agents robust.
+---
 
-The result: a scalable, configurable pipeline that turns a fun game into high-quality training data.
+## Demo
+
+
+https://github.com/user-attachments/assets/8b39cff0-88f1-4699-843e-a7a7df85d12a
+
+Watch the full 4 minute demo + explanation at [youtu.be/NIoFXv-JvBY](https://youtu.be/NIoFXv-JvBY)
 
 ---
 
@@ -60,117 +62,37 @@ flowchart LR
   L4 --> A1
 ```
 
-1. **Lobby** — Pick a task (Amazon shopping, Google Flights, Hacker News, etc.) and difficulty level
-2. **Arena** — Both agents run concurrently. The attacker navigates the real website with Playwright. The defender injects JavaScript disruptions via CDP. Health drains over time and on each hit.
-3. **Game Over** — Attacker wins by completing the task. Defender wins by depleting health to zero.
-4. **Data** — Every match records full Claude conversations, tool calls, DOM snapshots, screenshots, and video to Convex for training data extraction.
+1. **Lobby**
+   - Choose a browser agent and a real web task for it to accomplish (Amazon shopping cart, Google Flights, Hacker News), as well as a defender agent difficulty
+
+2. **Arena**  
+   - Attacker navigates the website using Playwright tools  
+   - Defender injects disruptive JavaScript into the page
+
+3. **Game Over**  
+   - Attacker wins by completing the task  
+   - Defender wins by draining the attacker's health
+
+4. **Data Collection**  
+   Each match records:
+   - tool calls
+   - DOM snapshots
+   - screenshots
+   - full agent conversations
+   - View and replay full game traces at [browser-brawl.com/history](https://browser-brawl.com/history)
+
+This data becomes training trajectories for browser agents.
 
 ---
 
-## Features
+### One-Click SFT Pipeline
 
-### Game
-- Real-time adversarial matches between two AI agents in a cloud browser
-- 4 difficulty levels controlling defender aggression, health decay, and disruption pool
-- 9 prebuilt JavaScript disruptions + AI-generated custom injections
-- Live browser view embedded in the arena via iframe
-- SSE streaming with full reconnection replay
-- Turn-based mode for step-by-step analysis
-- Cyberpunk neon UI with glitch animations, health bar shake, CRT scanlines
-
-### History & Replay
-- Paginated session list with difficulty/winner filters
-- Step-by-step replay with full tool input/output, DOM snapshots, before/after screenshots
-- Video player with play/pause, speed control (1x/2x/4x), scrubber
-- CSV export for sessions and disruption effectiveness analysis
-
-### Disruptions
-| Disruption | Damage | What it does |
-|-----------|--------|-------------|
-| Session Expired Popup | 8 HP | Fullscreen fake "session expired" overlay |
-| Fake Loading Spinner | 6 HP | Blocks viewport for 7 seconds |
-| Button Camouflage | 8 HP | Makes all buttons invisible for 10 seconds |
-| Scroll Hijack | 10 HP | Randomly scrolls the page for 6 seconds |
-| Custom Injection (AI) | 15 HP | Haiku reads the DOM and generates targeted JS |
-| Dialog Barrage | 12 HP | Three staggered confirmation dialogs |
-| Element Obliterator | 20 HP | Removes submit buttons from the DOM |
-| Visual Chaos | 15 HP | Shakes the entire page for 8 seconds |
-| Coordinated Assault | 30 HP | Hides nav + redirect countdown + click blocker |
-
-### Data Collection
-- Full Claude conversation persistence (messages, tool calls, tool results — untruncated)
-- Before/after screenshots via CDP on every step
-- DOM snapshots (50 interactive elements with positions, IDs, classes)
-- Health timeline with labeled deltas (decay vs. disruption damage)
-- Network request logging (method, URL, status, size)
-- Session video via CDP screencast (~1fps JPEG frames)
-- Laminar auto-traces on all LLM calls
-
-### One-Click Training Pipeline
-
-Select games on the history page, click **Kickoff Finetune**, and the full pipeline runs automatically — no Python environment or CLI needed.
+We built a PoC fine tuning pipeline that uses Browser Brawl's traces.
 
 ```mermaid
-flowchart TD
-  subgraph UI["Browser UI"]
-    H["/history\nselect games → Kickoff Finetune"]
-    T["/training\nlive status dashboard"]
-    L["Lobby\nBYOM toggle + endpoint URL"]
-  end
-
-  subgraph API["Next.js API Route"]
-    S["POST /api/training/start\nfetch conversations from Convex\nconvert: Anthropic → ShareGPT → OpenAI Messages"]
-  end
-
-  subgraph Convex["Convex"]
-    DB["conversations table\nfull Claude messages + tool calls"]
-    FS["file storage\nJSONL training blob"]
-    JT["trainingJobs table\nstatus + step/loss metrics"]
-  end
-
-  subgraph Modal["Modal — GPU Cloud"]
-    K["kickoff endpoint\nweb fn, spawns GPU job"]
-    TR["train\nUnsloth QLoRA on A10G\nQwen2.5-3B-Instruct"]
-    MG["merge\nLoRA adapter → base model"]
-    SV["serve\nvLLM endpoint, OpenAI-compatible"]
-  end
-
-  H --> S
-  S -->|query| DB
-  S -->|upload JSONL| FS
-  FS -->|download URL| S
-  S -->|fire-and-forget POST| K
-  K -->|spawn async| TR
-  TR -->|status callbacks| JT
-  TR --> MG
-  MG --> SV
-  JT -->|useQuery live updates| T
-  SV -->|serve URL| T
-  T -->|paste URL| L
-  L -->|fight with fine-tuned model| L
+flowchart LR
+  H["/history - select traces"] --> S["Next.js API Route - Anthropic tool_use to ShareGPT to OpenAI Messages"] --> FS["Convex - upload JSONL"] --> K["Modal - fire-and-forget POST"] --> TR["Unsloth QLoRA on A10G"] --> MG["LoRA merge into base model"] --> SV["vLLM serve endpoint"]
 ```
-
-Status transitions streamed live to `/training` via Convex subscriptions: `preparing → uploading → training → merging → ready`.
-
-### Bring Your Own Model (BYOM)
-
-Once you have a fine-tuned model, close the loop — fight with it directly in the game.
-
-1. In the lobby, enable **Bring Your Own Model**
-2. Paste your vLLM endpoint URL (OpenAI-compatible — e.g. the serve URL from `/training`)
-3. Hit **FIGHT** — the fine-tuned model controls the attacker using the same Playwright MCP tool interface it was trained on
-
-The model outputs `<tool_call>` XML matching the training data format. Results return as `<tool_response>` XML. Cold start handling built in: a warm-up ping fires during browser creation to overlap the ~2min Modal cold start with the ~8s browser spin-up.
-
-This closes the self-improvement loop: **play games → collect traces → train model → fight with that model → generate harder traces → repeat.**
-
-### Training Pipeline (CLI)
-- `extract-training-data.ts` — Pull successful game trajectories from Convex as raw JSONL
-- `convert-to-sharegpt.ts` — Convert Anthropic tool format to Qwen2.5-compatible ShareGPT format
-- `eval_browser_brawl.py` — Compare fine-tuned Qwen vs Claude Sonnet baseline across N games
-- `eval-miniwob.ts` — Out-of-distribution eval on MiniWob++ benchmark tasks
-- Quality filters (minimum tool call count, success-only)
-- Proven end-to-end: Convex → JSONL → ShareGPT → Qwen2.5-3B fine-tuning (QLoRA via Unsloth)
 
 ---
 
@@ -179,15 +101,12 @@ This closes the self-improvement loop: **play games → collect traces → train
 | Layer | Technology |
 |-------|-----------|
 | **Frontend** | Next.js 16, React 19, TypeScript 5, Tailwind CSS 4 |
-| **LLM** | Anthropic SDK — Claude Sonnet 4.6 (attacker), Claude Haiku 4.5 (defender) |
+| **LLM** | Anthropic SDK — Claude Sonnet 4.6 (customizable), Claude Haiku 4.5 (defender) |
 | **Cloud Browsers** | Browser-Use API (managed sessions with CDP + live view) |
-| **Real-time Streaming** | Server-Sent Events (SSE) |
 | **Database & Storage** | [Convex](https://convex.dev) (real-time DB + file storage) |
 | **LLM Observability** | [Laminar](https://www.lmnr.ai) (auto-traces all Anthropic calls) |
-| **Protocol** | [Model Context Protocol (MCP)](https://modelcontextprotocol.io) |
 | **Fine-tuning** | Unsloth QLoRA on Modal A10G — Qwen2.5-3B-Instruct |
 | **Serving** | vLLM on Modal, OpenAI-compatible API |
-| **Testing** | Vitest |
 
 ### Supported Browser Agent Frameworks
 
@@ -237,133 +156,23 @@ LMNR_PROJECT_API_KEY=...
 NEXT_PUBLIC_CONVEX_URL=https://...convex.cloud
 NEXT_PUBLIC_CONVEX_SITE_URL=https://...convex.site
 
-# Optional: Product analytics/session recording with PostHog
-# NEXT_PUBLIC_POSTHOG_KEY=phc_...
-# Optional (defaults to US cloud if omitted)
-# NEXT_PUBLIC_POSTHOG_HOST=https://us.i.posthog.com
-
 # Required for one-click training pipeline
 MODAL_TRAIN_ENDPOINT=https://your-workspace--browser-brawl-train-pipeline-kickoff.modal.run
 ```
 
-### Training Pipeline
-
-**One-click (recommended):**
-1. Play games and collect successful traces
-2. Go to `/history`, select winning sessions, click **Kickoff Finetune**
-3. Watch live progress on `/training` (`preparing → uploading → training → merging → ready`)
-4. Copy the serve URL from `/training` → paste into the lobby BYOM field → **FIGHT**
-
-**Deploy Modal endpoints first (one-time setup):**
-```bash
-modal deploy scripts/modal_train_pipeline.py   # training + kickoff endpoint
-modal deploy scripts/modal_serve.py            # vLLM inference endpoint (all experiments)
-```
-
-**Manual CLI:**
-```bash
-# Pull successful game trajectories from Convex
-npx tsx scripts/extract-training-data.ts -o data/raw.jsonl
-
-# Convert to ShareGPT format
-npx tsx scripts/convert-to-sharegpt.ts -i data/raw.jsonl -o data/train.jsonl
-
-# Run fine-tuning directly
-modal run scripts/modal_finetune.py --text-only
-```
-
-**Evaluate:**
-```bash
-# In-distribution: fine-tuned Qwen vs Claude Sonnet baseline
-python scripts/eval_browser_brawl.py --games 10 --task hackernews-upvote
-
-# Out-of-distribution: MiniWob++ benchmark
-npx tsx scripts/eval-miniwob.ts --finetuned-url <URL> --miniwob-dir ../miniwob-plusplus/miniwob/html
-```
-
-## API Routes
-
-| Route | Method | Purpose |
-|-------|--------|---------|
-| `/api/game/start` | POST | Create browser session, start both agents |
-| `/api/game/tasks` | GET | List available tasks |
-| `/api/game/[sessionId]/events` | GET | SSE event stream (replays history on reconnect) |
-| `/api/game/[sessionId]/status` | GET | Current game state snapshot |
-| `/api/game/[sessionId]/abort` | POST | Stop game, clean up resources |
-| `/api/training/start` | POST | Kick off full training pipeline (convert → upload → Modal GPU train) |
-| `/api/export/sessions` | GET | CSV download of all sessions |
-| `/api/export/disruptions` | GET | CSV download of all defender actions |
-| `/api/export/training` | GET | Download selected sessions as ShareGPT JSONL |
-
 ---
 
-## Difficulty Levels
+## Roadmap
 
-| Level | Defender Interval | Health Decay/s | Disruptions Available |
-|-------|-------------------|----------------|----------------------|
-| Easy | 20s | 0.05 | 2 |
-| Medium | 10s | 0.2 | 5 |
-| Hard | 5s | 0.4 | 7 |
-| Nightmare | 2.5s | 0.8 | All 9 |
+- **Bring Your Own Model** - fight with your fine-tuned model directly in the arena
+- **Supervised fine-tune Qwen 3.5** (mid-sized) on adversarial and non-adversarial browser traces
+- **New game modes:**
+  - Race mode - multiple browser agents racing to complete the same task
+  - Tower defense mode - defender places all perturbations upfront with a budget, attacker has a time limit
 
----
+Have an idea you want us to add? Reach out:
 
-## Project Structure
-
-```
-src/
-├── app/                          # Next.js pages + API routes
-│   ├── api/game/                 # Game lifecycle endpoints
-│   ├── api/training/             # One-click training pipeline endpoint
-│   ├── api/export/               # CSV + JSONL export endpoints
-│   ├── history/                  # Replay UI (session list + detail viewer)
-│   ├── training/                 # Live training dashboard
-│   └── page.tsx                  # Main game page (lobby → arena → game over)
-├── components/
-│   ├── lobby/                    # Task selector, difficulty picker, fighter select, BYOM toggle
-│   ├── arena/                    # Health bar, browser frame, agent panels
-│   ├── end/                      # Winner banner
-│   └── shared/                   # Glitch text, neon borders, loading screen
-├── hooks/                        # useGameState, useGameSSE, useArenaTimer, useHealthBar
-├── lib/
-│   ├── attacker-playwright.ts    # Attacker: Playwright MCP + Claude Sonnet loop
-│   ├── attacker-finetuned.ts     # Attacker: fine-tuned Qwen via vLLM (BYOM)
-│   ├── attacker-stagehand.ts     # Attacker: Stagehand alternative
-│   ├── browser-use-attacker.ts   # Attacker: Browser-Use SDK alternative
-│   ├── defender-agent.ts         # Defender: Haiku + JS injection loop
-│   ├── disruptions.ts            # 9 prebuilt disruptions + cooldown system
-│   ├── cdp.ts                    # CDP WebSocket: injectJS, snapshotDOM
-│   ├── data-collector.ts         # Fire-and-forget Convex mutations
-│   ├── training-converter.ts     # Anthropic native → ShareGPT → OpenAI Messages
-│   ├── screencast.ts             # CDP screencast frame capture
-│   ├── sse-emitter.ts            # SSE broadcast to connected clients
-│   └── game-session-store.ts     # In-memory session state
-├── types/                        # TypeScript interfaces
-convex/                           # Convex schema, mutations, queries, HTTP endpoint
-scripts/
-├── extract-training-data.ts      # Pull trajectories from Convex as JSONL
-├── convert-to-sharegpt.ts        # Anthropic tool format → ShareGPT
-├── modal_train_pipeline.py       # Modal: kickoff web endpoint + GPU training function
-├── modal_serve.py                # Modal: vLLM inference endpoint (all experiments)
-├── modal_finetune.py             # Modal: manual CLI fine-tuning alternative
-├── eval_browser_brawl.py         # Eval: fine-tuned vs baseline across Browser Brawl tasks
-└── eval-miniwob.ts               # Eval: MiniWob++ out-of-distribution benchmark
-defender/                         # Standalone defender CLI (legacy prototype)
-```
+- **Richard Hruby** - [GitHub](https://github.com/RichardHruby) | [hruby.richard@gmail.com](mailto:hruby.richard@gmail.com) | [@HrubyOnRails](https://x.com/HrubyOnRails)
+- **Mehul Kalia** - [GitHub](http://github.com/mehulkalia/) | [mehultkalia@gmail.com](mailto:mehultkalia@gmail.com) | [@MehulKalia_](https://x.com/MehulKalia_)
 
 ---
-
-## Collaborators
-
-- **Richard Hruby** — [GitHub](https://github.com/RichardHruby)
-- **Mehul Kalia** — [GitHub](http://github.com/mehulkalia/)
-
----
-
-## Acknowledgments
-
-Built at the [Browser Use](https://browser-use.com) Web Agents Hackathon at [Y Combinator](https://events.ycombinator.com/browser-use-hackathon), San Francisco.
-
-Sponsored by Anthropic, OpenAI, Vercel, Convex, and Browser Use.
-
-Theoretical inspiration from: Goodfellow, I. J., et al. (2014). *Generative Adversarial Nets.* NeurIPS. [arXiv:1406.2661](https://arxiv.org/abs/1406.2661)
