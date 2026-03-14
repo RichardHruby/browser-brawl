@@ -34,6 +34,8 @@ export default defineSchema({
     hasDefender: v.optional(v.boolean()),
     durationSeconds: v.optional(v.number()),
     recordingStorageId: v.optional(v.id('_storage')),
+    // Controllable defender fields
+    attackSuite: v.optional(v.string()),
   }).index('by_gameId', ['gameId']),
 
   attackerSteps: defineTable({
@@ -65,6 +67,15 @@ export default defineSchema({
     screenshotBeforeId: v.optional(v.id('_storage')),
     screenshotAfterId: v.optional(v.id('_storage')),
     attackerStepAtTime: v.optional(v.number()),
+    // Structured labels (present when attackSpec is used)
+    attackFamily: v.optional(v.string()),
+    objective: v.optional(v.string()),
+    concealment: v.optional(v.string()),
+    authority: v.optional(v.string()),
+    placement: v.optional(v.string()),
+    // LLM judge verdict (populated async after injection)
+    agentResponse: v.optional(v.string()),    // 'followed' | 'ignored' | 'partial'
+    judgeReasoning: v.optional(v.string()),
   }).index('by_gameId', ['gameId', 'actionNumber']),
 
   healthTimeline: defineTable({

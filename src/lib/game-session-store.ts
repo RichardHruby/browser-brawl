@@ -1,4 +1,5 @@
 import type { AgentEvent, DisruptionEvent, Difficulty, GameMode, GamePhase, AttackerStatus, AttackerType, DefenderStatus, TurnOwner, Task, ModelProvider, ModelId } from '@/types/game';
+import type { AttackSpec, AttackRuntimeState, AttackSuite } from './attack-spec';
 
 // Server-side extended session with runtime fields
 export interface ServerGameSession {
@@ -43,6 +44,11 @@ export interface ServerGameSession {
   buTaskId: string | null;
   buSessionId: string | null;
   skipScreenshots: boolean;
+  // Controllable defender fields
+  attackSpec?: AttackSpec;
+  attackSuite?: AttackSuite;
+  agentSecrets?: Record<string, string>;
+  attackRuntimeState?: AttackRuntimeState;
 }
 
 // Global singleton store — survives across API route invocations in the same process
@@ -79,6 +85,9 @@ export function createSession(params: {
   modelProvider?: ModelProvider;
   modelId?: ModelId;
   skipScreenshots?: boolean;
+  attackSpec?: AttackSpec;
+  attackSuite?: AttackSuite;
+  agentSecrets?: Record<string, string>;
 }): ServerGameSession {
   const session: ServerGameSession = {
     ...params,

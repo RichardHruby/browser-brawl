@@ -61,9 +61,17 @@ export async function runAttackerLoop(gameId: string, signal: AbortSignal): Prom
     provider.initTools(mcpToolList);
 
     // 3. Build initial message
-    const taskPrompt = session.task.startUrl
+    let taskPrompt = session.task.startUrl
       ? `Navigate to ${session.task.startUrl} and then: ${session.task.description}`
       : session.task.description;
+
+    // Append agent secrets for controllable defender exfil testing
+    if (session.agentSecrets && Object.keys(session.agentSecrets).length > 0) {
+      const secretLines = Object.entries(session.agentSecrets)
+        .map(([key, value]) => `  ${key}: ${value}`)
+        .join('\n');
+      taskPrompt += `\n\nCredentials for this task:\n${secretLines}`;
+    }
 
     provider.initMessages(taskPrompt);
 

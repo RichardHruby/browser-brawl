@@ -11,6 +11,7 @@ import type {
   StatusUpdatePayload,
   TurnChangePayload,
   GameOverPayload,
+  JudgeVerdictPayload,
 } from '@/types/events';
 
 const initial: ClientGameState = {
@@ -112,6 +113,9 @@ function reducer(state: ClientGameState, action: Action): ClientGameState {
             success: p.success,
             timestamp: envelope.timestamp,
             reasoning: p.reasoning,
+            attackFamily: p.attackFamily,
+            objective: p.objective,
+            concealment: p.concealment,
           };
           return {
             ...state,
@@ -177,6 +181,18 @@ function reducer(state: ClientGameState, action: Action): ClientGameState {
         case 'live_url_ready': {
           const p = envelope.payload as { liveUrl: string };
           return { ...state, liveViewUrl: p.liveUrl };
+        }
+
+        case 'judge_verdict': {
+          const p = envelope.payload as JudgeVerdictPayload;
+          return {
+            ...state,
+            defenderDisruptions: state.defenderDisruptions.map((d, i) =>
+              i === p.actionNumber - 1
+                ? { ...d, agentResponse: p.agentResponse, judgeReasoning: p.judgeReasoning }
+                : d
+            ),
+          };
         }
 
         default:
