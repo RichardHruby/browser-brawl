@@ -7,7 +7,8 @@ export interface ModelConfig {
 }
 
 export const AVAILABLE_MODELS: ModelConfig[] = [
-  { provider: 'anthropic', modelId: 'claude-sonnet-4-6', displayName: 'Claude Sonnet 4' },
+  { provider: 'anthropic', modelId: 'claude-opus-4-6', displayName: 'Claude Opus 4.6' },
+  { provider: 'anthropic', modelId: 'claude-sonnet-4-6', displayName: 'Claude Sonnet 4.6' },
   { provider: 'openai', modelId: 'gpt-5.4', displayName: 'GPT-5.4' },
   { provider: 'openai', modelId: 'gpt-5-mini', displayName: 'GPT-5 Mini' },
   { provider: 'gemini', modelId: 'gemini-3.1-pro-preview', displayName: 'Gemini 3.1 Pro' },

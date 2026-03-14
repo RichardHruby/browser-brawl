@@ -50,7 +50,7 @@ export function ModelPicker({ value, onChange, visible }: Props) {
   }
 
   // Group models by provider
-  const providers = (['anthropic', 'openai', 'gemini'] as ModelProvider[]).filter(
+  const providers = (['anthropic', 'openai', 'gemini', 'xai'] as ModelProvider[]).filter(
     p => models.some(m => m.provider === p)
   );
 

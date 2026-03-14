@@ -11,6 +11,7 @@ export type ModelProvider = 'anthropic' | 'openai' | 'gemini' | 'xai';
 
 // Specific model IDs per provider
 export type ModelId =
+  | 'claude-opus-4-6'
   | 'claude-sonnet-4-6'
   | 'gpt-5.4'
   | 'gpt-5-mini'
