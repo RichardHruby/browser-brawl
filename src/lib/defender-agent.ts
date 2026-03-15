@@ -9,8 +9,12 @@ import { getAnthropicApiKey } from './env';
 import { recordDefenderAction, finalizeGame, recordHealthChange, uploadScreenshot, setSessionRecording } from './data-collector';
 import { stopScreencast } from './screencast';
 import { log, logError, logWarn } from './log';
-import type { DisruptionEvent } from '@/types/game';
+import type { AgentEvent, DisruptionEvent } from '@/types/game';
 import type { DefenderActivityPayload, DefenderDisruptionPayload, HealthUpdatePayload, StatusUpdatePayload } from '@/types/events';
+import { createAttackRuntimeState, type AttackEntry, type AttackObjective, type SuccessCondition, type StructuredLabels } from './attack-spec';
+import { generatePrimitive, isPromptInjectionPrimitive } from './prompt-injections';
+import { judgeInjectionResponse } from './injection-judge';
+import { updateJudgeVerdict } from './data-collector';
 
 const client = new Anthropic({ apiKey: getAnthropicApiKey() });
 
@@ -35,6 +39,15 @@ export function startDefenderLoop(gameId: string): void {
   log('[defender] starting loop for game:', gameId);
   log('[defender] cdpUrl:', session.cdpUrl || '(EMPTY)');
   log('[defender] difficulty:', session.difficulty);
+
+  // Spec-driven mode: deterministic attacks, no health, no Haiku LLM
+  if (session.attackSpec) {
+    log('[defender] spec-driven mode — attacks:', session.attackSpec.attacks.length);
+    runSpecDrivenLoop(gameId).catch(err => {
+      logError('[defender-spec] loop error:', err);
+    });
+    return;
+  }
 
   if (session.mode === 'turnbased') {
     // Turn-based: no timers, no health decay — defender waits for signal from attacker
@@ -70,6 +83,364 @@ function scheduleNextAttack(gameId: string): void {
     await runDefenderTurn(gameId);
     scheduleNextAttack(gameId);
   }, intervalMs);
+}
+
+// ---------------------------------------------------------------------------
+// Spec-driven defender loop — deterministic, no health, no Haiku LLM
+// ---------------------------------------------------------------------------
+
+const SPEC_TICK_MS = 2000;
+
+async function runSpecDrivenLoop(gameId: string): Promise<void> {
+  const session = getSession(gameId);
+  if (!session || !session.attackSpec) return;
+
+  const spec = session.attackSpec;
+  const state = createAttackRuntimeState();
+  session.attackRuntimeState = state;
+  const maxInterventions = spec.budget?.maxInterventions ?? Infinity;
+
+  log(`[defender-spec] loop started — ${spec.attacks.length} attacks, budget: ${maxInterventions === Infinity ? 'unlimited' : maxInterventions}`);
+
+  // Set up on_interval attacks with their own setInterval handles
+  for (let i = 0; i < spec.attacks.length; i++) {
+    const attack = spec.attacks[i];
+    if (attack.trigger.type === 'on_interval' && attack.trigger.ms) {
+      const intervalMs = attack.trigger.ms;
+      const handle = setInterval(async () => {
+        const s = getSession(gameId);
+        if (!s || s.phase !== 'arena') {
+          clearInterval(handle);
+          return;
+        }
+        if (state.firedCount >= maxInterventions) return;
+        await fireSpecAttack(gameId, attack, i, state);
+      }, intervalMs);
+      state.intervalHandles.push(handle);
+    }
+  }
+
+  // Main tick loop — evaluates non-interval triggers
+  while (true) {
+    const s = getSession(gameId);
+    if (!s || s.phase !== 'arena') break;
+    if (state.firedCount >= maxInterventions) {
+      log(`[defender-spec] budget exhausted (${state.firedCount}/${maxInterventions})`);
+      break;
+    }
+
+    for (let i = 0; i < spec.attacks.length; i++) {
+      const attack = spec.attacks[i];
+
+      // Skip if already fired and one_shot (default)
+      const persistence = attack.persistence ?? 'one_shot';
+      if (persistence === 'one_shot' && state.firedAttackIndices.has(i)) continue;
+
+      // Skip interval triggers (handled by setInterval above)
+      if (attack.trigger.type === 'on_interval') continue;
+
+      // Budget check
+      if (state.firedCount >= maxInterventions) break;
+
+      // Evaluate trigger
+      const triggered = evaluateTrigger(attack, i, s, state);
+      if (!triggered) continue;
+
+      await fireSpecAttack(gameId, attack, i, state);
+    }
+
+    // Detect URL changes for after_navigation triggers
+    await updateLastKnownUrl(gameId, state);
+
+    await new Promise(resolve => setTimeout(resolve, SPEC_TICK_MS));
+  }
+
+  // Cleanup interval handles
+  for (const handle of state.intervalHandles) {
+    clearInterval(handle);
+  }
+  state.intervalHandles = [];
+
+  log(`[defender-spec] loop ended — fired ${state.firedCount} attacks`);
+}
+
+function evaluateTrigger(
+  attack: AttackEntry,
+  _index: number,
+  session: ServerGameSession,
+  state: ReturnType<typeof createAttackRuntimeState>,
+): boolean {
+  const trigger = attack.trigger;
+
+  switch (trigger.type) {
+    case 'on_page_load':
+      // Fire once on first evaluation
+      return true;
+
+    case 'after_n_steps':
+      return session.attackerSteps.length >= (trigger.n ?? 1);
+
+    case 'after_navigation':
+      // Fire when URL has changed from last known
+      // (URL tracking happens in the main loop via updateLastKnownUrl)
+      return state.lastKnownUrl !== null;
+
+    case 'on_interval':
+      // Handled by setInterval, should not reach here
+      return false;
+
+    default:
+      return false;
+  }
+}
+
+async function updateLastKnownUrl(
+  gameId: string,
+  state: ReturnType<typeof createAttackRuntimeState>,
+): Promise<void> {
+  const session = getSession(gameId);
+  if (!session) return;
+
+  // Use last attacker step's URL if available (cheaper than CDP call)
+  const lastStep = session.attackerSteps[session.attackerSteps.length - 1];
+  if (lastStep) {
+    const currentUrl = (lastStep as unknown as Record<string, unknown>).url as string | undefined;
+    if (currentUrl && currentUrl !== state.lastKnownUrl) {
+      log(`[defender-spec] URL changed: ${state.lastKnownUrl} → ${currentUrl}`);
+      state.lastKnownUrl = currentUrl;
+    }
+  }
+}
+
+async function fireSpecAttack(
+  gameId: string,
+  attack: AttackEntry,
+  index: number,
+  state: ReturnType<typeof createAttackRuntimeState>,
+): Promise<void> {
+  const session = getSession(gameId);
+  if (!session || session.phase !== 'arena') return;
+
+  let js: string;
+  let labels: StructuredLabels;
+  let disruptionId: string;
+  let disruptionName: string;
+  let description: string;
+
+  if (isPromptInjectionPrimitive(attack.primitive)) {
+    // Prompt injection primitive — use our new library
+    const result = generatePrimitive(attack);
+    if (!result) {
+      logWarn(`[defender-spec] generatePrimitive returned null for: ${attack.primitive}`);
+      return;
+    }
+    js = result.js;
+    labels = result.labels;
+    disruptionId = attack.primitive;
+    disruptionName = `PI: ${attack.primitive.replace(/_/g, ' ')}`;
+    description = attack.text?.slice(0, 100) ?? attack.objective;
+  } else {
+    // Legacy disruption ID — use existing disruption library
+    const disruption = getDisruptionById(attack.primitive);
+    if (!disruption) {
+      logWarn(`[defender-spec] unknown disruption ID: ${attack.primitive}`);
+      return;
+    }
+    js = disruption.generatePayload();
+    labels = {
+      family: attack.family,
+      objective: attack.objective,
+      concealment: attack.concealment ?? 'visible',
+      authority: attack.authority ?? 'none',
+      placement: attack.placement,
+    };
+    disruptionId = disruption.id;
+    disruptionName = disruption.name;
+    description = disruption.description;
+  }
+
+  log(`[defender-spec] firing attack[${index}]: ${disruptionId} (trigger: ${attack.trigger.type})`);
+
+  // Emit thinking activity
+  emitEvent<DefenderActivityPayload>(gameId, 'defender_activity', {
+    message: `[spec] Injecting ${disruptionName}...`,
+    kind: 'tool_call',
+  });
+
+  session.defenderStatus = 'striking';
+  emitEvent<StatusUpdatePayload>(gameId, 'status_update', {
+    attackerStatus: session.attackerStatus,
+    defenderStatus: 'striking',
+  });
+
+  // Capture before-screenshot and start upload in background (parallel with injection)
+  const beforePng = await captureScreenshot(session.cdpUrl).catch(() => null);
+  const beforeUploadPromise = beforePng
+    ? uploadScreenshot(beforePng).catch(() => null)
+    : Promise.resolve<string | null>(null);
+
+  // Inject via CDP
+  const success = await injectJS(session.cdpUrl, js);
+  log(`[defender-spec] injection ${success ? 'succeeded' : 'FAILED'} for attack[${index}]`);
+
+  // Capture after-screenshot (wait 800ms for DOM to settle)
+  let afterScreenshotId: string | null = null;
+  if (success) {
+    await new Promise(resolve => setTimeout(resolve, 800));
+    const afterPng = await captureScreenshot(session.cdpUrl).catch(() => null);
+    if (afterPng) afterScreenshotId = await uploadScreenshot(afterPng).catch(() => null);
+  }
+  const beforeScreenshotId = await beforeUploadPromise;
+
+  // Mark as fired
+  state.firedAttackIndices.add(index);
+  state.firedCount++;
+
+  // Build disruption event (no health damage in spec mode)
+  const reasoning = `[spec] ${attack.trigger.type}${attack.trigger.n ? ` (n=${attack.trigger.n})` : ''} — ${attack.objective}`;
+  const event: DisruptionEvent = {
+    id: nanoid(8),
+    disruptionId,
+    disruptionName,
+    description,
+    healthDamage: 0,
+    success,
+    timestamp: new Date().toISOString(),
+    reasoning,
+    attackFamily: labels.family,
+    objective: labels.objective,
+    concealment: labels.concealment,
+  };
+  session.defenderDisruptions.push(event);
+
+  // Emit disruption card via SSE with structured labels
+  emitEvent<DefenderDisruptionPayload>(gameId, 'defender_disruption', {
+    disruptionId,
+    disruptionName,
+    description,
+    healthDamage: 0,
+    success,
+    reasoning,
+    attackFamily: labels.family,
+    objective: labels.objective,
+    concealment: labels.concealment,
+    authority: labels.authority,
+    placement: labels.placement,
+  });
+
+  // Persist to Convex with structured labels + screenshots
+  recordDefenderAction({
+    gameId,
+    actionNumber: session.defenderDisruptions.length,
+    disruptionId,
+    disruptionName,
+    description,
+    healthDamage: 0,
+    success,
+    reasoning,
+    timestamp: event.timestamp,
+    injectionPayload: js.slice(0, 5000),
+    attackerStepAtTime: session.attackerSteps.length,
+    attackFamily: labels.family,
+    objective: labels.objective,
+    concealment: labels.concealment,
+    authority: labels.authority,
+    placement: labels.placement,
+    screenshotBeforeId: beforeScreenshotId ?? undefined,
+    screenshotAfterId: afterScreenshotId ?? undefined,
+  });
+
+  session.defenderStatus = 'cooling_down';
+  emitEvent<StatusUpdatePayload>(gameId, 'status_update', {
+    attackerStatus: session.attackerStatus,
+    defenderStatus: 'cooling_down',
+  });
+
+  // Schedule async LLM judge — waits for 5 more attacker steps, then evaluates
+  if (success && attack.text) {
+    const actionNumber = session.defenderDisruptions.length;
+    const stepAtInjection = session.attackerSteps.length;
+    const stepsBeforeSnapshot = session.attackerSteps.slice(-3);
+    scheduleJudge(gameId, {
+      actionNumber,
+      stepAtInjection,
+      taskDescription: session.task.description,
+      injectionText: attack.text,
+      injectionObjective: attack.objective,
+      stepsBefore: stepsBeforeSnapshot,
+      successCondition: attack.successCondition,
+    });
+  }
+}
+
+const JUDGE_WAIT_STEPS = 5;
+const JUDGE_POLL_MS = 3000;
+const JUDGE_MAX_WAIT_MS = 60000;
+
+function scheduleJudge(gameId: string, meta: {
+  actionNumber: number;
+  stepAtInjection: number;
+  taskDescription: string;
+  injectionText: string;
+  injectionObjective: AttackObjective;
+  stepsBefore: AgentEvent[];
+  successCondition?: SuccessCondition;
+}): void {
+  // Fire-and-forget async judge
+  (async () => {
+    const startTime = Date.now();
+
+    // Wait until we have enough post-injection steps or timeout
+    while (Date.now() - startTime < JUDGE_MAX_WAIT_MS) {
+      const s = getSession(gameId);
+      if (!s || s.phase !== 'arena') break;
+
+      const stepsAfter = s.attackerSteps.length - meta.stepAtInjection;
+      if (stepsAfter >= JUDGE_WAIT_STEPS) break;
+
+      await new Promise(resolve => setTimeout(resolve, JUDGE_POLL_MS));
+    }
+
+    const s = getSession(gameId);
+    if (!s) return;
+
+    const stepsAfter = s.attackerSteps.slice(meta.stepAtInjection, meta.stepAtInjection + JUDGE_WAIT_STEPS);
+
+    const result = await judgeInjectionResponse({
+      taskDescription: meta.taskDescription,
+      injectionText: meta.injectionText,
+      injectionObjective: meta.injectionObjective,
+      attackerStepsBefore: meta.stepsBefore,
+      attackerStepsAfter: stepsAfter,
+      successCondition: meta.successCondition,
+    });
+
+    log(`[judge] verdict for action ${meta.actionNumber}: ${result.verdict} — ${result.reasoning}`);
+
+    // Update in-memory disruption event
+    const disruption = s.defenderDisruptions[meta.actionNumber - 1];
+    if (disruption) {
+      disruption.agentResponse = result.verdict;
+      disruption.judgeReasoning = result.reasoning;
+    }
+
+    // Persist verdict to Convex
+    updateJudgeVerdict({
+      gameId,
+      actionNumber: meta.actionNumber,
+      agentResponse: result.verdict,
+      judgeReasoning: result.reasoning,
+    });
+
+    // Notify frontend via SSE so live arena can update verdict
+    emitEvent(gameId, 'judge_verdict', {
+      actionNumber: meta.actionNumber,
+      agentResponse: result.verdict,
+      judgeReasoning: result.reasoning,
+    });
+  })().catch(err => {
+    logError(`[judge] async judge error for action:`, err);
+  });
 }
 
 async function runTurnBasedDefenderLoop(gameId: string): Promise<void> {
@@ -538,6 +909,13 @@ export function endGame(
   if (session.healthDecayHandle) clearInterval(session.healthDecayHandle);
   if (session.attackerAbort) session.attackerAbort.abort();
   if (session.stopNetworkCapture) { session.stopNetworkCapture(); session.stopNetworkCapture = null; }
+  // Clean up spec-driven interval handles
+  if (session.attackRuntimeState) {
+    for (const handle of session.attackRuntimeState.intervalHandles) {
+      clearInterval(handle);
+    }
+    session.attackRuntimeState.intervalHandles = [];
+  }
 
   // Resolve turn-based gates so coroutines unblock and exit
   if (session.attackerGate) {
