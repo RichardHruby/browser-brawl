@@ -35,11 +35,24 @@ export type Persistence = 'one_shot' | 'sticky';
 // --- Trigger types ---
 
 export interface AttackTrigger {
-  type: 'on_page_load' | 'after_navigation' | 'after_n_steps' | 'on_interval';
+  type:
+    | 'on_page_load'
+    | 'after_navigation'
+    | 'after_n_steps'
+    | 'on_interval'
+    | 'when_url_matches'
+    | 'when_element_visible'
+    | 'natural_language';
   /** For after_n_steps: fire when attacker has taken this many steps */
   n?: number;
   /** For on_interval: fire every this many milliseconds */
   ms?: number;
+  /** For when_url_matches: regex pattern matched against currentUrl */
+  pattern?: string;
+  /** For when_element_visible: CSS selector checked via CDP */
+  selector?: string;
+  /** For natural_language: condition string evaluated by Haiku */
+  condition?: string;
 }
 
 // --- Success condition (for judge evaluation) ---
@@ -109,6 +122,8 @@ export interface AttackRuntimeState {
     stepAtInjection: number;
     successCondition?: SuccessCondition;
   }>;
+  /** Cache for natural_language trigger results: "url|condition" → boolean */
+  nlCache: Map<string, boolean>;
 }
 
 export function createAttackRuntimeState(): AttackRuntimeState {
@@ -118,6 +133,7 @@ export function createAttackRuntimeState(): AttackRuntimeState {
     lastKnownUrl: null,
     intervalHandles: [],
     pendingJudgments: new Map(),
+    nlCache: new Map(),
   };
 }
 

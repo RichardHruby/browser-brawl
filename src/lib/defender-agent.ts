@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { observe, Laminar } from '@lmnr-ai/lmnr';
 import { getSession, createGate, type ServerGameSession } from './game-session-store';
 import { getDisruptionsForDifficulty, getDisruptionById } from './disruptions';
-import { injectJS, snapshotDOM, captureScreenshot } from './cdp';
+import { injectJS, snapshotDOM, captureScreenshot, checkElementExists } from './cdp';
 import { emitEvent } from './sse-emitter';
 import { nanoid } from 'nanoid';
 import { getAnthropicApiKey } from './env';
@@ -143,7 +143,7 @@ async function runSpecDrivenLoop(gameId: string): Promise<void> {
       if (state.firedCount >= maxInterventions) break;
 
       // Evaluate trigger
-      const triggered = evaluateTrigger(attack, i, s, state);
+      const triggered = await evaluateTrigger(attack, i, s, state);
       if (!triggered) continue;
 
       await fireSpecAttack(gameId, attack, i, state);
@@ -164,12 +164,12 @@ async function runSpecDrivenLoop(gameId: string): Promise<void> {
   log(`[defender-spec] loop ended — fired ${state.firedCount} attacks`);
 }
 
-function evaluateTrigger(
+async function evaluateTrigger(
   attack: AttackEntry,
   _index: number,
   session: ServerGameSession,
   state: ReturnType<typeof createAttackRuntimeState>,
-): boolean {
+): Promise<boolean> {
   const trigger = attack.trigger;
 
   switch (trigger.type) {
@@ -189,8 +189,55 @@ function evaluateTrigger(
       // Handled by setInterval, should not reach here
       return false;
 
+    case 'when_url_matches': {
+      const url = state.lastKnownUrl ?? '';
+      if (!trigger.pattern) return false;
+      try {
+        return new RegExp(trigger.pattern).test(url);
+      } catch {
+        return false;
+      }
+    }
+
+    case 'when_element_visible': {
+      if (!trigger.selector || !session.cdpUrl) return false;
+      try {
+        return await checkElementExists(session.cdpUrl, trigger.selector);
+      } catch {
+        return false;
+      }
+    }
+
+    case 'natural_language': {
+      if (!trigger.condition) return false;
+      const url = state.lastKnownUrl ?? '';
+      const cacheKey = `${url}|${trigger.condition}`;
+      if (state.nlCache.has(cacheKey)) return state.nlCache.get(cacheKey)!;
+      const result = await evaluateNLCondition(trigger.condition, url);
+      state.nlCache.set(cacheKey, result);
+      return result;
+    }
+
     default:
       return false;
+  }
+}
+
+async function evaluateNLCondition(condition: string, currentUrl: string): Promise<boolean> {
+  try {
+    const response = await client.messages.create({
+      model: 'claude-haiku-4-5-20251001',
+      max_tokens: 10,
+      messages: [{
+        role: 'user',
+        content: `Has the browser agent reached this state: "${condition}"?\nCurrent URL: ${currentUrl}\nAnswer with only YES or NO.`,
+      }],
+    });
+    const text = response.content[0].type === 'text' ? response.content[0].text.trim().toUpperCase() : '';
+    return text.startsWith('YES');
+  } catch (err) {
+    logError('[defender-spec] evaluateNLCondition failed:', err);
+    return false;
   }
 }
 
