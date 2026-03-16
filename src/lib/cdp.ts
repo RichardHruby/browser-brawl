@@ -310,6 +310,22 @@ export async function startNetworkCapture(
 }
 
 /**
+ * Check whether a CSS selector matches any element in the page via CDP querySelector.
+ * Returns true if at least one matching element exists, false otherwise.
+ */
+export async function checkElementExists(cdpUrl: string, selector: string): Promise<boolean> {
+  if (!cdpUrl) return false;
+  const expression = `document.querySelector(${JSON.stringify(selector)}) !== null ? 'true' : 'false'`;
+  const result = await runWithPageTargetRetry(
+    cdpUrl,
+    'checkElementExists',
+    (wsUrl) => evaluateAndReturnViaCDP(wsUrl, expression),
+    (value) => value == null,
+  );
+  return result === 'true';
+}
+
+/**
  * Extract a snapshot of interactive DOM elements via CDP.
  * Returns a JSON string describing up to 50 visible interactive elements,
  * or null on failure.
