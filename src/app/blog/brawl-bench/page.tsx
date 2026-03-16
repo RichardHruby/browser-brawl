@@ -46,17 +46,17 @@ export default function BrawlBenchBlog() {
             But what happens when the page is actively trying to trick it?
           </P>
           <P>
-            Surprisingly, nobody had systematically measured this. So we built{' '}
+            We built{' '}
             <A href="https://github.com/RichardHruby/brawl-bench">BRAWL-Bench</A>{' '}
             (<strong className="neon-cyan">B</strong>rowser{' '}
             <strong className="neon-cyan">R</strong>obustness{' '}
             <strong className="neon-cyan">A</strong>gainst{' '}
             <strong className="neon-cyan">W</strong>eb-
-            <strong className="neon-cyan">L</strong>evel Attacks) - an adversarial benchmark that injects attack scripts into live websites, then measures whether LLM browser agents get hijacked, phished, or both.
+            <strong className="neon-cyan">L</strong>evel Attacks) - an adversarial benchmark that injects attack scripts into live websites, then measures whether LLM browser agents get hijacked or phished.
           </P>
           <P>
             BRAWL-Bench is a new project from{' '}
-            <A href="https://browser-brawl.com">Browser Brawl</A>. This is a proof-of-concept release: one website (Amazon), six hand-crafted disruptions across two attack categories, three models. A minimal setup - and the results are already striking enough that we wanted to share them while we scale the benchmark to a richer set of tasks and more realistic injections.
+            <A href="https://browser-brawl.com">Browser Brawl</A>. This is a preliminary version: one website (Amazon), six hand-crafted disruptions across two attack categories, three models. A minimal setup - and the results are already striking enough that we wanted to share them while we scale the benchmark to a richer set of tasks and more realistic injections.
           </P>
           <P>
             We ran 37 Amazon shopping tasks from the{' '}
@@ -84,7 +84,7 @@ export default function BrawlBenchBlog() {
             The methodology is intentionally simple. Take a real website. Inject adversarial JavaScript via Playwright&apos;s <InlineCode>--init-script</InlineCode>. Point a browser agent at a task. Measure what happens.
           </P>
           <P>
-            No model fine-tuning, no custom training data, no exotic attack vectors. Just DOM manipulation - the same techniques any malicious website could deploy today.
+            No exotic attack vectors. Just DOM manipulation, the same techniques any malicious website could deploy today.
           </P>
           <P>
             Each task is drawn from the WebVoyager Amazon subset: natural-language shopping queries like &ldquo;Find an Xbox Wireless Controller with green color rated above 4 stars&rdquo; or &ldquo;Search for a women&apos;s golf polo between $50 and $75.&rdquo; The agent browses Amazon, navigates search results, and attempts to answer.
@@ -193,6 +193,12 @@ export default function BrawlBenchBlog() {
           <P>
             Claude was also the only model to leak through <InlineCode>browser_type</InlineCode> (5 instances) - directly typing credentials into phishing forms, the way a human victim would.
           </P>
+
+          <H3>What gets leaked</H3>
+          <P>
+            The table below breaks down which canary types were exfiltrated. API keys were the most frequently leaked credential across all three models. Claude Sonnet 4.6 was the only model to also leak emails (7 tasks) and passwords (4 tasks).
+          </P>
+          <CanaryBreakdownTable />
         </Section>
 
         {/* Why this matters */}
@@ -202,10 +208,10 @@ export default function BrawlBenchBlog() {
             Browser agents are being deployed for real tasks: filling out forms, booking flights, managing accounts. If an agent hands over its API key to a fake modal on Amazon, it will do the same on any compromised website - or any website specifically designed to target agents.
           </P>
           <P>
-            This isn&apos;t a jailbreak. We didn&apos;t need prompt injection in the traditional sense. We showed the agent a modal that looked official and asked nicely. The agent complied.
+            The major browser agent benchmarks today - WebVoyager, Mind2Web, WebArena - all measure performance on cooperative pages. The agent navigates a clean website, completes a task, gets a score. This is useful for measuring capability, but it only tests the happy path. None of these benchmarks include pages that push back - pages with injected UI, phishing modals, or fake navigation elements. As a result, we have detailed leaderboards for how well agents browse the web, but almost no data on how they behave when the web is adversarial.
           </P>
           <P>
-            The core takeaway: <strong style={{ color: 'var(--color-text-primary)' }}>adversarial testing needs to become standard practice for browser agents.</strong> No major agent benchmark today - WebVoyager, Mind2Web, WebArena - evaluates robustness against hostile web content. They all assume a cooperative environment. The real web is not cooperative. Until benchmarks reflect that, we&apos;re measuring capability in a vacuum.
+            BRAWL-Bench is a first step toward filling that gap. Even with only six hand-crafted disruptions on a single website, the failure rates we observed suggest this is a dimension worth measuring systematically.
           </P>
         </Section>
 
@@ -346,6 +352,14 @@ function InlineCode({ children }: { children: React.ReactNode }) {
   );
 }
 
+function FigCaption({ num, children }: { num: number; children: React.ReactNode }) {
+  return (
+    <p className="mt-3 text-xs font-mono px-4" style={{ color: 'var(--color-text-secondary)', opacity: 0.6 }}>
+      <span className="neon-cyan" style={{ opacity: 1 }}>Fig. {num}</span> {children}
+    </p>
+  );
+}
+
 function Li({ icon, children }: { icon: string; children: React.ReactNode }) {
   return (
     <li className="flex gap-3 font-game text-base" style={{ color: 'var(--color-text-secondary)', lineHeight: '1.75' }}>
@@ -418,6 +432,7 @@ function ResultsTable() {
           ))}
         </tbody>
       </table>
+      <FigCaption num={1}>Task success and security failure rates under hijack and exfil conditions. N=37 WebVoyager Amazon tasks per model per condition.</FigCaption>
     </div>
   );
 }
@@ -462,6 +477,50 @@ function ExfilBreakdownTable() {
           ))}
         </tbody>
       </table>
+      <FigCaption num={3}>Exfiltration incidents by tool call type under the exfil condition. Counts reflect individual leak events; a single task can leak multiple canary types. N=37 tasks per model.</FigCaption>
+    </div>
+  );
+}
+
+function CanaryBreakdownTable() {
+  const data = [
+    { model: 'Claude Sonnet 4.6', apiKey: 16, email: 7, password: 4 },
+    { model: 'Gemini 3 Flash', apiKey: 16, email: 0, password: 0 },
+    { model: 'Gemini 3.1 Flash Lite', apiKey: 2, email: 0, password: 0 },
+  ];
+
+  return (
+    <div
+      className="my-6 rounded-lg overflow-hidden"
+      style={{ border: '1px solid var(--color-border)' }}
+    >
+      <table className="w-full text-sm font-mono">
+        <thead>
+          <tr style={{ background: 'var(--color-bg-card)' }}>
+            <th className="text-left px-4 py-3 font-game font-bold tracking-wide" style={{ color: 'var(--color-text-primary)' }}>Model</th>
+            <th className="text-center px-3 py-3 text-xs" style={{ color: 'var(--color-text-secondary)' }}>API key</th>
+            <th className="text-center px-3 py-3 text-xs" style={{ color: 'var(--color-text-secondary)' }}>Email</th>
+            <th className="text-center px-3 py-3 text-xs" style={{ color: 'var(--color-text-secondary)' }}>Password</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((row, i) => (
+            <tr
+              key={row.model}
+              style={{
+                background: i % 2 === 0 ? 'var(--color-bg-panel)' : 'var(--color-bg-deep)',
+                borderBottom: '1px solid var(--color-border)',
+              }}
+            >
+              <td className="px-4 py-3 font-game font-semibold" style={{ color: 'var(--color-text-primary)' }}>{row.model}</td>
+              <td className="text-center px-3 py-3" style={{ color: row.apiKey > 0 ? 'var(--color-defender)' : 'var(--color-health-high)' }}>{row.apiKey}</td>
+              <td className="text-center px-3 py-3" style={{ color: row.email > 0 ? 'var(--color-defender)' : 'var(--color-health-high)' }}>{row.email}</td>
+              <td className="text-center px-3 py-3" style={{ color: row.password > 0 ? 'var(--color-defender)' : 'var(--color-health-high)' }}>{row.password}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <FigCaption num={4}>Exfiltration count by canary type under the exfil condition. Each count represents the number of tasks (out of 37) where that canary value appeared in the agent&apos;s tool calls.</FigCaption>
     </div>
   );
 }
@@ -556,10 +615,7 @@ function VulnerabilityChart() {
         ))}
       </div>
 
-      {/* Caption */}
-      <p className="mt-5 text-xs font-mono text-center" style={{ color: 'var(--color-text-secondary)', opacity: 0.6 }}>
-        Security failure rate (%) per model - hijack vs exfiltration conditions, n=37 tasks each
-      </p>
+      <FigCaption num={2}>Security failure rate (%) per model across hijack and exfil conditions. N=37 tasks per model per condition.</FigCaption>
     </div>
   );
 }
