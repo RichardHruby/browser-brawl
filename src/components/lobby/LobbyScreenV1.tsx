@@ -204,20 +204,36 @@ export function LobbyScreenV1({ onStart }: Props) {
         }}
       >
         <div className="w-full max-w-6xl mx-auto flex flex-col sm:flex-row items-center gap-4 sm:gap-6 px-4">
-          <div className="order-2 sm:order-1 flex gap-4 sm:flex-1">
+          <div className="order-2 sm:order-1 flex items-center gap-4 sm:flex-1 shrink-0 whitespace-nowrap">
             <Link
               href="/history"
-              className="font-mono text-sm tracking-widest font-bold transition-all duration-200 hover:underline"
+              className="font-mono text-xs sm:text-sm tracking-widest font-bold transition-all duration-200 hover:underline"
               style={{ color: 'var(--color-attacker)' }}
             >
               [ PRIOR TRACES ]
             </Link>
             <Link
               href="/waitlist"
-              className="font-mono text-sm tracking-widest font-bold transition-all duration-200 hover:underline"
+              className="font-mono text-xs sm:text-sm tracking-widest font-bold transition-all duration-200 hover:underline"
               style={{ color: '#cc44ff', opacity: 0.6 }}
             >
               [ FINE TUNING RUNS ]
+            </Link>
+            <Link
+              href="/blog/brawl-bench"
+              className="font-mono text-xs sm:text-sm tracking-widest font-bold transition-all duration-200 hover:underline flex items-center gap-2"
+              style={{ color: 'var(--color-text-primary)' }}
+            >
+              <span
+                className="animate-pulse-red px-1.5 py-0.5 text-[9px] font-display font-bold tracking-widest"
+                style={{
+                  color: 'var(--color-defender)',
+                  border: '1px solid var(--color-defender)',
+                }}
+              >
+                NEW
+              </span>
+              [ BRAWL-BENCH ]
             </Link>
           </div>
 
