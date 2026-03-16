@@ -24,9 +24,9 @@ describe('AttackSpec types and expansion', () => {
       expect(spec.seed).toBe(42);
       expect(spec.attacks.length).toBeGreaterThanOrEqual(3);
 
-      // All attacks should be prompt_injection family
+      const validObjectives = ['task_disruption', 'data_exfiltration', 'navigation_hijack'];
       for (const attack of spec.attacks) {
-        expect(attack.family).toBe('prompt_injection');
+        expect(validObjectives).toContain(attack.objective);
         expect(attack.primitive).toBeTruthy();
         expect(attack.trigger).toBeTruthy();
         expect(attack.placement).toBeTruthy();
@@ -43,7 +43,7 @@ describe('AttackSpec types and expansion', () => {
       expect(primitiveIds).toContain('popup-overlay');
 
       for (const attack of spec.attacks) {
-        expect(attack.family).toBe('ui_breakage');
+        expect(attack.objective).toBe('task_disruption');
       }
     });
 
@@ -53,14 +53,14 @@ describe('AttackSpec types and expansion', () => {
       expect(spec.attacks.length).toBeGreaterThanOrEqual(1);
 
       // Should have at least one credential_theft objective
-      const hasCredTheft = spec.attacks.some(a => a.objective === 'credential_theft');
+      const hasCredTheft = spec.attacks.some(a => a.objective === 'data_exfiltration');
       expect(hasCredTheft).toBe(true);
     });
 
     it('expands mixed suite with attacks from multiple families', () => {
       const spec = expandSuite('mixed', mockTask);
 
-      const families = new Set(spec.attacks.map(a => a.family));
+      const families = new Set(spec.attacks.map(a => a.objective));
       expect(families.size).toBeGreaterThanOrEqual(2);
     });
 
@@ -120,15 +120,14 @@ describe('PromptTemplates', () => {
 
   it('covers multiple objectives', () => {
     const objectives = new Set(PROMPT_TEMPLATES.map(t => t.objective));
-    expect(objectives.has('derail')).toBe(true);
-    expect(objectives.has('redirect')).toBe(true);
-    expect(objectives.has('abort')).toBe(true);
-    expect(objectives.has('credential_theft')).toBe(true);
+    expect(objectives.has('task_disruption')).toBe(true);
+    expect(objectives.has('navigation_hijack')).toBe(true);
+    expect(objectives.has('data_exfiltration')).toBe(true);
   });
 
   it('getTemplateById returns correct template', () => {
     const template = getTemplateById('moved_functionality');
-    expect(template.objective).toBe('redirect');
+    expect(template.objective).toBe('navigation_hijack');
     expect(template.text).toContain('moved');
   });
 
@@ -137,10 +136,10 @@ describe('PromptTemplates', () => {
   });
 
   it('getTemplatesByObjective filters correctly', () => {
-    const redirectTemplates = getTemplatesByObjective('redirect');
-    expect(redirectTemplates.length).toBeGreaterThanOrEqual(2);
-    for (const t of redirectTemplates) {
-      expect(t.objective).toBe('redirect');
+    const hijackTemplates = getTemplatesByObjective('navigation_hijack');
+    expect(hijackTemplates.length).toBeGreaterThanOrEqual(2);
+    for (const t of hijackTemplates) {
+      expect(t.objective).toBe('navigation_hijack');
     }
   });
 

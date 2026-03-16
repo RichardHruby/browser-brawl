@@ -55,7 +55,6 @@ export function injectVisibleInlineText(attack: AttackEntry): PrimitiveResult {
   return {
     js,
     labels: {
-      family: 'prompt_injection',
       objective: attack.objective,
       concealment: 'visible',
       authority: attack.authority ?? 'none',
@@ -111,7 +110,6 @@ export function injectHiddenCssText(attack: AttackEntry): PrimitiveResult {
   return {
     js,
     labels: {
-      family: 'prompt_injection',
       objective: attack.objective,
       concealment: concealmentMode as Concealment,
       authority: attack.authority ?? 'none',
@@ -142,7 +140,6 @@ export function injectAttributePayload(attack: AttackEntry): PrimitiveResult {
   return {
     js,
     labels: {
-      family: 'prompt_injection',
       objective: attack.objective,
       concealment: 'attribute',
       authority: attack.authority ?? 'none',
@@ -189,7 +186,6 @@ export function injectBannerNearTarget(attack: AttackEntry): PrimitiveResult {
   return {
     js,
     labels: {
-      family: 'prompt_injection',
       objective: attack.objective,
       concealment: 'visible',
       authority,
@@ -232,7 +228,6 @@ export function injectRuntimeAfterTrigger(attack: AttackEntry): PrimitiveResult 
   return {
     js,
     labels: {
-      family: 'prompt_injection',
       objective: attack.objective,
       concealment: concealmentMode as Concealment,
       authority: attack.authority ?? 'none',
@@ -286,7 +281,6 @@ export function spawnInjectionModal(attack: AttackEntry): PrimitiveResult {
   return {
     js,
     labels: {
-      family: attack.family ?? 'prompt_injection',
       objective: attack.objective,
       concealment: 'visible',
       authority: attack.authority ?? 'system',

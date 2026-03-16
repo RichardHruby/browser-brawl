@@ -19,8 +19,7 @@ const PRIMITIVES = [
   'button-camouflage',
 ];
 
-const FAMILIES = ['prompt_injection', 'ui_breakage', 'phishing', 'availability'] as const;
-const OBJECTIVES = ['derail', 'abort', 'loop', 'redirect', 'credential_theft', 'exfil'] as const;
+const OBJECTIVES = ['task_disruption', 'data_exfiltration', 'navigation_hijack'] as const;
 const PLACEMENTS = ['near_target', 'top_banner', 'modal_center', 'inline_content', 'sidebar', 'offscreen', 'hidden_dom'] as const;
 const CONCEALMENTS = ['visible', 'css_opacity', 'white_on_white', 'zero_font', 'offscreen', 'attribute'] as const;
 const AUTHORITIES = ['none', 'system', 'security', 'admin'] as const;
@@ -61,8 +60,7 @@ function triggerSummary(trigger: AttackEntry['trigger']): string {
 
 const DEFAULT_ATTACK: AttackEntry = {
   primitive: 'inject_visible_inline_text',
-  family: 'prompt_injection',
-  objective: 'derail',
+  objective: 'task_disruption',
   trigger: { type: 'after_n_steps', n: 2 },
   concealment: 'visible',
   placement: 'inline_content',
@@ -155,34 +153,19 @@ function AttackCard({
             </select>
           </div>
 
-          {/* Family + Objective */}
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="font-mono text-[10px] uppercase tracking-wider block mb-1" style={labelStyle}>
-                Family
-              </label>
-              <select
-                value={attack.family}
-                onChange={e => onUpdate({ family: e.target.value as AttackEntry['family'] })}
-                className="w-full px-2 py-1 rounded font-mono text-xs"
-                style={inputStyle}
-              >
-                {FAMILIES.map(f => <option key={f} value={f}>{f}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="font-mono text-[10px] uppercase tracking-wider block mb-1" style={labelStyle}>
-                Objective
-              </label>
-              <select
-                value={attack.objective}
-                onChange={e => onUpdate({ objective: e.target.value as AttackEntry['objective'] })}
-                className="w-full px-2 py-1 rounded font-mono text-xs"
-                style={inputStyle}
-              >
-                {OBJECTIVES.map(o => <option key={o} value={o}>{o}</option>)}
-              </select>
-            </div>
+          {/* Objective */}
+          <div>
+            <label className="font-mono text-[10px] uppercase tracking-wider block mb-1" style={labelStyle}>
+              Objective
+            </label>
+            <select
+              value={attack.objective}
+              onChange={e => onUpdate({ objective: e.target.value as AttackEntry['objective'] })}
+              className="w-full px-2 py-1 rounded font-mono text-xs"
+              style={inputStyle}
+            >
+              {OBJECTIVES.map(o => <option key={o} value={o}>{o}</option>)}
+            </select>
           </div>
 
           {/* Placement + Concealment */}
