@@ -11,7 +11,7 @@ import { startNetworkCapture } from '@/lib/cdp';
 import { startScreencast } from '@/lib/screencast';
 import { runBrowserUseAttackerLoop } from '@/lib/browser-use-attacker';
 import type { AttackerType, Difficulty, ModelProvider, ModelId } from '@/types/game';
-import type { AttackSpec, AttackSuite } from '@/lib/attack-spec';
+import type { AttackSpec, AttackSuite, AgentSecrets } from '@/lib/attack-spec';
 import { expandSuite } from '@/lib/attack-spec';
 
 export async function POST(req: NextRequest) {
@@ -28,7 +28,7 @@ export async function POST(req: NextRequest) {
     modelId?: ModelId;
     attackSpec?: AttackSpec;
     attackSuite?: AttackSuite;
-    agentSecrets?: Record<string, string>;
+    agentSecrets?: AgentSecrets;
   };
   const gameMode = mode === 'turnbased' ? 'turnbased' : 'realtime' as const;
 

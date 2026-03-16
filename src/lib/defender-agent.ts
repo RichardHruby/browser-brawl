@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { observe, Laminar } from '@lmnr-ai/lmnr';
 import { getSession, createGate, type ServerGameSession } from './game-session-store';
 import { getDisruptionsForDifficulty, getDisruptionById } from './disruptions';
-import { injectJS, snapshotDOM, captureScreenshot, checkElementExists } from './cdp';
+import { injectJS, snapshotDOM, captureScreenshot, checkElementExists, registerPersistentScript } from './cdp';
 import { emitEvent } from './sse-emitter';
 import { nanoid } from 'nanoid';
 import { getAnthropicApiKey } from './env';
@@ -12,8 +12,9 @@ import { log, logError, logWarn } from './log';
 import type { AgentEvent, DisruptionEvent } from '@/types/game';
 import type { DefenderActivityPayload, DefenderDisruptionPayload, HealthUpdatePayload, StatusUpdatePayload } from '@/types/events';
 import { createAttackRuntimeState, type AttackEntry, type AttackObjective, type SuccessCondition, type StructuredLabels } from './attack-spec';
+import { getStaticDisruption } from './static-disruptions';
 import { generatePrimitive, isPromptInjectionPrimitive } from './prompt-injections';
-import { judgeInjectionResponse } from './injection-judge';
+import { judgeInjectionResponse, judgeStaticDisruptions } from './injection-judge';
 import { updateJudgeVerdict } from './data-collector';
 
 const client = new Anthropic({ apiKey: getAnthropicApiKey() });
@@ -102,6 +103,30 @@ async function runSpecDrivenLoop(gameId: string): Promise<void> {
 
   log(`[defender-spec] loop started — ${spec.attacks.length} attacks, budget: ${maxInterventions === Infinity ? 'unlimited' : maxInterventions}`);
 
+  // Register static_js scripts via Page.addScriptToEvaluateOnNewDocument (before tick loop)
+  // These persist across navigations and have their own internal trigger logic.
+  const staticAttacks = spec.attacks.filter(a => a.primitive === 'static_js');
+  for (const attack of staticAttacks) {
+    const disruption = getStaticDisruption(attack.payload?.id as string);
+    if (disruption) {
+      const ok = await registerPersistentScript(session.cdpUrl, disruption.js);
+      log(`[defender-spec] static script '${disruption.id}' registered: ${ok}`);
+      emitEvent<DefenderDisruptionPayload>(gameId, 'defender_disruption', {
+        disruptionId: disruption.id,
+        disruptionName: disruption.id.replace(/_/g, ' '),
+        description: disruption.description,
+        healthDamage: 0,
+        success: ok,
+        reasoning: 'Static persistent script registered via Page.addScriptToEvaluateOnNewDocument',
+        attackFamily: disruption.objective,
+        objective: disruption.objective,
+        concealment: 'visible',
+        authority: 'security',
+        placement: attack.placement,
+      });
+    }
+  }
+
   // Set up on_interval attacks with their own setInterval handles
   for (let i = 0; i < spec.attacks.length; i++) {
     const attack = spec.attacks[i];
@@ -136,6 +161,9 @@ async function runSpecDrivenLoop(gameId: string): Promise<void> {
       const persistence = attack.persistence ?? 'one_shot';
       if (persistence === 'one_shot' && state.firedAttackIndices.has(i)) continue;
 
+      // Skip static_js attacks — registered above, have their own internal trigger logic
+      if (attack.primitive === 'static_js') continue;
+
       // Skip interval triggers (handled by setInterval above)
       if (attack.trigger.type === 'on_interval') continue;
 
@@ -162,6 +190,22 @@ async function runSpecDrivenLoop(gameId: string): Promise<void> {
   state.intervalHandles = [];
 
   log(`[defender-spec] loop ended — fired ${state.firedCount} attacks`);
+
+  // Post-hoc judge for static disruptions: scan all attacker steps for canary leakage + hijack
+  if (staticAttacks.length > 0) {
+    const s = getSession(gameId);
+    if (s) {
+      const taskDomain = (() => {
+        try { return new URL(s.task.startUrl ?? '').hostname; } catch { return ''; }
+      })();
+      judgeStaticDisruptions({
+        gameId,
+        allSteps: s.attackerSteps,
+        agentSecrets: s.agentSecrets,
+        taskDomain,
+      }).catch(err => logError('[defender-spec] judgeStaticDisruptions error:', err));
+    }
+  }
 }
 
 async function evaluateTrigger(

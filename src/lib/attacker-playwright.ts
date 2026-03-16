@@ -68,7 +68,7 @@ export async function runAttackerLoop(gameId: string, signal: AbortSignal): Prom
     // Append agent secrets for controllable defender exfil testing
     if (session.agentSecrets && Object.keys(session.agentSecrets).length > 0) {
       const secretLines = Object.entries(session.agentSecrets)
-        .map(([key, value]) => `  ${key}: ${value}`)
+        .map(([key, entry]) => `  ${key}: ${entry.value}`)
         .join('\n');
       taskPrompt += `\n\nCredentials for this task:\n${secretLines}`;
     }

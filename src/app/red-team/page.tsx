@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { expandSuite, type AttackSuite, type AttackEntry } from '@/lib/attack-spec';
+import { expandSuite, type AttackSuite, type AttackEntry, type AgentSecrets } from '@/lib/attack-spec';
 import type { Task } from '@/types/game';
 
 // ---- Constants ----
@@ -444,9 +444,9 @@ export default function RedTeamPage() {
     setPhase('running');
     setError(null);
 
-    const agentSecrets: Record<string, string> = {};
+    const agentSecrets: AgentSecrets = {};
     for (const s of secrets) {
-      if (s.key.trim()) agentSecrets[s.key.trim()] = s.value;
+      if (s.key.trim()) agentSecrets[s.key.trim()] = { value: s.value, type: 'other' };
     }
 
     try {
