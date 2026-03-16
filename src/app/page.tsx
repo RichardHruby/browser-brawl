@@ -7,6 +7,8 @@ import { useGameState } from '@/hooks/useGameState';
 import { useGameSSE } from '@/hooks/useGameSSE';
 import { ArenaScreen } from '@/components/arena/ArenaScreen';
 import type { AttackerType, Difficulty, GameMode, ModelId, ModelProvider, Task } from '@/types/game';
+import type { DefenderConfigState } from '@/components/lobby/DefenderConfig';
+import { DEFAULT_SYSTEM_PROMPTS, DEFAULT_HIJACK_TARGET, DEFAULT_SECRETS } from '@/components/lobby/DefenderConfig';
 
 export default function Home() {
   const { state, startGame, setArenaReady, handleSSEEvent, reset } = useGameState();
@@ -16,7 +18,7 @@ export default function Home() {
     handleSSEEvent
   );
 
-  async function handleStart(difficulty: Difficulty, task: Task, mode: GameMode, attackerType: AttackerType, modelUrl?: string, modelProvider?: ModelProvider, modelId?: ModelId) {
+  async function handleStart(difficulty: Difficulty, task: Task, mode: GameMode, attackerType: AttackerType, modelUrl?: string, modelProvider?: ModelProvider, modelId?: ModelId, defenderConfig?: DefenderConfigState) {
     startGame(difficulty, task, mode, attackerType);
     try {
       const res = await fetch('/api/game/start', {
@@ -31,6 +33,20 @@ export default function Home() {
           modelProvider,
           modelId,
           customTask: task.id === 'custom' ? task.description : undefined,
+          ...(defenderConfig?.mode && {
+            defenderMode: defenderConfig.mode,
+            defenderSystemPrompt: defenderConfig.systemPrompt.trim() || DEFAULT_SYSTEM_PROMPTS[defenderConfig.mode],
+            defenderHijackTarget: defenderConfig.mode === 'hijack'
+              ? (defenderConfig.hijackTarget.trim() || DEFAULT_HIJACK_TARGET)
+              : undefined,
+            agentSecrets: defenderConfig.mode === 'data_exfiltration'
+              ? (() => {
+                  const filled = defenderConfig.secrets.filter(s => s.key.trim());
+                  const effective = filled.length > 0 ? filled : DEFAULT_SECRETS;
+                  return Object.fromEntries(effective.map(s => [s.key.trim(), s.value]));
+                })()
+              : undefined,
+          }),
         }),
       });
       if (!res.ok) throw new Error('Failed to start game');

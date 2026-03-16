@@ -73,6 +73,12 @@ export class AttackerStepLogger {
 
     this.pushToSession(step, description, 'acting', timestamp);
 
+    // Accumulate raw tool result for post-game verifier (exfil/hijack detection)
+    if (opts.toolResult) {
+      const session = getSession(this.gameId);
+      if (session) session.stepToolOutputs.push(opts.toolResult.slice(0, 5000));
+    }
+
     // Include screenshotUrl in SSE payload for live display (Browser-Use)
     emitEvent<AttackerStepPayload>(this.gameId, 'attacker_step', {
       step,

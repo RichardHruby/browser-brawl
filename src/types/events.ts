@@ -11,7 +11,8 @@ export type SSEEventType =
   | 'turn_change'
   | 'game_over'
   | 'live_url_ready'
-  | 'judge_verdict';
+  | 'judge_verdict'
+  | 'defender_outcome';
 
 export interface SSEEnvelope<T = unknown> {
   type: SSEEventType;

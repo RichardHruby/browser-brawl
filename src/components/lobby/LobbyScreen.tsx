@@ -2,9 +2,10 @@
 
 import { LobbyScreenV1 } from './LobbyScreenV1';
 import type { AttackerType, Difficulty, GameMode, ModelId, ModelProvider, Task } from '@/types/game';
+import type { DefenderConfigState } from './DefenderConfig';
 
 interface Props {
-  onStart: (difficulty: Difficulty, task: Task, mode: GameMode, attackerType: AttackerType, modelUrl?: string, modelProvider?: ModelProvider, modelId?: ModelId) => void;
+  onStart: (difficulty: Difficulty, task: Task, mode: GameMode, attackerType: AttackerType, modelUrl?: string, modelProvider?: ModelProvider, modelId?: ModelId, defenderConfig?: DefenderConfigState) => void;
 }
 
 export function LobbyScreen({ onStart }: Props) {

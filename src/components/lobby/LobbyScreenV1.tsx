@@ -8,13 +8,21 @@ import { ArenaSelector } from './ArenaSelector';
 import { DifficultyBar } from './DifficultyBar';
 import { ModeToggle } from './ModeToggle';
 import { ModelPicker } from './ModelPicker';
+import { DefenderConfig, type DefenderConfigState } from './DefenderConfig';
 import { TASKS } from '@/lib/tasks';
 import type { AttackerType, Difficulty, GameMode, ModelId, ModelProvider, Task } from '@/types/game';
 
 const DEFAULT_TASK = TASKS.find(t => t.id === 'amazon-toothpaste') ?? null;
 
+const DEFAULT_DEFENDER_CONFIG: DefenderConfigState = {
+  mode: null,
+  systemPrompt: '',
+  hijackTarget: '',
+  secrets: [],
+};
+
 interface Props {
-  onStart: (difficulty: Difficulty, task: Task, mode: GameMode, attackerType: AttackerType, modelUrl?: string, modelProvider?: ModelProvider, modelId?: ModelId) => void;
+  onStart: (difficulty: Difficulty, task: Task, mode: GameMode, attackerType: AttackerType, modelUrl?: string, modelProvider?: ModelProvider, modelId?: ModelId, defenderConfig?: DefenderConfigState) => void;
 }
 
 export function LobbyScreenV1({ onStart }: Props) {
@@ -24,6 +32,7 @@ export function LobbyScreenV1({ onStart }: Props) {
   const [attackerType, setAttackerType] = useState<AttackerType>('playwright-mcp');
   const [modelProvider, setModelProvider] = useState<ModelProvider>('anthropic');
   const [modelId, setModelId] = useState<ModelId>('claude-sonnet-4-6');
+  const [defenderConfig, setDefenderConfig] = useState<DefenderConfigState>(DEFAULT_DEFENDER_CONFIG);
   const canStart = !!task;
 
   return (
@@ -190,6 +199,12 @@ export function LobbyScreenV1({ onStart }: Props) {
                 />
                 <ModeToggle value={mode} onChange={setMode} />
               </div>
+
+              {/* Defender config section */}
+              <DefenderConfig
+                value={defenderConfig}
+                onChange={updates => setDefenderConfig(prev => ({ ...prev, ...updates }))}
+              />
             </div>
           </div>
         </div>
@@ -225,7 +240,7 @@ export function LobbyScreenV1({ onStart }: Props) {
 
           <div className="order-1 sm:order-2 w-full max-w-sm sm:max-w-none sm:flex-1 flex justify-center">
             <button
-              onClick={() => task && onStart(difficulty, task, mode, attackerType, undefined, modelProvider, modelId)}
+              onClick={() => task && onStart(difficulty, task, mode, attackerType, undefined, modelProvider, modelId, defenderConfig.mode ? defenderConfig : undefined)}
               disabled={!canStart}
               className="w-full max-w-sm sm:w-auto px-6 sm:px-12 py-3 font-display text-base sm:text-lg font-black tracking-[0.2em] sm:tracking-[0.3em] uppercase transition-all duration-300 cursor-pointer disabled:cursor-not-allowed"
               style={{

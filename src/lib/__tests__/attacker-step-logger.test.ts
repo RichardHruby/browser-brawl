@@ -8,6 +8,7 @@ import { AttackerStepLogger } from '../attacker-step-logger';
 const mockSession = {
   gameId: 'test-game-1',
   attackerSteps: [] as Array<{ id: string; step: number; description: string; timestamp: string; agentStatus: string }>,
+  stepToolOutputs: [] as string[],
   attackerStatus: 'idle' as string,
   defenderStatus: 'idle' as string,
   phase: 'arena' as string,

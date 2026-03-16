@@ -16,7 +16,7 @@ import { expandSuite } from '@/lib/attack-spec';
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { taskId, difficulty = 'easy', customTask, mode = 'realtime', attackerType = 'playwright-mcp', modelUrl, noDefender = false, modelProvider, modelId, attackSpec: rawAttackSpec, attackSuite, agentSecrets } = body as {
+  const { taskId, difficulty = 'easy', customTask, mode = 'realtime', attackerType = 'playwright-mcp', modelUrl, noDefender = false, modelProvider, modelId, attackSpec: rawAttackSpec, attackSuite, agentSecrets, defenderMode, defenderSystemPrompt, defenderHijackTarget } = body as {
     taskId?: string;
     difficulty?: Difficulty;
     customTask?: string;
@@ -29,6 +29,9 @@ export async function POST(req: NextRequest) {
     attackSpec?: AttackSpec;
     attackSuite?: AttackSuite;
     agentSecrets?: Record<string, string>;
+    defenderMode?: 'disruption' | 'hijack' | 'data_exfiltration';
+    defenderSystemPrompt?: string;
+    defenderHijackTarget?: string;
   };
   const gameMode = mode === 'turnbased' ? 'turnbased' : 'realtime' as const;
 
@@ -126,6 +129,9 @@ export async function POST(req: NextRequest) {
     attackSpec: resolvedAttackSpec,
     attackSuite,
     agentSecrets,
+    defenderMode,
+    defenderSystemPrompt,
+    defenderHijackTarget,
   });
 
   // 2b. Persist to Convex for training data collection

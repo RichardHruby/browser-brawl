@@ -49,6 +49,11 @@ export interface ServerGameSession {
   attackSuite?: AttackSuite;
   agentSecrets?: Record<string, string>;
   attackRuntimeState?: AttackRuntimeState;
+  // Lobby defender config (bypasses AttackSpec — guides regular LLM defender loop)
+  defenderMode?: 'disruption' | 'hijack' | 'data_exfiltration';
+  defenderSystemPrompt?: string;
+  defenderHijackTarget?: string;
+  stepToolOutputs: string[]; // raw tool result strings for post-game verifier
 }
 
 // Global singleton store — survives across API route invocations in the same process
@@ -88,6 +93,9 @@ export function createSession(params: {
   attackSpec?: AttackSpec;
   attackSuite?: AttackSuite;
   agentSecrets?: Record<string, string>;
+  defenderMode?: 'disruption' | 'hijack' | 'data_exfiltration';
+  defenderSystemPrompt?: string;
+  defenderHijackTarget?: string;
 }): ServerGameSession {
   const session: ServerGameSession = {
     ...params,
@@ -120,6 +128,7 @@ export function createSession(params: {
     knownStepIds: new Set(),
     buTaskId: null,
     buSessionId: null,
+    stepToolOutputs: [],
   };
   sessions.set(params.gameId, session);
   return session;
