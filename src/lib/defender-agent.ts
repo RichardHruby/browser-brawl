@@ -12,8 +12,9 @@ import { log, logError, logWarn } from './log';
 import type { AgentEvent, DisruptionEvent } from '@/types/game';
 import type { DefenderActivityPayload, DefenderDisruptionPayload, HealthUpdatePayload, StatusUpdatePayload } from '@/types/events';
 import { createAttackRuntimeState, type AttackEntry, type AttackObjective, type SuccessCondition, type StructuredLabels } from './attack-spec';
+import { getStaticDisruption } from './static-disruptions';
 import { generatePrimitive, isPromptInjectionPrimitive } from './prompt-injections';
-import { judgeInjectionResponse } from './injection-judge';
+import { judgeInjectionResponse, judgeStaticDisruptions } from './injection-judge';
 import { updateJudgeVerdict } from './data-collector';
 
 const client = new Anthropic({ apiKey: getAnthropicApiKey() });
@@ -162,6 +163,23 @@ async function runSpecDrivenLoop(gameId: string): Promise<void> {
   state.intervalHandles = [];
 
   log(`[defender-spec] loop ended — fired ${state.firedCount} attacks`);
+
+  // Post-hoc judge for static disruptions: scan all attacker steps for canary leakage + hijack
+  const hasStaticAttacks = spec.attacks.some(a => a.primitive === 'static_js');
+  if (hasStaticAttacks) {
+    const s = getSession(gameId);
+    if (s) {
+      const taskDomain = (() => {
+        try { return new URL(s.task.startUrl ?? '').hostname; } catch { return ''; }
+      })();
+      judgeStaticDisruptions({
+        gameId,
+        allSteps: s.attackerSteps,
+        agentSecrets: s.agentSecrets,
+        taskDomain,
+      }).catch(err => logError('[defender-spec] judgeStaticDisruptions error:', err));
+    }
+  }
 }
 
 async function evaluateTrigger(
@@ -274,7 +292,25 @@ async function fireSpecAttack(
   let disruptionName: string;
   let description: string;
 
-  if (isPromptInjectionPrimitive(attack.primitive)) {
+  if (attack.primitive === 'static_js') {
+    // Static JS disruption — inject via Runtime.evaluate on each navigation.
+    // The script's internal localStorage/sessionStorage idempotency prevents duplicate modals.
+    const disruption = getStaticDisruption(attack.payload?.id as string);
+    if (!disruption) {
+      logWarn(`[defender-spec] unknown static disruption ID: ${attack.payload?.id}`);
+      return;
+    }
+    js = disruption.js;
+    labels = {
+      objective: attack.objective,
+      concealment: attack.concealment ?? 'visible',
+      authority: attack.authority ?? 'none',
+      placement: attack.placement,
+    };
+    disruptionId = disruption.id;
+    disruptionName = disruption.id.replace(/_/g, ' ');
+    description = disruption.description;
+  } else if (isPromptInjectionPrimitive(attack.primitive)) {
     // Prompt injection primitive — use our new library
     const result = generatePrimitive(attack);
     if (!result) {

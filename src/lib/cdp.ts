@@ -38,6 +38,12 @@ export async function injectJS(cdpUrl: string, script: string): Promise<boolean>
   }
 }
 
+/**
+ * Register a persistent script via CDP Page.addScriptToEvaluateOnNewDocument.
+ * Unlike Runtime.evaluate (one-shot), this script runs on every new document load,
+ * making it survive page navigations within the same browser session.
+ */
+
 function evaluateViaCDP(wsUrl: string, expression: string): Promise<boolean> {
   return new Promise((resolve) => {
     const t0 = Date.now();

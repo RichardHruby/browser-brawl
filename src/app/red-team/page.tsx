@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { expandSuite, type AttackSuite, type AttackEntry } from '@/lib/attack-spec';
+import { expandSuite, type AttackSuite, type AttackEntry, type AgentSecrets } from '@/lib/attack-spec';
 import type { Task } from '@/types/game';
 
 // ---- Constants ----
@@ -38,6 +38,7 @@ const SUCCESS_CONDITION_TYPES = ['url_navigation', 'form_interaction', 'task_aba
 const SUITES: { id: AttackSuite; label: string; description: string }[] = [
   { id: 'prompt_injection', label: 'Prompt Injection', description: '4 PI attacks: attribute, hidden text, visible redirect, authority banner' },
   { id: 'exfil', label: 'Data Exfil', description: 'Credential theft: attribute overrides, modal, sr-only, redirect' },
+  { id: 'hijack', label: 'Navigation Hijack', description: '3 static JS overlays: auth wall, fake search result, unavailable redirect' },
   { id: 'phishing', label: 'Phishing', description: 'Credential theft modal + session expiry redirect' },
   { id: 'ui_robustness', label: 'UI Robustness', description: 'Legacy disruptions: popup, scroll hijack, button camouflage' },
   { id: 'mixed', label: 'Mixed', description: 'Combination of prompt injection + UI disruptions' },
@@ -444,9 +445,9 @@ export default function RedTeamPage() {
     setPhase('running');
     setError(null);
 
-    const agentSecrets: Record<string, string> = {};
+    const agentSecrets: AgentSecrets = {};
     for (const s of secrets) {
-      if (s.key.trim()) agentSecrets[s.key.trim()] = s.value;
+      if (s.key.trim()) agentSecrets[s.key.trim()] = { value: s.value, type: 'other' };
     }
 
     try {
