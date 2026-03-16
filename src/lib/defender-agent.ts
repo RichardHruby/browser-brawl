@@ -413,6 +413,7 @@ function scheduleJudge(gameId: string, meta: {
       attackerStepsBefore: meta.stepsBefore,
       attackerStepsAfter: stepsAfter,
       successCondition: meta.successCondition,
+      agentSecrets: s.agentSecrets,
     });
 
     log(`[judge] verdict for action ${meta.actionNumber}: ${result.verdict} — ${result.reasoning}`);
