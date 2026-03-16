@@ -154,20 +154,18 @@ function AttackCard({
           </div>
 
           {/* Objective */}
-          <div className="grid grid-cols-2 gap-2">
-            <div>
-              <label className="font-mono text-[10px] uppercase tracking-wider block mb-1" style={labelStyle}>
-                Objective
-              </label>
-              <select
-                value={attack.objective}
-                onChange={e => onUpdate({ objective: e.target.value as AttackEntry['objective'] })}
-                className="w-full px-2 py-1 rounded font-mono text-xs"
-                style={inputStyle}
-              >
-                {OBJECTIVES.map(o => <option key={o} value={o}>{o}</option>)}
-              </select>
-            </div>
+          <div>
+            <label className="font-mono text-[10px] uppercase tracking-wider block mb-1" style={labelStyle}>
+              Objective
+            </label>
+            <select
+              value={attack.objective}
+              onChange={e => onUpdate({ objective: e.target.value as AttackEntry['objective'] })}
+              className="w-full px-2 py-1 rounded font-mono text-xs"
+              style={inputStyle}
+            >
+              {OBJECTIVES.map(o => <option key={o} value={o}>{o}</option>)}
+            </select>
           </div>
 
           {/* Placement + Concealment */}
