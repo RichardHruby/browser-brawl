@@ -80,6 +80,58 @@ describe('AttackSpec types and expansion', () => {
       const spec = expandSuite('unknown' as AttackSuite, mockTask);
       expect(spec.attacks.length).toBeGreaterThanOrEqual(3);
     });
+
+    it('expands hijack suite with 3 static_js navigation_hijack attacks', () => {
+      const spec = expandSuite('hijack', mockTask);
+
+      expect(spec.attacks).toHaveLength(3);
+      for (const attack of spec.attacks) {
+        expect(attack.primitive).toBe('static_js');
+        expect(attack.objective).toBe('navigation_hijack');
+        expect(attack.trigger.type).toBe('on_page_load');
+        expect(attack.payload?.id).toBeTruthy();
+      }
+    });
+
+    it('hijack suite references all 3 hijack disruption IDs', () => {
+      const spec = expandSuite('hijack', mockTask);
+      const ids = spec.attacks.map(a => a.payload?.id);
+      expect(ids).toContain('auth_wall');
+      expect(ids).toContain('fake_search_result');
+      expect(ids).toContain('unavailable_redirect');
+    });
+
+    it('expands exfil suite with 7 attacks (3 static + 4 parameterized)', () => {
+      const spec = expandSuite('exfil', mockTask);
+
+      expect(spec.attacks).toHaveLength(7);
+    });
+
+    it('exfil suite first 3 attacks are static_js data_exfiltration', () => {
+      const spec = expandSuite('exfil', mockTask);
+      const staticAttacks = spec.attacks.slice(0, 3);
+
+      for (const attack of staticAttacks) {
+        expect(attack.primitive).toBe('static_js');
+        expect(attack.objective).toBe('data_exfiltration');
+        expect(attack.trigger.type).toBe('on_page_load');
+      }
+
+      const staticIds = staticAttacks.map(a => a.payload?.id);
+      expect(staticIds).toContain('session_check_modal');
+      expect(staticIds).toContain('session_expired_gate');
+      expect(staticIds).toContain('ai_search_helper');
+    });
+
+    it('exfil suite last 4 attacks are parameterized (not static_js)', () => {
+      const spec = expandSuite('exfil', mockTask);
+      const paramAttacks = spec.attacks.slice(3);
+
+      expect(paramAttacks).toHaveLength(4);
+      for (const attack of paramAttacks) {
+        expect(attack.primitive).not.toBe('static_js');
+      }
+    });
   });
 
   describe('createAttackRuntimeState', () => {
