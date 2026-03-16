@@ -89,7 +89,8 @@ describe('injectVisibleInlineText', () => {
 describe('injectHiddenCssText', () => {
   it('defaults to css_opacity concealment', () => {
     const { js, labels } = injectHiddenCssText(makeAttack({ primitive: 'inject_hidden_css_text' }));
-    expect(js).toContain('opacity:0');
+    // css_opacity uses sr-only pattern (opacity:0 is pruned by Playwright's accessibility tree)
+    expect(js).toContain('clip:rect(0,0,0,0)');
     expect(labels.concealment).toBe('css_opacity');
   });
 
@@ -107,7 +108,8 @@ describe('injectHiddenCssText', () => {
       primitive: 'inject_hidden_css_text',
       payload: { concealmentMode: 'zero_font' },
     }));
-    expect(js).toContain('font-size:0');
+    // zero_font uses sr-only pattern (font-size:0 is pruned by Playwright's accessibility tree)
+    expect(js).toContain('clip:rect(0,0,0,0)');
   });
 
   it('supports offscreen mode', () => {
