@@ -88,7 +88,7 @@ describe('AttackSpec types and expansion', () => {
       for (const attack of spec.attacks) {
         expect(attack.primitive).toBe('static_js');
         expect(attack.objective).toBe('navigation_hijack');
-        expect(attack.trigger.type).toBe('on_page_load');
+        expect(attack.trigger.type).toBe('after_navigation');
         expect(attack.payload?.id).toBeTruthy();
       }
     });
@@ -114,7 +114,7 @@ describe('AttackSpec types and expansion', () => {
       for (const attack of staticAttacks) {
         expect(attack.primitive).toBe('static_js');
         expect(attack.objective).toBe('data_exfiltration');
-        expect(attack.trigger.type).toBe('on_page_load');
+        expect(attack.trigger.type).toBe('after_navigation');
       }
 
       const staticIds = staticAttacks.map(a => a.payload?.id);

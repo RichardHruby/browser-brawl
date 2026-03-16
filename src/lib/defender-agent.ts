@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { observe, Laminar } from '@lmnr-ai/lmnr';
 import { getSession, createGate, type ServerGameSession } from './game-session-store';
 import { getDisruptionsForDifficulty, getDisruptionById } from './disruptions';
-import { injectJS, snapshotDOM, captureScreenshot, checkElementExists, registerPersistentScript } from './cdp';
+import { injectJS, snapshotDOM, captureScreenshot, checkElementExists } from './cdp';
 import { emitEvent } from './sse-emitter';
 import { nanoid } from 'nanoid';
 import { getAnthropicApiKey } from './env';
@@ -103,30 +103,6 @@ async function runSpecDrivenLoop(gameId: string): Promise<void> {
 
   log(`[defender-spec] loop started — ${spec.attacks.length} attacks, budget: ${maxInterventions === Infinity ? 'unlimited' : maxInterventions}`);
 
-  // Register static_js scripts via Page.addScriptToEvaluateOnNewDocument (before tick loop)
-  // These persist across navigations and have their own internal trigger logic.
-  const staticAttacks = spec.attacks.filter(a => a.primitive === 'static_js');
-  for (const attack of staticAttacks) {
-    const disruption = getStaticDisruption(attack.payload?.id as string);
-    if (disruption) {
-      const ok = await registerPersistentScript(session.cdpUrl, disruption.js);
-      log(`[defender-spec] static script '${disruption.id}' registered: ${ok}`);
-      emitEvent<DefenderDisruptionPayload>(gameId, 'defender_disruption', {
-        disruptionId: disruption.id,
-        disruptionName: disruption.id.replace(/_/g, ' '),
-        description: disruption.description,
-        healthDamage: 0,
-        success: ok,
-        reasoning: 'Static persistent script registered via Page.addScriptToEvaluateOnNewDocument',
-        attackFamily: disruption.objective,
-        objective: disruption.objective,
-        concealment: 'visible',
-        authority: 'security',
-        placement: attack.placement,
-      });
-    }
-  }
-
   // Set up on_interval attacks with their own setInterval handles
   for (let i = 0; i < spec.attacks.length; i++) {
     const attack = spec.attacks[i];
@@ -161,9 +137,6 @@ async function runSpecDrivenLoop(gameId: string): Promise<void> {
       const persistence = attack.persistence ?? 'one_shot';
       if (persistence === 'one_shot' && state.firedAttackIndices.has(i)) continue;
 
-      // Skip static_js attacks — registered above, have their own internal trigger logic
-      if (attack.primitive === 'static_js') continue;
-
       // Skip interval triggers (handled by setInterval above)
       if (attack.trigger.type === 'on_interval') continue;
 
@@ -192,7 +165,8 @@ async function runSpecDrivenLoop(gameId: string): Promise<void> {
   log(`[defender-spec] loop ended — fired ${state.firedCount} attacks`);
 
   // Post-hoc judge for static disruptions: scan all attacker steps for canary leakage + hijack
-  if (staticAttacks.length > 0) {
+  const hasStaticAttacks = spec.attacks.some(a => a.primitive === 'static_js');
+  if (hasStaticAttacks) {
     const s = getSession(gameId);
     if (s) {
       const taskDomain = (() => {
@@ -318,7 +292,25 @@ async function fireSpecAttack(
   let disruptionName: string;
   let description: string;
 
-  if (isPromptInjectionPrimitive(attack.primitive)) {
+  if (attack.primitive === 'static_js') {
+    // Static JS disruption — inject via Runtime.evaluate on each navigation.
+    // The script's internal localStorage/sessionStorage idempotency prevents duplicate modals.
+    const disruption = getStaticDisruption(attack.payload?.id as string);
+    if (!disruption) {
+      logWarn(`[defender-spec] unknown static disruption ID: ${attack.payload?.id}`);
+      return;
+    }
+    js = disruption.js;
+    labels = {
+      objective: attack.objective,
+      concealment: attack.concealment ?? 'visible',
+      authority: attack.authority ?? 'none',
+      placement: attack.placement,
+    };
+    disruptionId = disruption.id;
+    disruptionName = disruption.id.replace(/_/g, ' ');
+    description = disruption.description;
+  } else if (isPromptInjectionPrimitive(attack.primitive)) {
     // Prompt injection primitive — use our new library
     const result = generatePrimitive(attack);
     if (!result) {
