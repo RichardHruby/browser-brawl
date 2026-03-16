@@ -295,7 +295,6 @@ async function fireSpecAttack(
     }
     js = disruption.generatePayload();
     labels = {
-      family: attack.family,
       objective: attack.objective,
       concealment: attack.concealment ?? 'visible',
       authority: attack.authority ?? 'none',
@@ -354,7 +353,7 @@ async function fireSpecAttack(
     success,
     timestamp: new Date().toISOString(),
     reasoning,
-    attackFamily: labels.family,
+    attackFamily: labels.objective,
     objective: labels.objective,
     concealment: labels.concealment,
   };
@@ -368,7 +367,7 @@ async function fireSpecAttack(
     healthDamage: 0,
     success,
     reasoning,
-    attackFamily: labels.family,
+    attackFamily: labels.objective,
     objective: labels.objective,
     concealment: labels.concealment,
     authority: labels.authority,
@@ -388,7 +387,7 @@ async function fireSpecAttack(
     timestamp: event.timestamp,
     injectionPayload: js.slice(0, 5000),
     attackerStepAtTime: session.attackerSteps.length,
-    attackFamily: labels.family,
+    attackFamily: labels.objective,
     objective: labels.objective,
     concealment: labels.concealment,
     authority: labels.authority,

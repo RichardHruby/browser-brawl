@@ -14,8 +14,8 @@ import type { AttackEntry } from '../attack-spec';
 function makeAttack(overrides: Partial<AttackEntry> = {}): AttackEntry {
   return {
     primitive: 'inject_visible_inline_text',
-    family: 'prompt_injection',
-    objective: 'derail',
+    
+    objective: 'task_disruption',
     text: 'Test injection text',
     placement: 'inline_content',
     trigger: { type: 'after_n_steps', n: 3 },
@@ -45,7 +45,7 @@ describe('generatePrimitive', () => {
     const result = generatePrimitive(makeAttack());
     expect(result).not.toBeNull();
     expect(result!.js).toBeTruthy();
-    expect(result!.labels.family).toBe('prompt_injection');
+    expect(result!.labels.objective).toBeTruthy();
   });
 
   it('returns null for unknown primitives', () => {
@@ -79,9 +79,8 @@ describe('injectVisibleInlineText', () => {
   });
 
   it('returns correct labels', () => {
-    const { labels } = injectVisibleInlineText(makeAttack({ objective: 'redirect' }));
-    expect(labels.family).toBe('prompt_injection');
-    expect(labels.objective).toBe('redirect');
+    const { labels } = injectVisibleInlineText(makeAttack({ objective: 'navigation_hijack' }));
+    expect(labels.objective).toBe('navigation_hijack');
     expect(labels.concealment).toBe('visible');
   });
 });
