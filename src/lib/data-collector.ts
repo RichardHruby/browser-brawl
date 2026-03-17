@@ -56,7 +56,7 @@ export function createGameRecord(params: {
 export function finalizeGame(params: {
   gameId: string;
   winner: 'attacker' | 'defender';
-  winReason: 'task_complete' | 'health_depleted' | 'aborted';
+  winReason: 'task_complete' | 'health_depleted' | 'aborted' | 'time_limit';
   healthFinal: number;
   durationSeconds: number;
 }): void {

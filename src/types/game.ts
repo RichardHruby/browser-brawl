@@ -52,6 +52,7 @@ export interface DisruptionEvent {
   success: boolean;
   timestamp: string;
   reasoning: string;
+  injectionPayload?: string;
   // Structured labels (present when attackSpec is used)
   attackFamily?: string;
   objective?: string;
@@ -103,4 +104,5 @@ export interface ClientGameState {
   attackerStepsPerTurn: number;
   defenderSteps: DefenderStep[];
   defenderNextAttackIn: number | null;
+  defenderMode: 'disruption' | 'hijack' | 'data_exfiltration' | null;
 }

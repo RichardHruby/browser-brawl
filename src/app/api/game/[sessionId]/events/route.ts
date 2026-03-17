@@ -35,6 +35,7 @@ export async function GET(
           health: session.health,
           attackerStatus: session.attackerStatus,
           defenderStatus: session.defenderStatus,
+          defenderMode: session.defenderMode ?? null,
         },
       })}\n\n`;
       controller.enqueue(encoder.encode(welcome));

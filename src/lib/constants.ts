@@ -67,6 +67,7 @@ export const REASON_LABELS: Record<string, string> = {
   task_complete:   'Task completed successfully',
   health_depleted: 'Attacker health depleted',
   aborted:         'Battle aborted',
+  time_limit:      'Time limit reached',
 };
 
 // ── Winner labels (compact, for tables) ──

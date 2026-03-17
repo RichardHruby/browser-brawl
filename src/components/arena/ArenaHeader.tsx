@@ -17,9 +17,11 @@ interface Props {
   attackerStepsPerTurn: number;
   difficulty: Difficulty;
   attackerType: AttackerType;
+  defenderMode: 'disruption' | 'hijack' | 'data_exfiltration' | null;
 }
 
-export function ArenaHeader({ health, elapsed, task, onAbort, mode, currentTurn, turnNumber, attackerStepsThisTurn, attackerStepsPerTurn, difficulty, attackerType }: Props) {
+export function ArenaHeader({ health, elapsed, task, onAbort, mode, currentTurn, turnNumber, attackerStepsThisTurn, attackerStepsPerTurn, difficulty, attackerType, defenderMode }: Props) {
+  const isTimeLimitMode = defenderMode === 'hijack' || defenderMode === 'data_exfiltration';
   const diffColor = DIFFICULTY_COLORS[difficulty];
   const attackerTypeColor = ATTACKER_TYPE_COLORS[attackerType];
   return (
@@ -72,8 +74,8 @@ export function ArenaHeader({ health, elapsed, task, onAbort, mode, currentTurn,
         </div>
       </div>
 
-      {/* Health bar row */}
-      <HealthBar health={health} />
+      {/* Health bar — hidden for hijack/exfil (time-limit modes have no health) */}
+      {!isTimeLimitMode && <HealthBar health={health} />}
 
       {/* Turn indicator (turn-based mode only) */}
       {mode === 'turnbased' && currentTurn && (

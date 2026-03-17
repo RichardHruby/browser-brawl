@@ -22,7 +22,7 @@ export interface ServerGameSession {
   attackerSteps: AgentEvent[];
   defenderDisruptions: DisruptionEvent[];
   winner: 'attacker' | 'defender' | null;
-  winReason: 'task_complete' | 'health_depleted' | 'aborted' | null;
+  winReason: 'task_complete' | 'health_depleted' | 'aborted' | 'time_limit' | null;
   // Turn-based mode fields
   mode: GameMode;
   currentTurn: TurnOwner | null;
@@ -38,6 +38,7 @@ export interface ServerGameSession {
   defenderLoopHandle: ReturnType<typeof setTimeout> | null;
   defenderCooldowns: Map<string, number>;
   healthDecayHandle: ReturnType<typeof setInterval> | null;
+  timeLimitHandle: ReturnType<typeof setTimeout> | null;
   attackerAbort: AbortController | null;
   stopNetworkCapture: (() => void) | null;
   knownStepIds: Set<string>;
@@ -49,6 +50,11 @@ export interface ServerGameSession {
   attackSuite?: AttackSuite;
   agentSecrets?: Record<string, string>;
   attackRuntimeState?: AttackRuntimeState;
+  // Lobby defender config (bypasses AttackSpec — guides regular LLM defender loop)
+  defenderMode?: 'disruption' | 'hijack' | 'data_exfiltration';
+  defenderSystemPrompt?: string;
+  defenderHijackTarget?: string;
+  stepToolOutputs: string[]; // raw tool result strings for post-game verifier
 }
 
 // Global singleton store — survives across API route invocations in the same process
@@ -88,6 +94,9 @@ export function createSession(params: {
   attackSpec?: AttackSpec;
   attackSuite?: AttackSuite;
   agentSecrets?: Record<string, string>;
+  defenderMode?: 'disruption' | 'hijack' | 'data_exfiltration';
+  defenderSystemPrompt?: string;
+  defenderHijackTarget?: string;
 }): ServerGameSession {
   const session: ServerGameSession = {
     ...params,
@@ -115,11 +124,13 @@ export function createSession(params: {
     defenderLoopHandle: null,
     defenderCooldowns: new Map(),
     healthDecayHandle: null,
+    timeLimitHandle: null,
     attackerAbort: null,
     stopNetworkCapture: null,
     knownStepIds: new Set(),
     buTaskId: null,
     buSessionId: null,
+    stepToolOutputs: [],
   };
   sessions.set(params.gameId, session);
   return session;

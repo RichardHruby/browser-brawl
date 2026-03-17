@@ -37,6 +37,7 @@ export const finalize = mutation({
       v.literal('task_complete'),
       v.literal('health_depleted'),
       v.literal('aborted'),
+      v.literal('time_limit'),
     ),
     healthFinal: v.number(),
     durationSeconds: v.number(),
