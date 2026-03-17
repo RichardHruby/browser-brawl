@@ -26,6 +26,7 @@ export default defineSchema({
         v.literal('task_complete'),
         v.literal('health_depleted'),
         v.literal('aborted'),
+        v.literal('time_limit'),
       ),
     ),
     attackerType: v.optional(v.string()),

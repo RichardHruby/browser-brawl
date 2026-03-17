@@ -37,6 +37,7 @@ const initial: ClientGameState = {
   attackerStepsPerTurn: 3,
   defenderSteps: [],
   defenderNextAttackIn: null,
+  defenderMode: null,
 };
 
 type Action =
@@ -68,8 +69,10 @@ function reducer(state: ClientGameState, action: Action): ClientGameState {
     case 'SSE_EVENT': {
       const { envelope } = action;
       switch (envelope.type) {
-        case 'connection_established':
-          return { ...state, phase: 'arena' };
+        case 'connection_established': {
+          const cp = envelope.payload as { defenderMode?: string | null };
+          return { ...state, phase: 'arena', defenderMode: (cp.defenderMode as ClientGameState['defenderMode']) ?? null };
+        }
 
         case 'attacker_step': {
           const p = envelope.payload as AttackerStepPayload;

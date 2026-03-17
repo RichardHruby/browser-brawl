@@ -32,6 +32,7 @@ export function ArenaScreen({ state, onAbort }: Props) {
         attackerStepsPerTurn={state.attackerStepsPerTurn}
         difficulty={state.difficulty}
         attackerType={state.attackerType}
+        defenderMode={state.defenderMode}
       />
 
       <main className="flex flex-1 gap-2 p-2 overflow-hidden min-h-0">

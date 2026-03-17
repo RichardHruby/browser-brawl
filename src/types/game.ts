@@ -103,4 +103,5 @@ export interface ClientGameState {
   attackerStepsPerTurn: number;
   defenderSteps: DefenderStep[];
   defenderNextAttackIn: number | null;
+  defenderMode: 'disruption' | 'hijack' | 'data_exfiltration' | null;
 }

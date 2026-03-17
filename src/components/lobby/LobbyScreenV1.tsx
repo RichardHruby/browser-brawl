@@ -8,7 +8,7 @@ import { ArenaSelector } from './ArenaSelector';
 import { DifficultyBar } from './DifficultyBar';
 import { ModeToggle } from './ModeToggle';
 import { ModelPicker } from './ModelPicker';
-import { DefenderConfig, type DefenderConfigState } from './DefenderConfig';
+import { DefenderConfig, DEFAULT_SECRETS, type DefenderConfigState } from './DefenderConfig';
 import { TASKS } from '@/lib/tasks';
 import type { AttackerType, Difficulty, GameMode, ModelId, ModelProvider, Task } from '@/types/game';
 
@@ -18,7 +18,7 @@ const DEFAULT_DEFENDER_CONFIG: DefenderConfigState = {
   mode: null,
   systemPrompt: '',
   hijackTarget: '',
-  secrets: [],
+  secrets: DEFAULT_SECRETS,
 };
 
 interface Props {

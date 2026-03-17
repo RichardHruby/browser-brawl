@@ -22,7 +22,7 @@ export interface ServerGameSession {
   attackerSteps: AgentEvent[];
   defenderDisruptions: DisruptionEvent[];
   winner: 'attacker' | 'defender' | null;
-  winReason: 'task_complete' | 'health_depleted' | 'aborted' | null;
+  winReason: 'task_complete' | 'health_depleted' | 'aborted' | 'time_limit' | null;
   // Turn-based mode fields
   mode: GameMode;
   currentTurn: TurnOwner | null;
@@ -38,6 +38,7 @@ export interface ServerGameSession {
   defenderLoopHandle: ReturnType<typeof setTimeout> | null;
   defenderCooldowns: Map<string, number>;
   healthDecayHandle: ReturnType<typeof setInterval> | null;
+  timeLimitHandle: ReturnType<typeof setTimeout> | null;
   attackerAbort: AbortController | null;
   stopNetworkCapture: (() => void) | null;
   knownStepIds: Set<string>;
@@ -123,6 +124,7 @@ export function createSession(params: {
     defenderLoopHandle: null,
     defenderCooldowns: new Map(),
     healthDecayHandle: null,
+    timeLimitHandle: null,
     attackerAbort: null,
     stopNetworkCapture: null,
     knownStepIds: new Set(),
